@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+
+      - name: Install Dependencies
+        run: uv sync --all-groups
+
+      - name: Run Ruff Lint Check
+        run: uv run ruff check .
+
+      - name: Run Ruff Format Check
+        run: uv run ruff format --check .
+
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Dependencies
+        run: uv sync --all-groups
+
+      - name: Run Pytest Suite with Coverage
+        run: uv run pytest -v --cov=hooks --cov-report=term-missing
+
+  validate:
+    name: Plugin Manifest & Zero-Dependency Hook Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+
+      - name: Validate Plugin & Hook Manifests
+        run: |
+          python3 -c "import json; json.load(open('plugin.json'))"
+          python3 -c "import json; json.load(open('hooks.json'))"
+
+      - name: Verify Zero-Dependency Runtime Hook Invariant (Bare Python 3)
+        run: |
+          # Test auto_approve_gate with mock stdin using system Python without virtualenv
+          echo '{"toolCall":{"name":"view_file","args":{"AbsolutePath":"/tmp/test"}},"workspacePaths":["/tmp"],"stepIdx":0}' | python3 hooks/auto_approve_gate.py
+          # Test pre_invocation hook with mock stdin
+          echo '{"conversationId":"test-ci","artifactDirectoryPath":"/tmp"}' | python3 hooks/pre_invocation.py
+          # Test policy configuration CLI
+          python3 skills/auto-permissions-configure/scripts/configure_permissions.py --list

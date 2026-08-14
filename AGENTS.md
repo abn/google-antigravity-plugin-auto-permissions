@@ -35,6 +35,14 @@ auto-permissions/
 ├── uv.lock                                  # Deterministic dependency lockfile
 ├── plugin.json                              # Plugin manifest (version, author, description)
 ├── hooks.json                               # PreToolUse lifecycle hook declaration
+├── .pre-commit-config.yaml                  # Pre-commit git hooks configuration
+├── release-please-config.json               # Release Please automation config
+├── .release-please-manifest.json            # Release Please package versions
+├── .github/
+│   ├── dependabot.yml                       # Weekly grouped dependency & actions updater
+│   └── workflows/
+│       ├── ci.yml                           # Matrix testing, linting, and hook validation
+│       └── release.yml                      # Automated semantic versioning & release PRs
 ├── .agents/
 │   └── auto-permissions.json               # Project-level static ACL policy grants
 ├── hooks/
