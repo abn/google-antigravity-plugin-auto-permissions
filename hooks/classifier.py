@@ -74,9 +74,23 @@ def format_classifier_payload(
     """Formats minimal sanitized context into structured XML for the security classifier."""
     prior_section = ""
     if prior_prompts:
-        history_lines = "\n".join(
-            f"- [Turn -{len(prior_prompts) - i}]: {p.strip()}" for i, p in enumerate(prior_prompts)
-        )
+        lines = []
+        anchor = None
+        relative_prompts = []
+        for p in prior_prompts:
+            if p.startswith("[Session Goal / Turn 0]: "):
+                anchor = p[len("[Session Goal / Turn 0]: ") :].strip()
+            else:
+                relative_prompts.append(p)
+
+        if anchor:
+            lines.append(f"- [Session Goal / Turn 0]: {anchor}")
+
+        for i, p in enumerate(relative_prompts):
+            turn_idx = len(relative_prompts) - i
+            lines.append(f"- [Turn -{turn_idx}]: {p.strip()}")
+
+        history_lines = "\n".join(lines)
         prior_section = f"""<prior_user_prompts>
 {history_lines}
 </prior_user_prompts>

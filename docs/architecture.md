@@ -133,11 +133,11 @@ The plugin implements a **4-Tier Permission Taxonomy** mapped directly to Antigr
 
 ## 5. Context Extraction & XML Payload Schema
 
-### 5.1 Token-Efficient Multi-Turn Prompt History
-To resolve referential commands (e.g. *"Proceed"*, *"Run it again"*, *"Delete that old migration"*) without context bloat:
-1. The parser seeks backwards in `transcript.jsonl`.
-2. It extracts up to 4 prior `USER_INPUT` steps and separates them from `<active_user_prompt>`.
-3. All intermediate assistant responses and tool outputs are discarded.
+### 5.1 Token-Efficient Multi-Turn Prompt History & Session Anchor Pattern
+To resolve referential commands (e.g. *"Proceed"*, *"Run it again"*, *"Delete that old migration"*) and standing session goals (e.g. *"Push changes as you go to origin"*) across long conversations:
+1. **Session Anchor (Turn 0):** The parser always extracts and preserves the very first prompt of the conversation (`[Session Goal / Turn 0]`). This ensures session-wide directives remain visible across 50+ turns without drifting out of context.
+2. **Rolling Recent Turns (`max_history = 4`):** Extracts the most recent 4 user prompt turns (`[Turn -4]` through `[Turn -1]`) to resolve immediate context.
+3. **Decoupled Sanitization:** All intermediate assistant responses, CoT reasoning, and previous tool outputs are discarded, eliminating token bloat and indirect prompt injection vectors.
 
 ### 5.2 Formatted Payload Sent to Gemini
 
@@ -147,6 +147,7 @@ To resolve referential commands (e.g. *"Proceed"*, *"Run it again"*, *"Delete th
 </workspace_roots>
 
 <prior_user_prompts>
+- [Session Goal / Turn 0]: "Refactor authentication module and push changes as you go to origin"
 - [Turn -2]: "We need to test the user authentication workflow in test_auth.py"
 - [Turn -1]: "The mock credentials test failed due to timeout"
 </prior_user_prompts>

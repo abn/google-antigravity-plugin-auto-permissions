@@ -42,10 +42,11 @@ def read_user_prompts_from_transcript(
 ) -> tuple[list[str], str | None]:
     """
     Parses transcript.jsonl to extract prior user prompts and the active user prompt.
+    Preserves initial Turn 0 (Session Goal / Anchor) if conversation exceeds max_history turns.
 
     Returns:
         Tuple of (prior_prompts, active_prompt):
-        - prior_prompts: List of previous user prompts in chronological order
+        - prior_prompts: List of previous user prompts (Turn 0 anchor + rolling recent turns)
         - active_prompt: Most recent user prompt, or None if not found
     """
     if not transcript_path or not os.path.isfile(transcript_path):
@@ -70,6 +71,21 @@ def read_user_prompts_from_transcript(
         return [], None
 
     active_prompt = user_prompts[-1]
-    prior_prompts = user_prompts[-(max_history + 1) : -1] if len(user_prompts) > 1 else []
+    all_priors = user_prompts[:-1]
+
+    if not all_priors:
+        return [], active_prompt
+
+    if len(all_priors) <= max_history:
+        return all_priors, active_prompt
+
+    # Conversation exceeds max_history: preserve Turn 0 Session Goal + rolling recent turns
+    session_anchor = all_priors[0]
+    rolling_recent = all_priors[-max_history:]
+
+    if session_anchor not in rolling_recent:
+        prior_prompts = [f"[Session Goal / Turn 0]: {session_anchor}"] + rolling_recent
+    else:
+        prior_prompts = rolling_recent
 
     return prior_prompts, active_prompt

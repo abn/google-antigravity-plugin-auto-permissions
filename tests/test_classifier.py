@@ -35,6 +35,25 @@ class TestClassifier(unittest.TestCase):
         self.assertIn("Summary: Run tests", payload)
         self.assertIn("Action Intent: Running test suite for auth module", payload)
 
+    def test_format_classifier_payload_with_session_anchor(self):
+        payload = format_classifier_payload(
+            workspace_paths=["/tmp"],
+            prior_prompts=[
+                "[Session Goal / Turn 0]: Refactor auth and push changes as you go to origin",
+                "Fix button CSS",
+                "Update unit tests",
+            ],
+            active_prompt="Verify and push changes",
+            tool_name="run_command",
+            tool_args={"CommandLine": "git push origin main"},
+        )
+        self.assertIn(
+            "- [Session Goal / Turn 0]: Refactor auth and push changes as you go", payload
+        )
+        self.assertIn("- [Turn -2]: Fix button CSS", payload)
+        self.assertIn("- [Turn -1]: Update unit tests", payload)
+        self.assertIn("Tool: run_command", payload)
+
     @patch("urllib.request.urlopen")
     def test_classify_tool_call_mock_success(self, mock_urlopen):
         mock_response = MagicMock()

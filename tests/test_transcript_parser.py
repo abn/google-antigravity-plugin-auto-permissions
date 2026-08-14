@@ -50,6 +50,38 @@ class TestTranscriptParser(unittest.TestCase):
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
+    def test_read_user_prompts_turn0_preservation(self):
+        with tempfile.NamedTemporaryFile("w+", suffix=".jsonl", delete=False) as f:
+            lines = [
+                {"type": "USER_INPUT", "content": "Turn 0: Push changes as you go to origin"},
+                {"type": "USER_INPUT", "content": "Turn 1: Add login page"},
+                {"type": "USER_INPUT", "content": "Turn 2: Fix styling"},
+                {"type": "USER_INPUT", "content": "Turn 3: Update colors"},
+                {"type": "USER_INPUT", "content": "Turn 4: Fix responsive layout"},
+                {"type": "USER_INPUT", "content": "Turn 5: Update tests"},
+                {"type": "USER_INPUT", "content": "Turn 6: Final check"},
+            ]
+            for step_record in lines:
+                f.write(json.dumps(step_record) + "\n")
+            temp_path = f.name
+
+        try:
+            # max_history = 3, so prior prompts should contain Turn 0 + rolling Turns 3, 4, 5
+            prior, active = read_user_prompts_from_transcript(temp_path, max_history=3)
+            self.assertEqual(active, "Turn 6: Final check")
+            self.assertEqual(
+                prior,
+                [
+                    "[Session Goal / Turn 0]: Turn 0: Push changes as you go to origin",
+                    "Turn 3: Update colors",
+                    "Turn 4: Fix responsive layout",
+                    "Turn 5: Update tests",
+                ],
+            )
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
 
 if __name__ == "__main__":
     unittest.main()
