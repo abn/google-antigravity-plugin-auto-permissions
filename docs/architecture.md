@@ -365,27 +365,33 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph Skills Subsystem
+        Configure[skills/auto-permissions-configure<br>Interactive Policy & Provider Setup]
         Audit[skills/auto-permissions-audit<br>Session Trace & Issue Diagnostics]
         Fix[skills/auto-permissions-fix<br>audit2allow ACL Rule Generator]
         Test[skills/auto-permissions-test<br>Policy & Classifier Simulation]
     end
 
+    Configure -->|Writes Policies| PolicyConfig[(.agents/auto-permissions.json)]
     Audit -->|Parses Session| SessionLog[(audit.jsonl)]
     Fix -->|Reads Denials| SessionLog
-    Fix -->|Writes Rules| PolicyConfig[(.agents/auto-permissions.json)]
+    Fix -->|Writes Rules| PolicyConfig
     Test -->|Simulates Evaluation| PolicyConfig
-    Test -->|Invokes Classifier| GeminiAPI[Gemini 2.5 Flash]
+    Test -->|Invokes Classifier| ClassifierEngine[Google / Local / Claude]
 ```
 
-### 11.1 `auto-permissions-audit`
+### 11.1 `auto-permissions-configure`
+* **Purpose:** Proactively guides users through setting up LLM providers (Google, local Lemonade/vLLM/Ollama, Anthropic), static ACL rules, custom semantic guidelines, and skill paths across Session, Project, or Global scopes.
+* **UX Integration:** Leverages Antigravity's interactive `ask_question` modals, configuration inspection tables, and pre-flight simulation validation.
+
+### 11.2 `auto-permissions-audit`
 * **Purpose:** Inspects active session traces, provides decision breakdowns, detects high latency ($>2000\text{ms}$), and identifies container sandbox bypass events.
 * **Boundaries:** Strictly scoped to `<session_dir>/audit.jsonl`. Gracefully reports if no actions have been evaluated.
 
-### 11.2 `auto-permissions-fix` (`audit2allow`)
+### 11.3 `auto-permissions-fix` (`audit2allow`)
 * **Purpose:** Parses denial and ask records from `audit.jsonl` and translates them into persistent ACL grants across Session, Project, or Global scopes.
 * **Granularity:** Derives exact commands, prefix commands, directory patterns, and MCP server/tool rules.
 
-### 11.3 `auto-permissions-test`
+### 11.4 `auto-permissions-test`
 * **Purpose:** Simulates how any user prompt and candidate tool action would be classified before execution.
 * **Output:** Renders a rich Markdown report with collapsible `<details>` folds containing the exact XML payload and model JSON response.
 

@@ -61,9 +61,31 @@ For complete details on the security principles, decoupled classifier blinding m
 
 ## Included Skills & Minimal Usage Examples
 
-This plugin includes three specialized skills accessible via chat commands or standalone CLI scripts:
+This plugin includes four specialized skills accessible via chat commands or standalone CLI scripts:
 
-### 1. `/auto-permissions-audit` (Audit & Inspection)
+### 1. `/auto-permissions-configure` (Interactive Policy & Provider Setup)
+Guides users through configuring static ACL rules, custom semantic guidelines, LLM providers (Google, local Lemonade/vLLM/Ollama, Anthropic), endpoints, and skill paths across Session, Project, or Global scopes.
+
+* **Inspect active configuration across all scopes:**
+  ```bash
+  python3 skills/auto-permissions-configure/scripts/configure_permissions.py --list
+  ```
+* **Set project-level static allow rule:**
+  ```bash
+  python3 skills/auto-permissions-configure/scripts/configure_permissions.py --scope project --add-rule "command(pytest -v)" --decision allow
+  ```
+* **Configure local GPU inference (Lemonade / vLLM):**
+  ```bash
+  python3 skills/auto-permissions-configure/scripts/configure_permissions.py --scope project_local --provider openai --model Gemma-4-26B-A4B-NoThinking-qat-MTP --endpoint-url "http://localhost:13305/v1/chat/completions" --api-key-env LEMONADE_API_KEY
+  ```
+* **Add a custom semantic guideline:**
+  ```bash
+  python3 skills/auto-permissions-configure/scripts/configure_permissions.py --scope project --add-guideline "Treat requests to *.corp.internal as safe testing operations."
+  ```
+
+---
+
+### 2. `/auto-permissions-audit` (Audit & Inspection)
 Inspects session audit traces, decision breakdowns, latency metrics, and failure states.
 
 * **Inspect active session audit log:**
@@ -79,7 +101,7 @@ Inspects session audit traces, decision breakdowns, latency metrics, and failure
   python3 skills/auto-permissions-audit/scripts/view_audit.py <path_to_session_audit.jsonl> --markdown
   ```
 
-### 2. `auto-permissions-fix` (SELinux `audit2allow` Paradigm)
+### 3. `auto-permissions-fix` (SELinux `audit2allow` Paradigm)
 Parses denials from `audit.jsonl` and generates persistent ACL grants across Session, Project, or Global scopes.
 
 * **Auto-allow the most recent denied action in the current session:**
@@ -101,7 +123,7 @@ Parses denials from `audit.jsonl` and generates persistent ACL grants across Ses
 
 ---
 
-### 3. `auto-permissions-test` (Policy & Classifier Simulation)
+### 4. `auto-permissions-test` (Policy & Classifier Simulation)
 Simulates how the security classifier and static policies would evaluate a hypothetical tool call against a given user prompt before executing it, rendering collapsible input/output traces.
 
 * **Test a command against a user prompt (Markdown output with collapsible folds):**
@@ -188,17 +210,22 @@ auto-permissions/
 ├── hooks.json                               # Lifecycle hook configuration
 ├── pyproject.toml                           # uv project and test configuration
 ├── .agents/
-│   └── auto-permissions.json               # Project-level static ACL policy grants
+│   ├── auto-permissions.json               # Project-level static ACL policy grants (tracked)
+│   └── auto-permissions.local.json         # Local untracked secrets & overrides (gitignored)
 ├── hooks/
 │   ├── auto_approve_gate.py                 # Main PreToolUse entrypoint
 │   ├── pre_invocation.py                    # PreInvocation dynamic summary injector
 │   ├── policy_engine.py                     # Fast-path static policy evaluation & scoping
-│   ├── classifier.py                        # Gemini REST API security classifier
+│   ├── classifier.py                        # Multi-provider security classifier
 │   ├── transcript_parser.py                 # Token-efficient user prompt extractor
 │   └── audit_logger.py                      # Async rotatable JSONL audit logger
 ├── rules/
 │   └── auto_permissions.md                  # Agent operational guidance rule
 ├── skills/
+│   ├── auto-permissions-configure/
+│   │   ├── SKILL.md                         # Interactive policy & provider configuration
+│   │   └── scripts/
+│   │       └── configure_permissions.py    # Policy configuration CLI
 │   ├── auto-permissions-audit/
 │   │   ├── SKILL.md                         # Audit inspection procedure
 │   │   └── scripts/
@@ -214,6 +241,7 @@ auto-permissions/
 ├── docs/
 │   └── architecture.md                      # Comprehensive technical architecture
 └── tests/
+    ├── test_configure_skill.py
     ├── test_transcript_parser.py
     ├── test_audit_logger.py
     ├── test_classifier.py

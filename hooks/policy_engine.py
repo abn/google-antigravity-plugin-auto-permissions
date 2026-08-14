@@ -610,6 +610,30 @@ def save_policy_file(file_path: str, policy: dict[str, list[str]]) -> None:
         json.dump(policy, f, indent=2)
 
 
+def resolve_scope_file_path(
+    scope: str,
+    workspace_dir: str | None = None,
+    session_dir: str | None = None,
+) -> str:
+    """Resolves target configuration file path for a given scope."""
+    scope = scope.lower()
+    if scope == "session":
+        if not session_dir:
+            msg = "Session directory is required for session-scope configuration."
+            raise ValueError(msg)
+        return os.path.join(session_dir, SESSION_OVERRIDES_FILENAME)
+    if scope in ("project_local", "local"):
+        ws = workspace_dir or os.getcwd()
+        return os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH)
+    if scope == "project":
+        ws = workspace_dir or os.getcwd()
+        return os.path.join(ws, PROJECT_CONFIG_REL_PATH)
+    if scope == "global":
+        return GLOBAL_CONFIG_PATH
+    msg = f"Invalid scope '{scope}'. Must be 'session', 'project_local', 'project', or 'global'."
+    raise ValueError(msg)
+
+
 def add_rule_to_scope(
     rule_str: str,
     decision: str,
@@ -618,7 +642,7 @@ def add_rule_to_scope(
     session_dir: str | None = None,
 ) -> str:
     """
-    Adds a rule to the specified policy scope ('session', 'project', 'global').
+    Adds a rule to the specified policy scope ('session', 'project_local', 'project', 'global').
     Returns the file path written to.
     """
     decision = decision.lower()
@@ -626,20 +650,9 @@ def add_rule_to_scope(
         msg = f"Invalid decision '{decision}'. Must be allow, ask, or deny."
         raise ValueError(msg)
 
-    if scope == "session":
-        if not session_dir:
-            msg = "Session directory is required for session-scope rule."
-            raise ValueError(msg)
-        target_path = os.path.join(session_dir, SESSION_OVERRIDES_FILENAME)
-    elif scope == "project":
-        ws = workspace_dir or os.getcwd()
-        target_path = os.path.join(ws, PROJECT_CONFIG_REL_PATH)
-    elif scope == "global":
-        target_path = GLOBAL_CONFIG_PATH
-    else:
-        msg = f"Invalid scope '{scope}'. Must be session, project, or global."
-        raise ValueError(msg)
-
+    target_path = resolve_scope_file_path(
+        scope, workspace_dir=workspace_dir, session_dir=session_dir
+    )
     policy = load_policy_file(target_path)
     if rule_str not in policy[decision]:
         # Remove from other buckets if present
@@ -649,6 +662,113 @@ def add_rule_to_scope(
         policy[decision].append(rule_str)
         save_policy_file(target_path, policy)
 
+    return target_path
+
+
+def remove_rule_from_scope(
+    rule_str: str,
+    scope: str,
+    workspace_dir: str | None = None,
+    session_dir: str | None = None,
+) -> str:
+    """Removes a static rule from the specified scope file."""
+    target_path = resolve_scope_file_path(
+        scope, workspace_dir=workspace_dir, session_dir=session_dir
+    )
+    policy = load_policy_file(target_path)
+    modified = False
+    for bucket in ("allow", "ask", "deny"):
+        if rule_str in policy.get(bucket, []):
+            policy[bucket].remove(rule_str)
+            modified = True
+    if modified:
+        save_policy_file(target_path, policy)
+    return target_path
+
+
+def add_guideline_to_scope(
+    guideline: str,
+    scope: str,
+    workspace_dir: str | None = None,
+    session_dir: str | None = None,
+) -> str:
+    """Adds a custom semantic guideline to the specified scope file."""
+    clean_g = guideline.strip()
+    if not clean_g:
+        msg = "Guideline text cannot be empty."
+        raise ValueError(msg)
+
+    target_path = resolve_scope_file_path(
+        scope, workspace_dir=workspace_dir, session_dir=session_dir
+    )
+    policy = load_policy_file(target_path)
+    guidelines = policy.get("custom_guidelines", [])
+    if clean_g not in guidelines:
+        guidelines.append(clean_g)
+        policy["custom_guidelines"] = guidelines
+        save_policy_file(target_path, policy)
+    return target_path
+
+
+def remove_guideline_from_scope(
+    guideline: str,
+    scope: str,
+    workspace_dir: str | None = None,
+    session_dir: str | None = None,
+) -> str:
+    """Removes a custom semantic guideline from the specified scope file."""
+    clean_g = guideline.strip()
+    target_path = resolve_scope_file_path(
+        scope, workspace_dir=workspace_dir, session_dir=session_dir
+    )
+    policy = load_policy_file(target_path)
+    guidelines = policy.get("custom_guidelines", [])
+    if clean_g in guidelines:
+        guidelines.remove(clean_g)
+        policy["custom_guidelines"] = guidelines
+        save_policy_file(target_path, policy)
+    return target_path
+
+
+def add_skill_path_to_scope(
+    path_str: str,
+    scope: str,
+    workspace_dir: str | None = None,
+    session_dir: str | None = None,
+) -> str:
+    """Adds an allowed skill path to the specified scope file."""
+    clean_p = path_str.strip()
+    if not clean_p:
+        msg = "Skill path cannot be empty."
+        raise ValueError(msg)
+
+    target_path = resolve_scope_file_path(
+        scope, workspace_dir=workspace_dir, session_dir=session_dir
+    )
+    policy = load_policy_file(target_path)
+    paths = policy.get("allowed_skill_paths", [])
+    if clean_p not in paths:
+        paths.append(clean_p)
+        policy["allowed_skill_paths"] = paths
+        save_policy_file(target_path, policy)
+    return target_path
+
+
+def update_classifier_settings_in_scope(
+    settings: dict[str, Any],
+    scope: str,
+    workspace_dir: str | None = None,
+    session_dir: str | None = None,
+) -> str:
+    """Updates provider, model, endpoint_url, api_key, api_key_env in specified scope."""
+    target_path = resolve_scope_file_path(
+        scope, workspace_dir=workspace_dir, session_dir=session_dir
+    )
+    policy = load_policy_file(target_path)
+    for k in ("provider", "model", "endpoint_url", "api_key", "api_key_env"):
+        if k in settings:
+            policy[k] = settings[k]
+    save_policy_file(target_path, policy)
     return target_path
 
 

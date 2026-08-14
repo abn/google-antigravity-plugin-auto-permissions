@@ -48,6 +48,10 @@ auto-permissions/
 ├── rules/
 │   └── auto_permissions.md                  # Workspace rules for the agent
 ├── skills/
+│   ├── auto-permissions-configure/
+│   │   ├── SKILL.md                         # Interactive policy & provider configuration
+│   │   └── scripts/
+│   │       └── configure_permissions.py    # Policy configuration CLI
 │   ├── auto-permissions-audit/
 │   │   ├── SKILL.md                         # Audit inspection instructions
 │   │   └── scripts/
@@ -63,9 +67,10 @@ auto-permissions/
 ├── docs/
 │   └── architecture.md                      # Comprehensive design specification
 ├── tests/
+│   ├── test_configure_skill.py              # Unit tests for policy configuration skill
 │   ├── test_transcript_parser.py            # Unit tests for transcript parser
 │   ├── test_audit_logger.py                 # Unit tests for audit log & rotation
-│   ├── test_classifier.py                   # Unit tests for classifier prompt & mocks
+│   ├── test_classifier.py                   # Unit tests for multi-provider classifier
 │   ├── test_policy_engine.py                # Unit tests for static ACL policy engine
 │   ├── test_pre_invocation.py               # Unit tests for PreInvocation hook
 │   ├── test_fix_permissions.py              # Unit tests for audit2allow rule derivation
