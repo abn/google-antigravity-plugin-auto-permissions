@@ -1,3 +1,9 @@
+---
+name: auto-permissions
+description: Auto-permissions security gate rules and operational guidelines for autonomous tool execution.
+always_on: true
+---
+
 # Auto-Permissions Security Gate Rules
 
 This workspace is protected by the **Auto-Permissions Classifier Plugin**, which emulates Claude Code's Auto-Mode security moderator.
