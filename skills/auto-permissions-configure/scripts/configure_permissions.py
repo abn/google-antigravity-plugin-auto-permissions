@@ -279,7 +279,14 @@ def main():
     args = parser.parse_args()
 
     workspace_dir = os.path.abspath(args.workspace)
-    session_dir = os.path.abspath(args.session_dir) if args.session_dir else None
+    session_dir = (
+        os.path.abspath(args.session_dir)
+        if args.session_dir
+        else os.environ.get("AUTO_PERMISSIONS_SESSION_DIR")
+        or os.environ.get("ANTIGRAVITY_ARTIFACT_DIR")
+    )
+    if session_dir:
+        session_dir = os.path.abspath(session_dir)
     scope = args.scope
 
     actions_performed = []
