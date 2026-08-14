@@ -52,6 +52,60 @@ class TestPackagePlugin(unittest.TestCase):
                     self.assertNotIn(".venv", name)
                     self.assertNotIn("__pycache__", name)
 
+    def test_rules_and_skills_yaml_frontmatter(self):
+        repo_root = Path(__file__).resolve().parent.parent
+
+        # 1. Validate rules/*.md
+        rules_dir = repo_root / "rules"
+        rule_files = list(rules_dir.glob("*.md"))
+        self.assertGreater(len(rule_files), 0, "No rule markdown files found")
+
+        for rule_file in rule_files:
+            content = rule_file.read_text(encoding="utf-8")
+            self.assertTrue(
+                content.startswith("---\n"),
+                f"Rule file {rule_file.name} missing opening YAML frontmatter delimiter '---'",
+            )
+            parts = content.split("---\n", 2)
+            self.assertGreaterEqual(
+                len(parts),
+                3,
+                f"Rule file {rule_file.name} missing closing YAML frontmatter delimiter '---'",
+            )
+            fm = parts[1]
+            self.assertIn("name:", fm, f"Rule file {rule_file.name} missing 'name' in frontmatter")
+            self.assertIn(
+                "description:",
+                fm,
+                f"Rule file {rule_file.name} missing 'description' in frontmatter",
+            )
+            self.assertIn(
+                "always_on:", fm, f"Rule file {rule_file.name} missing 'always_on' in frontmatter"
+            )
+
+        # 2. Validate skills/*/SKILL.md
+        skills_dir = repo_root / "skills"
+        skill_files = list(skills_dir.glob("*/SKILL.md"))
+        self.assertGreater(len(skill_files), 0, "No skill markdown files found")
+
+        for skill_file in skill_files:
+            content = skill_file.read_text(encoding="utf-8")
+            self.assertTrue(
+                content.startswith("---\n"),
+                f"Skill file {skill_file} missing opening YAML frontmatter delimiter '---'",
+            )
+            parts = content.split("---\n", 2)
+            self.assertGreaterEqual(
+                len(parts),
+                3,
+                f"Skill file {skill_file} missing closing YAML frontmatter delimiter '---'",
+            )
+            fm = parts[1]
+            self.assertIn("name:", fm, f"Skill file {skill_file} missing 'name' in frontmatter")
+            self.assertIn(
+                "description:", fm, f"Skill file {skill_file} missing 'description' in frontmatter"
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

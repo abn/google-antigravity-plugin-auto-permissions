@@ -28,6 +28,10 @@ When working in this repository, all AI agents and subagents must strictly adher
    - PR titles must strictly follow Conventional Commits format (`feat:`, `fix:`, `docs:`, `chore:`, `build:`, `refactor:`, `test:`, `ci:`) because Release Please parses PR titles to calculate semantic version increments and generate release notes.
    - All PRs must be merged using **Squash and Merge** (`gh pr merge <id> --squash --delete-branch`) with the PR title preserved as the squash commit headline on `main`.
 
+6. **Plugin Rules & Skills YAML Frontmatter Invariant:**
+   - All rule files (`rules/*.md`) must begin with valid YAML frontmatter specifying `name`, `description`, and `always_on: true`. Omission or malformed YAML causes Antigravity's plugin loader (`plugins.go`) to fail initialization and silently disable all hooks and skills.
+   - All skill files (`skills/*/SKILL.md`) must begin with valid YAML frontmatter specifying `name` and `description`.
+
 ---
 
 ## 2. Directory Structure
