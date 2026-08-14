@@ -90,3 +90,10 @@ jobs:
           echo '{"conversationId":"test-ci","artifactDirectoryPath":"/tmp"}' | python3 hooks/pre_invocation.py
           # Test policy configuration CLI
           python3 skills/auto-permissions-configure/scripts/configure_permissions.py --list
+
+      - name: Verify Release Packaging & Asset Isolation
+        run: |
+          python3 scripts/package_plugin.py --output-dir dist
+          # Assert only plugin files exist inside the archive
+          tar -tzf dist/auto-permissions-*.tar.gz
+

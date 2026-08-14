@@ -16,4 +16,6 @@ session_overrides.json
 *.pem
 .venv/
 env/
+dist/
+build/
 
