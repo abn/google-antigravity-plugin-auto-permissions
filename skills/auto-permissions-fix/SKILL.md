@@ -22,7 +22,7 @@ python3 skills/auto-permissions-fix/scripts/fix_permissions.py --last --allow --
 ```
 
 ### 2. Interactive Rule Generator
-Run without flags to browse all recent denials, select candidate rule representations (`command(...)`, `write_file(...)`, `read_url(...)`), and choose the target scope:
+Run without flags to browse all recent denials, select candidate rule representations (`command(...)`, `write_file(...)`, `read_url(...)`, `mcp(server:tool)`), and choose the target scope:
 ```bash
 python3 skills/auto-permissions-fix/scripts/fix_permissions.py
 ```
@@ -30,7 +30,11 @@ python3 skills/auto-permissions-fix/scripts/fix_permissions.py
 ### 3. Explicit Rule Injection
 Add a custom permission rule directly to a target scope:
 ```bash
+# Allow a command at project level:
 python3 skills/auto-permissions-fix/scripts/fix_permissions.py --rule "command(uv lock)" --decision allow --scope project
+
+# Allow all MCP tools on a specific server for the active session:
+python3 skills/auto-permissions-fix/scripts/fix_permissions.py --rule "mcp(nowledge-mem:*)" --decision allow --scope session
 ```
 
 ## Policy Scopes

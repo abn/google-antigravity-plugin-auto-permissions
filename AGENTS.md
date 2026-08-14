@@ -29,6 +29,7 @@ When working in this repository, all AI agents and subagents must strictly adher
 
 ```text
 auto-permissions/
+├── LICENSE                                  # MIT License
 ├── pyproject.toml                           # uv project & tool configuration (Ruff, pytest)
 ├── .python-version                          # Pinned interpreter version (3.14)
 ├── uv.lock                                  # Deterministic dependency lockfile
