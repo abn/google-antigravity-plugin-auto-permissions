@@ -238,6 +238,51 @@ class TestPolicyEngine(unittest.TestCase):
             self.assertEqual(decision, "deny")
             self.assertEqual(scope, "session")
 
+    def test_is_path_in_workspaces_symlink_traversal(self):
+        with tempfile.TemporaryDirectory() as ws, tempfile.TemporaryDirectory() as external_dir:
+            secret_file = os.path.join(external_dir, "sensitive.txt")
+            with open(secret_file, "w", encoding="utf-8") as f:
+                f.write("secret data")
+
+            # Symlink inside workspace pointing to external file
+            symlink_in_ws = os.path.join(ws, "symlink_to_secret.txt")
+            os.symlink(secret_file, symlink_in_ws)
+
+            # abspath looks like it is in ws, but realpath escapes to external_dir
+            self.assertFalse(is_path_in_workspaces(symlink_in_ws, [ws]))
+
+    def test_is_safe_skill_read_and_custom_paths(self):
+        with tempfile.TemporaryDirectory() as ws, tempfile.TemporaryDirectory() as custom_skills:
+            skill_md = os.path.join(custom_skills, "my-custom-skill", "SKILL.md")
+            os.makedirs(os.path.dirname(skill_md), exist_ok=True)
+            with open(skill_md, "w", encoding="utf-8") as f:
+                f.write("# My Skill")
+
+            # 1. By default, custom external directory is NOT fast-pathed
+            res1 = evaluate_static_policies(
+                tool_name="view_file",
+                tool_args={"AbsolutePath": skill_md, "IsSkillFile": True},
+                workspace_paths=[ws],
+            )
+            self.assertIsNone(res1)
+
+            # 2. Add allowed_skill_paths to project config
+            config_file = os.path.join(ws, PROJECT_CONFIG_REL_PATH)
+            os.makedirs(os.path.dirname(config_file), exist_ok=True)
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump({"allowed_skill_paths": [custom_skills]}, f)
+
+            # 3. Now it is auto-approved on the fast-path!
+            res2 = evaluate_static_policies(
+                tool_name="view_file",
+                tool_args={"AbsolutePath": skill_md, "IsSkillFile": True},
+                workspace_paths=[ws],
+            )
+            self.assertIsNotNone(res2)
+            decision, _reason, scope = res2
+            self.assertEqual(decision, "allow")
+            self.assertEqual(scope, "skill_resource")
+
 
 if __name__ == "__main__":
     unittest.main()

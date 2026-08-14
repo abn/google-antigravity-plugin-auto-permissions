@@ -278,6 +278,14 @@ The model is resolved using this strict priority cascade:
 4. **Environment Variable:** `AUTO_PERMISSIONS_MODEL` or `GEMINI_MODEL`
 5. **Default:** `gemini-2.5-flash`
 
+### 8.6 Symlink Canonicalization, Safe Skill Reading & Traversal Defense
+Agent skills and configurations frequently involve symbolic links (e.g. skills symlinked from external tool managers or virtual caches).
+
+* **Canonical Path Verification:** All path boundary checks evaluate both the logical path (`os.path.abspath()`) and the physical canonical target (`os.path.realpath()`).
+* **Symlink Traversal Prevention:** If a cloned repository contains a malicious symlink pointing outside the workspace (e.g. `repo/link.txt -> ~/.ssh/id_rsa`), the gate detects that `realpath` escapes `<workspace_roots>` and rejects auto-approval.
+* **Sensitive Target Blacklist:** Paths targeting known credential/system stores (`~/.ssh`, `~/.aws`, `~/.gnupg`, `/etc/shadow`, `.env`, `id_rsa`, etc.) are permanently denied fast-path access.
+* **Safe Skill Fast-Path:** Read-only inspection of standard Antigravity skill definitions (`~/.gemini/`, `~/.agents/skills/`) is fast-path approved in `0.1ms`. Non-standard custom skill directories (e.g. `~/.nowledge-mem/skills-active`) can be added to `"allowed_skill_paths"` in configuration files.
+
 ---
 
 ## 9. Two-Tier Security Architecture: Plugin Gate vs. Platform Container Sandbox

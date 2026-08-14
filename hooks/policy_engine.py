@@ -216,14 +216,69 @@ def match_tool_against_rule(rule_str: str, tool_name: str, tool_args: dict[str, 
     return False
 
 
+SENSITIVE_PATH_PATTERNS = (
+    ".ssh",
+    ".aws",
+    ".gnupg",
+    ".kube",
+    ".config/gcloud",
+    "/etc/shadow",
+    "/etc/sudoers",
+    "/etc/passwd",
+    "/root",
+)
+
+SENSITIVE_FILENAMES = (
+    "id_rsa",
+    "id_ed25519",
+    "id_ecdsa",
+    "id_dsa",
+    ".env",
+    "credentials",
+    "secrets.json",
+    "service-account.json",
+)
+
+
+def is_sensitive_path(path: str) -> bool:
+    """Checks if a path targets sensitive system or credential files."""
+    if not path:
+        return False
+    norm = os.path.abspath(os.path.expanduser(path))
+    real = os.path.realpath(norm)
+    for target in (norm, real):
+        for pattern in SENSITIVE_PATH_PATTERNS:
+            expanded = os.path.abspath(
+                os.path.expanduser(f"~/{pattern}" if pattern.startswith(".") else pattern)
+            )
+            if target == expanded or target.startswith(expanded + os.sep):
+                return True
+        basename = os.path.basename(target)
+        if basename in SENSITIVE_FILENAMES:
+            return True
+    return False
+
+
 def is_path_in_workspaces(target_path: str, workspace_paths: list[str] | None) -> bool:
-    """Checks if a target path is strictly located within one of the active workspace roots."""
+    """
+    Checks if a target path is strictly located within one of the active workspace roots.
+    Evaluates both logical abspath and physical realpath to prevent symlink traversal attacks.
+    """
     if not workspace_paths or not target_path:
         return False
     norm_target = os.path.abspath(os.path.expanduser(target_path))
+    real_target = os.path.realpath(norm_target)
+
+    # Sensitive path protection
+    if is_sensitive_path(norm_target) or is_sensitive_path(real_target):
+        return False
+
     for ws in workspace_paths:
         norm_ws = os.path.abspath(os.path.expanduser(ws))
-        if norm_target == norm_ws or norm_target.startswith(norm_ws + os.sep):
+        real_ws = os.path.realpath(norm_ws)
+        is_logical_in = norm_target == norm_ws or norm_target.startswith(norm_ws + os.sep)
+        is_real_in = real_target == real_ws or real_target.startswith(real_ws + os.sep)
+        if is_logical_in and is_real_in:
             return True
     return False
 
@@ -231,13 +286,14 @@ def is_path_in_workspaces(target_path: str, workspace_paths: list[str] | None) -
 def load_policy_file(file_path: str) -> dict[str, Any]:
     """
     Loads a policy JSON file returning a dict with keys
-    'allow', 'ask', 'deny', 'custom_guidelines', 'model'.
+    'allow', 'ask', 'deny', 'custom_guidelines', 'allowed_skill_paths', 'model'.
     """
     policy: dict[str, Any] = {
         "allow": [],
         "ask": [],
         "deny": [],
         "custom_guidelines": [],
+        "allowed_skill_paths": [],
         "model": None,
     }
     if not file_path or not os.path.isfile(file_path):
@@ -247,7 +303,7 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
         with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
             if isinstance(data, dict):
-                for k in ("allow", "ask", "deny", "custom_guidelines"):
+                for k in ("allow", "ask", "deny", "custom_guidelines", "allowed_skill_paths"):
                     val = data.get(k, [])
                     if isinstance(val, list):
                         policy[k] = [str(x) for x in val]
@@ -256,6 +312,93 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
     except Exception:
         pass
     return policy
+
+
+def load_allowed_skill_paths(
+    session_dir: str | None = None,
+    workspace_paths: list[str] | None = None,
+) -> list[str]:
+    """
+    Loads allowed skill directory paths from default standard locations plus
+    any user-configured 'allowed_skill_paths' in Global, Project, or Session policies.
+    """
+    # Standard Antigravity defaults
+    allowed: list[str] = [
+        os.path.abspath(os.path.expanduser("~/.gemini")),
+        os.path.abspath(os.path.expanduser("~/.agents/skills")),
+    ]
+    if workspace_paths:
+        for ws in workspace_paths:
+            allowed.append(os.path.abspath(os.path.join(ws, ".agents", "skills")))
+
+    # Load configured overrides
+    scope_files = []
+    scope_files.append(GLOBAL_CONFIG_PATH)
+    if workspace_paths:
+        for ws in workspace_paths:
+            scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
+    if session_dir and os.path.isdir(session_dir):
+        scope_files.append(os.path.join(session_dir, SESSION_OVERRIDES_FILENAME))
+
+    for f_path in scope_files:
+        if not os.path.isfile(f_path):
+            continue
+        policy = load_policy_file(f_path)
+        for custom_path in policy.get("allowed_skill_paths", []):
+            clean_p = os.path.abspath(os.path.expanduser(custom_path.strip()))
+            if clean_p and clean_p not in allowed:
+                allowed.append(clean_p)
+
+    return allowed
+
+
+def is_safe_skill_read(
+    tool_name: str,
+    tool_args: dict[str, Any],
+    workspace_paths: list[str] | None = None,
+    session_dir: str | None = None,
+) -> bool:
+    """
+    Verifies if a read tool call is safely inspecting an authorized agent skill definition.
+    Ensures real canonical path is within allowed skill paths and not targeting sensitive locations.
+    """
+    if tool_name != "view_file":
+        return False
+
+    raw_path = str(tool_args.get("AbsolutePath", "")).strip()
+    if not raw_path:
+        return False
+
+    # Check if flagged as skill file or path clearly targets a skill definition
+    is_skill_flag = bool(tool_args.get("IsSkillFile"))
+    is_skill_path = (
+        raw_path.endswith("SKILL.md") or "/skills/" in raw_path or "/.agents/skills/" in raw_path
+    )
+
+    if not (is_skill_flag or is_skill_path):
+        return False
+
+    norm_target = os.path.abspath(os.path.expanduser(raw_path))
+    real_target = os.path.realpath(norm_target)
+
+    # Hard defense: reject if real target touches sensitive system/credential targets
+    if is_sensitive_path(norm_target) or is_sensitive_path(real_target):
+        return False
+
+    allowed_paths = load_allowed_skill_paths(
+        session_dir=session_dir, workspace_paths=workspace_paths
+    )
+    all_roots = allowed_paths + [
+        os.path.abspath(os.path.expanduser(ws)) for ws in (workspace_paths or [])
+    ]
+
+    # Real canonical target must be inside an allowed root
+    for root in all_roots:
+        real_root = os.path.realpath(root)
+        if real_target == real_root or real_target.startswith(real_root + os.sep):
+            return True
+
+    return False
 
 
 def resolve_configured_model(
@@ -457,5 +600,18 @@ def evaluate_static_policies(
                 f"Auto-approved workspace read inspection for {tool_name}",
                 "workspace_boundary",
             )
+
+    # 5. Built-in fast-path for safe skill definitions
+    if is_safe_skill_read(
+        tool_name=tool_name,
+        tool_args=tool_args,
+        workspace_paths=workspace_paths,
+        session_dir=session_dir,
+    ):
+        return (
+            "allow",
+            "Auto-approved read of registered skill definition",
+            "skill_resource",
+        )
 
     return None

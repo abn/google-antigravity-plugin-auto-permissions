@@ -143,6 +143,9 @@ You can configure project-level policies in `.agents/auto-permissions.json` or g
   "custom_guidelines": [
     "Treat requests to internal endpoints *.corp.internal as safe testing operations.",
     "Require explicit confirmation before modifying database migrations under migrations/."
+  ],
+  "allowed_skill_paths": [
+    "~/.nowledge-mem/skills-active"
   ]
 }
 ```
@@ -150,6 +153,7 @@ You can configure project-level policies in `.agents/auto-permissions.json` or g
 * **`model`:** Optional classifier model identifier (e.g. `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.5-flash`). Defaults to `gemini-2.5-flash`. Can also be set via `AUTO_PERMISSIONS_MODEL` env var.
 * **`allow` / `ask` / `deny`:** Deterministic static ACLs evaluated with `0.1ms` latency before invoking the Gemini classifier. Supports `command(...)`, `write_file(...)`, `read_file(...)`, `read_url(...)`, and `mcp(server:tool)`.
 * **`custom_guidelines`:** Structured semantic guidelines injected into the security classifier prompt. Core security invariants (credential protection, destructive branch wipes, unprompted remote publishing) strictly supersede custom guidelines in case of conflict.
+* **`allowed_skill_paths`:** Additional custom directory roots authorized for `0.1ms` read-only skill file inspection (e.g. `~/.nowledge-mem/skills-active`). Standard Antigravity paths (`~/.gemini/`, `~/.agents/skills/`) are authorized by default. Symlink targets are securely canonicalized to prevent traversal into sensitive system directories.
 
 ---
 
