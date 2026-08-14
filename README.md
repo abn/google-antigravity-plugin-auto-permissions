@@ -95,6 +95,24 @@ Parses denials from `audit.jsonl` and generates persistent ACL grants across Ses
 
 ---
 
+### 3. `auto-permissions-test` (Policy & Classifier Simulation)
+Simulates how the security classifier and static policies would evaluate a hypothetical tool call against a given user prompt before executing it, rendering collapsible input/output traces.
+
+* **Test a command against a user prompt (Markdown output with collapsible folds):**
+  ```bash
+  python3 skills/auto-permissions-test/scripts/test_permission.py "fix styling in style.css" --command "git push origin main" --markdown
+  ```
+* **Test file modifications:**
+  ```bash
+  python3 skills/auto-permissions-test/scripts/test_permission.py "refactor auth" --tool write_to_file --target src/auth.py --markdown
+  ```
+* **Output raw JSON:**
+  ```bash
+  python3 skills/auto-permissions-test/scripts/test_permission.py "run test suite" --command "pytest -v" --json
+  ```
+
+---
+
 ## Configuration: Static ACLs & Custom Semantic Guidelines
 
 You can configure project-level policies in `.agents/auto-permissions.json` or global user policies in `~/.gemini/config/auto-permissions.json`:
@@ -148,10 +166,14 @@ auto-permissions/
 │   │   ├── SKILL.md                         # Audit inspection procedure
 │   │   └── scripts/
 │   │       └── view_audit.py                # Audit log summary CLI
-│   └── auto-permissions-fix/
-│       ├── SKILL.md                         # ACL rule generator from denials (audit2allow)
+│   ├── auto-permissions-fix/
+│   │   ├── SKILL.md                         # ACL rule generator from denials (audit2allow)
+│   │   └── scripts/
+│   │       └── fix_permissions.py          # Policy rule fixer CLI
+│   └── auto-permissions-test/
+│       ├── SKILL.md                         # Policy & classifier simulation procedure
 │       └── scripts/
-│           └── fix_permissions.py          # Policy rule fixer CLI
+│           └── test_permission.py          # Classifier simulation CLI
 ├── docs/
 │   └── architecture.md                      # Comprehensive technical architecture
 └── tests/
@@ -161,6 +183,7 @@ auto-permissions/
     ├── test_policy_engine.py
     ├── test_pre_invocation.py
     ├── test_fix_permissions.py
+    ├── test_permission_skill.py
     └── test_gate_e2e.py
 ```
 
