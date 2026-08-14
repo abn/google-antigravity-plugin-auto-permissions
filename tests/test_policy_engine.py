@@ -89,6 +89,43 @@ class TestPolicyEngine(unittest.TestCase):
             )
         )
 
+        # MCP tools
+        self.assertTrue(
+            match_tool_against_rule(
+                "mcp(nowledge-mem:*)",
+                "call_mcp_tool",
+                {"ServerName": "nowledge-mem", "ToolName": "memory_search"},
+            )
+        )
+        self.assertTrue(
+            match_tool_against_rule(
+                "mcp(nowledge-mem:memory_search)",
+                "call_mcp_tool",
+                {"ServerName": "nowledge-mem", "ToolName": "memory_search"},
+            )
+        )
+        self.assertTrue(
+            match_tool_against_rule(
+                "mcp(chrome-devtools:*)",
+                "mcp_chrome-devtools_navigate_page",
+                {},
+            )
+        )
+        self.assertTrue(
+            match_tool_against_rule(
+                "mcp(nowledge-mem:*)",
+                "read_resource",
+                {"ServerName": "nowledge-mem", "Uri": "nmem://profile"},
+            )
+        )
+        self.assertFalse(
+            match_tool_against_rule(
+                "mcp(nowledge-mem:memory_search)",
+                "call_mcp_tool",
+                {"ServerName": "nowledge-mem", "ToolName": "memory_delete"},
+            )
+        )
+
     def test_is_path_in_workspaces(self):
         with tempfile.TemporaryDirectory() as ws:
             in_path = os.path.join(ws, "src", "app.py")

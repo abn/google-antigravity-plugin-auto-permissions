@@ -66,12 +66,29 @@ def suggest_rules_for_tool_call(tool_name: str, tool_args: dict[str, Any]) -> li
         if action:
             suggestions.append(f"manage_task({action})")
 
-    elif tool_name.startswith("mcp_") or tool_name == "call_mcp_tool":
+    elif tool_name == "call_mcp_tool":
         server = str(tool_args.get("ServerName", "")).strip()
         sub_tool = str(tool_args.get("ToolName", "")).strip()
         if server and sub_tool:
-            suggestions.append(f"mcp({server}/{sub_tool})")
-            suggestions.append(f"mcp({server}/*)")
+            suggestions.append(f"mcp({server}:{sub_tool})")
+            suggestions.append(f"mcp({server}:*)")
+        elif server:
+            suggestions.append(f"mcp({server}:*)")
+
+    elif tool_name.startswith("mcp_"):
+        raw = tool_name[4:]
+        if "_" in raw:
+            server, sub_tool = raw.split("_", 1)
+            suggestions.append(f"mcp({server}:{sub_tool})")
+            suggestions.append(f"mcp({server}:*)")
+        else:
+            suggestions.append(f"mcp({raw}:*)")
+
+    elif tool_name in ("read_resource", "list_resources"):
+        server = str(tool_args.get("ServerName", "")).strip()
+        if server:
+            suggestions.append(f"mcp({server}:{tool_name})")
+            suggestions.append(f"mcp({server}:*)")
 
     return list(dict.fromkeys(suggestions))  # Deduplicate preserving order
 

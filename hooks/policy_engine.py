@@ -105,6 +105,50 @@ def match_url(pattern: str, target_url: str) -> bool:
     return bool(pattern == target_host or target_host.endswith("." + pattern))
 
 
+def match_mcp(pattern: str, server_name: str, tool_name: str) -> bool:
+    """
+    Matches an MCP server and tool name against a pattern.
+    Supported patterns:
+      - `*` (any MCP tool)
+      - `server:*` or `server/*` or `server` (any tool on that server)
+      - `server:tool` or `server/tool` (exact tool on that server)
+      - `*:tool` (matching tool across any server)
+      - regex patterns
+    """
+    if pattern == "*":
+        return True
+    pattern = pattern.strip()
+    full_colon = f"{server_name}:{tool_name}" if server_name else tool_name
+    full_slash = f"{server_name}/{tool_name}" if server_name else tool_name
+
+    # Check exact match on server name
+    if pattern == server_name:
+        return True
+
+    # Check colon / slash exact match
+    if pattern in (full_colon, full_slash):
+        return True
+
+    # Check wildcard patterns
+    if pattern.endswith(":*") and server_name == pattern[:-2]:
+        return True
+    if pattern.endswith("/*") and server_name == pattern[:-2]:
+        return True
+    if pattern.startswith("*:") and tool_name == pattern[2:]:
+        return True
+    if pattern.startswith("*/") and tool_name == pattern[2:]:
+        return True
+
+    # Regex support
+    try:
+        if re.search(r"[\\^$*+?.()|[\]{}]", pattern):
+            return bool(re.search(pattern, full_colon) or re.search(pattern, full_slash))
+    except re.error:
+        pass
+
+    return False
+
+
 def match_tool_against_rule(rule_str: str, tool_name: str, tool_args: dict[str, Any]) -> bool:
     """Evaluates if a specific tool call matches a permission resource rule."""
     parsed = parse_resource_rule(rule_str)
@@ -149,16 +193,25 @@ def match_tool_against_rule(rule_str: str, tool_name: str, tool_args: dict[str, 
         if action == "manage_task":
             return target_pattern in ("*", sub_action)
 
-    elif tool_name.startswith("mcp_") or tool_name == "call_mcp_tool":
+    elif tool_name == "call_mcp_tool":
         server = str(tool_args.get("ServerName", ""))
         sub_tool = str(tool_args.get("ToolName", ""))
-        full_tool = f"{server}/{sub_tool}" if server else tool_name
-        if action == "mcp":
-            if target_pattern == "*":
-                return True
-            if target_pattern.endswith("/*"):
-                return full_tool.startswith(target_pattern[:-1])
-            return target_pattern == full_tool
+        if action in ("mcp", "call_mcp_tool"):
+            return match_mcp(target_pattern, server, sub_tool)
+
+    elif tool_name.startswith("mcp_"):
+        raw = tool_name[4:]
+        if "_" in raw:
+            server, sub_tool = raw.split("_", 1)
+        else:
+            server, sub_tool = raw, "*"
+        if action in ("mcp", "call_mcp_tool"):
+            return match_mcp(target_pattern, server, sub_tool)
+
+    elif tool_name in ("read_resource", "list_resources"):
+        server = str(tool_args.get("ServerName", ""))
+        if action in ("mcp", "read_resource", "list_resources"):
+            return match_mcp(target_pattern, server, tool_name)
 
     return False
 

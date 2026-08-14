@@ -258,6 +258,15 @@ When teams require domain-specific context for the Gemini security classifier (e
 
 * **System Invariant:** Core safety invariants (credential protection, destructive branch wipes, unprompted external publishing) strictly supersede custom guidelines in case of conflict.
 
+### 8.4 Model Context Protocol (MCP) Governance & Resource Matching
+The `auto-permissions` gate intercepts all MCP tool invocations (`call_mcp_tool`, eager `mcp_<server>_<tool>`, `read_resource`, `list_resources`):
+
+* **Static MCP ACL Syntax:**
+  - `mcp(server:*)` or `mcp(server/*)`: Matches any tool on that MCP server (e.g. `mcp(nowledge-mem:*)`).
+  - `mcp(server:tool)`: Matches a specific tool (e.g. `mcp(stripe:charge_customer)`).
+  - `mcp(*:delete_*)`: Wildcard pattern across all MCP servers.
+* **Classifier Evaluation:** Unmatched MCP calls are evaluated by the Gemini 2.5 Flash classifier, ensuring destructive operations or external data modifications align with active user intent.
+
 ---
 
 ## 9. Two-Tier Security Architecture: Plugin Gate vs. Platform Container Sandbox

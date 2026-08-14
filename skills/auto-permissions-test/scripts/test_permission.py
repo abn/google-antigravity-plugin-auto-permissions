@@ -178,6 +178,8 @@ def main():
         help="Target file path or URL for write_to_file, view_file, or read_url_content.",
     )
     parser.add_argument("--args", "-a", help="JSON dictionary string for tool arguments.")
+    parser.add_argument("--mcp-server", help="MCP server name (for testing call_mcp_tool).")
+    parser.add_argument("--mcp-tool", help="MCP tool name (for testing call_mcp_tool).")
     parser.add_argument(
         "--workspace",
         "-w",
@@ -205,8 +207,21 @@ def main():
     if not active_prompt:
         parser.error("An active user prompt is required (via positional argument or stdin).")
 
+    tool_name = args.tool
     tool_args: dict[str, Any] = {}
-    if args.args:
+    if args.mcp_server or args.mcp_tool:
+        tool_name = "call_mcp_tool"
+        tool_args = {
+            "ServerName": args.mcp_server or "unknown-server",
+            "ToolName": args.mcp_tool or "unknown-tool",
+            "Arguments": {},
+        }
+        if args.args:
+            try:
+                tool_args["Arguments"] = json.loads(args.args)
+            except json.JSONDecodeError as exc:
+                parser.error(f"Invalid JSON passed to --args: {exc}")
+    elif args.args:
         try:
             tool_args = json.loads(args.args)
         except json.JSONDecodeError as exc:
@@ -232,7 +247,7 @@ def main():
 
     res = evaluate_simulated_permission(
         active_prompt=active_prompt,
-        tool_name=args.tool,
+        tool_name=tool_name,
         tool_args=tool_args,
         workspace_paths=[os.path.abspath(args.workspace)],
         prior_prompts=args.history,
@@ -241,11 +256,12 @@ def main():
     if args.json:
         print(json.dumps(res, indent=2))
     elif args.markdown:
-        print(format_markdown_report(active_prompt, args.tool, tool_args, res))
+        print(format_markdown_report(active_prompt, tool_name, tool_args, res))
     else:
         print("=" * 80)
         print(f"AUTO-PERMISSIONS TEST VERDICT: {res['decision'].upper()}")
         print("=" * 80)
+        print(f"Tool Name       : {tool_name}")
         print(f"Evaluation Mode : {res['mode']} ({res['latency_ms']:.1f}ms)")
         print(f"Risk Category   : {res['risk_category']}")
         print(f"Confidence      : {res['confidence']:.2f}")

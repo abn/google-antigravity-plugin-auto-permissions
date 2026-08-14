@@ -121,14 +121,17 @@ You can configure project-level policies in `.agents/auto-permissions.json` or g
 {
   "allow": [
     "command(uv lock)",
-    "command(pytest -v)"
+    "command(pytest -v)",
+    "mcp(nowledge-mem:*)"
   ],
   "ask": [
     "command(git push .*)",
-    "command(gh pr .*)"
+    "command(gh pr .*)",
+    "mcp(stripe:*)"
   ],
   "deny": [
-    "write_file(.github/workflows/.*)"
+    "write_file(.github/workflows/.*)",
+    "mcp(*:delete_*)"
   ],
   "custom_guidelines": [
     "Treat requests to internal endpoints *.corp.internal as safe testing operations.",
@@ -137,7 +140,7 @@ You can configure project-level policies in `.agents/auto-permissions.json` or g
 }
 ```
 
-* **`allow` / `ask` / `deny`:** Deterministic static ACLs evaluated with `0.1ms` latency before invoking the Gemini classifier.
+* **`allow` / `ask` / `deny`:** Deterministic static ACLs evaluated with `0.1ms` latency before invoking the Gemini classifier. Supports `command(...)`, `write_file(...)`, `read_file(...)`, `read_url(...)`, and `mcp(server:tool)`.
 * **`custom_guidelines`:** Structured semantic guidelines injected into the security classifier prompt. Core security invariants (credential protection, destructive branch wipes, unprompted remote publishing) strictly supersede custom guidelines in case of conflict.
 
 ---

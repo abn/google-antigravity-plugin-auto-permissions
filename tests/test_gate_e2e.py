@@ -123,6 +123,42 @@ class TestGateE2E(unittest.TestCase):
                 self.assertEqual(res["decision"], "deny")
                 self.assertIn("Security Gate Block", res["reason"])
 
+    @patch("hooks.auto_approve_gate.classify_tool_call")
+    def test_gate_e2e_mcp_classifier_ask(self, mock_classify):
+        mock_classify.return_value = (
+            "<raw_prompt>",
+            {
+                "decision": "ask",
+                "reason": "Escalating external Stripe mutation",
+                "risk_category": "high_risk_infrastructure",
+            },
+            None,
+            42.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_payload = {
+                "toolCall": {
+                    "name": "call_mcp_tool",
+                    "args": {"ServerName": "stripe", "ToolName": "charge_customer"},
+                },
+                "stepIdx": 4,
+                "conversationId": "test-e2e-mcp-ask",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+            }
+
+            stdin_data = json.dumps(input_payload)
+            with (
+                patch("sys.stdin", io.StringIO(stdin_data)),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout,
+            ):
+                gate.main()
+                output_text = mock_stdout.getvalue().strip()
+                res = json.loads(output_text)
+                self.assertEqual(res["decision"], "ask")
+                self.assertEqual(res["reason"], "Escalating external Stripe mutation")
+
     def test_gate_e2e_empty_stdin(self):
         with (
             patch("sys.stdin", io.StringIO("")),

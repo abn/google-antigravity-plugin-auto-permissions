@@ -43,6 +43,13 @@ class TestFixPermissions(unittest.TestCase):
         )
         self.assertIn("read_url(docs.pytest.org)", rules)
 
+        # MCP tool
+        rules = suggest_rules_for_tool_call(
+            "call_mcp_tool", {"ServerName": "nowledge-mem", "ToolName": "memory_search"}
+        )
+        self.assertIn("mcp(nowledge-mem:memory_search)", rules)
+        self.assertIn("mcp(nowledge-mem:*)", rules)
+
     def test_load_denied_audit_records(self):
         with tempfile.NamedTemporaryFile("w+", suffix=".jsonl", delete=False) as f:
             records = [
