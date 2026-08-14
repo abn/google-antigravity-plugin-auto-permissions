@@ -33,15 +33,29 @@ The plugin intercepts sensitive tool operations (commands, file writes, web requ
 
 ## Installation & Setup
 
-### Global Scope (Recommended)
-Clone the repository directly into your global Antigravity plugins directory:
+### Option 1: One-Shot Release Download (Recommended)
+Download and extract the latest release artifact directly into your plugin directory in one shot, automatically creating parent directories and overwriting existing files:
+
 ```bash
-git clone https://github.com/abn/google-antigravity-plugin-auto-permissions ~/.gemini/config/plugins/auto-permissions
+# Global Scope (Recommended)
+mkdir -p ~/.gemini/config/plugins/auto-permissions && \
+curl -sL https://github.com/abn/google-antigravity-plugin-auto-permissions/releases/latest/download/auto-permissions.tar.gz | \
+tar -xz -C ~/.gemini/config/plugins/auto-permissions --strip-components=1 --overwrite
+
+# Workspace-Specific Scope
+mkdir -p .agents/plugins/auto-permissions && \
+curl -sL https://github.com/abn/google-antigravity-plugin-auto-permissions/releases/latest/download/auto-permissions.tar.gz | \
+tar -xz -C .agents/plugins/auto-permissions --strip-components=1 --overwrite
 ```
 
-### Workspace-Specific Scope
-Alternatively, clone directly into an individual workspace's `.agents/plugins/` directory:
+### Option 2: Git Clone
+Alternatively, clone the repository directly if you prefer tracking git commits:
+
 ```bash
+# Global Scope
+git clone https://github.com/abn/google-antigravity-plugin-auto-permissions ~/.gemini/config/plugins/auto-permissions
+
+# Workspace-Specific Scope
 git clone https://github.com/abn/google-antigravity-plugin-auto-permissions <your-workspace>/.agents/plugins/auto-permissions
 ```
 

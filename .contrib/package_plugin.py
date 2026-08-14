@@ -123,6 +123,12 @@ def build_package(root_dir: Path, output_dir: Path) -> tuple[Path, Path]:
     # Clean up staging
     shutil.rmtree(stage_dir.parent)
 
+    # Create unversioned copies for predictable latest download URLs
+    unversioned_tar = output_dir / "auto-permissions.tar.gz"
+    unversioned_zip = output_dir / "auto-permissions.zip"
+    shutil.copy2(tar_path, unversioned_tar)
+    shutil.copy2(zip_path, unversioned_zip)
+
     return tar_path, zip_path
 
 
