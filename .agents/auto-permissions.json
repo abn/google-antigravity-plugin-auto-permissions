@@ -2,11 +2,21 @@
   "allow": [
     "command(uv lock)",
     "command(uv run ruff .*)",
-    "command(uv run pytest .*)"
+    "command(uv run pytest .*)",
+    "command(git status.*)",
+    "command(git diff.*)",
+    "command(git log.*)",
+    "command(git show.*)",
+    "command(git checkout -b .*)",
+    "command(git switch -c .*)",
+    "command(git add .*)",
+    "command(git commit .*)",
+    "command(gh pr view.*)",
+    "command(gh pr list.*)",
+    "command(gh pr checks.*)",
+    "command(gh pr create.*)"
   ],
-  "ask": [
-    "command(git push .*)"
-  ],
+  "ask": [],
   "deny": [
     "command(rm -rf /.*)"
   ]

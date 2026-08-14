@@ -10,6 +10,7 @@ from hooks.policy_engine import (
     add_rule_to_scope,
     evaluate_static_policies,
     is_path_in_workspaces,
+    is_safe_session_artifact_read,
     is_ungoverned_surface,
     load_custom_guidelines,
     match_command,
@@ -434,6 +435,74 @@ class TestPolicyEngine(unittest.TestCase):
             self.assertFalse(is_ungoverned_surface("invoke_subagent", workspace_paths=[ws]))
             self.assertFalse(is_ungoverned_surface("schedule", workspace_paths=[ws]))
             self.assertTrue(is_ungoverned_surface("generate_image", workspace_paths=[ws]))
+
+    def test_is_safe_session_artifact_read(self):
+        with tempfile.TemporaryDirectory() as session_tmp:
+            session_dir = os.path.abspath(session_tmp)
+            audit_log = os.path.join(session_dir, "audit.jsonl")
+            scratch_dir = os.path.join(session_dir, "scratch")
+            scratch_file = os.path.join(scratch_dir, "test.py")
+            os.makedirs(scratch_dir, exist_ok=True)
+            with open(audit_log, "w", encoding="utf-8") as f:
+                f.write("{}\n")
+            with open(scratch_file, "w", encoding="utf-8") as f:
+                f.write("print('hello')\n")
+
+            # 1. view_file on audit.jsonl and session files
+            self.assertTrue(
+                is_safe_session_artifact_read(
+                    "view_file", {"AbsolutePath": audit_log}, session_dir=session_dir
+                )
+            )
+            self.assertTrue(
+                is_safe_session_artifact_read(
+                    "view_file", {"AbsolutePath": scratch_file}, session_dir=session_dir
+                )
+            )
+
+            # 2. list_dir on session directory and subdirectories
+            self.assertTrue(
+                is_safe_session_artifact_read(
+                    "list_dir", {"DirectoryPath": session_dir}, session_dir=session_dir
+                )
+            )
+            self.assertTrue(
+                is_safe_session_artifact_read(
+                    "list_dir", {"DirectoryPath": scratch_dir}, session_dir=session_dir
+                )
+            )
+
+            # 3. grep_search on session directory
+            self.assertTrue(
+                is_safe_session_artifact_read(
+                    "grep_search", {"SearchPath": session_dir}, session_dir=session_dir
+                )
+            )
+
+            # 4. Reject files outside session_dir
+            outside_file = "/tmp/other_dir/other.txt"
+            self.assertFalse(
+                is_safe_session_artifact_read(
+                    "view_file", {"AbsolutePath": outside_file}, session_dir=session_dir
+                )
+            )
+
+            # 5. Reject non-read tools
+            self.assertFalse(
+                is_safe_session_artifact_read(
+                    "write_to_file", {"TargetFile": scratch_file}, session_dir=session_dir
+                )
+            )
+
+            # 6. evaluate_static_policies fast-path returns ("allow", ..., "session_artifact")
+            res = evaluate_static_policies(
+                "view_file",
+                {"AbsolutePath": audit_log},
+                session_dir=session_dir,
+            )
+            self.assertIsNotNone(res)
+            self.assertEqual(res[0], "allow")
+            self.assertEqual(res[2], "session_artifact")
 
 
 if __name__ == "__main__":

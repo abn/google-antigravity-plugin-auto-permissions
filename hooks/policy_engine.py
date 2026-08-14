@@ -604,6 +604,48 @@ def is_safe_skill_read(
     return False
 
 
+def is_safe_session_artifact_read(
+    tool_name: str,
+    tool_args: dict[str, Any],
+    session_dir: str | None = None,
+) -> bool:
+    """
+    Verifies if a read-only tool call (view_file, list_dir, grep_search) is safely inspecting
+    the active session's own artifact, scratch, or audit log directory (<session_dir>/...).
+    Ensures real canonical path is strictly within the session directory and not sensitive.
+    """
+    if tool_name not in ("view_file", "list_dir", "grep_search"):
+        return False
+    if not session_dir or not os.path.isabs(session_dir):
+        return False
+
+    target_path = ""
+    if tool_name == "view_file":
+        target_path = str(tool_args.get("AbsolutePath", "")).strip()
+    elif tool_name == "list_dir":
+        target_path = str(tool_args.get("DirectoryPath", "")).strip()
+    elif tool_name == "grep_search":
+        target_path = str(tool_args.get("SearchPath", "")).strip()
+
+    if not target_path:
+        return False
+
+    norm_target = os.path.abspath(os.path.expanduser(target_path))
+    real_target = os.path.realpath(norm_target)
+
+    # Hard defense: reject if real target touches sensitive system/credential targets
+    if is_sensitive_path(norm_target) or is_sensitive_path(real_target):
+        return False
+
+    norm_session = os.path.abspath(session_dir)
+    real_session = os.path.realpath(norm_session)
+
+    # Validate target is strictly within the active session directory
+    is_norm_in = norm_target == norm_session or norm_target.startswith(norm_session + os.sep)
+    is_real_in = real_target == real_session or real_target.startswith(real_session + os.sep)
+    return is_norm_in and is_real_in
+
+
 def resolve_classifier_config(
     session_dir: str | None = None,
     workspace_paths: list[str] | None = None,
@@ -1046,7 +1088,19 @@ def evaluate_static_policies(
                 "workspace_boundary",
             )
 
-    # 5. Built-in fast-path for safe skill definitions
+    # 5. Built-in fast-path for active session artifacts, scratch, and audit logs
+    if is_safe_session_artifact_read(
+        tool_name=tool_name,
+        tool_args=tool_args,
+        session_dir=session_dir,
+    ):
+        return (
+            "allow",
+            f"Auto-approved active session artifact read for {tool_name}",
+            "session_artifact",
+        )
+
+    # 6. Built-in fast-path for safe skill definitions
     if is_safe_skill_read(
         tool_name=tool_name,
         tool_args=tool_args,
