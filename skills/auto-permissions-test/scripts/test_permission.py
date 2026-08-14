@@ -17,8 +17,16 @@ plugin_root = os.path.abspath(os.path.join(current_dir, "../../.."))
 if plugin_root not in sys.path:
     sys.path.insert(0, plugin_root)
 
-from hooks.classifier import classify_tool_call, format_classifier_payload  # noqa: E402
-from hooks.policy_engine import evaluate_static_policies, load_custom_guidelines  # noqa: E402
+from hooks.classifier import (  # noqa: E402
+    DEFAULT_MODEL,
+    classify_tool_call,
+    format_classifier_payload,
+)
+from hooks.policy_engine import (  # noqa: E402
+    evaluate_static_policies,
+    load_custom_guidelines,
+    resolve_configured_model,
+)
 
 
 def evaluate_simulated_permission(
@@ -30,9 +38,13 @@ def evaluate_simulated_permission(
     tool_action: str | None = None,
     tool_summary: str | None = None,
     api_key: str | None = None,
+    model: str | None = None,
 ) -> dict[str, Any]:
     """Evaluates a simulated tool call against static policies and the security classifier."""
     prior_prompts = prior_prompts or []
+    resolved_model = model or resolve_configured_model(
+        workspace_paths=workspace_paths, default_model=DEFAULT_MODEL
+    )
 
     # 1. Fast-path static policy check
     static_verdict = evaluate_static_policies(
@@ -84,6 +96,7 @@ def evaluate_simulated_permission(
         tool_summary=tool_summary,
         custom_guidelines=custom_guidelines,
         api_key=api_key,
+        model=resolved_model,
     )
 
     return {
@@ -197,6 +210,11 @@ def main():
         "--markdown", "-m", action="store_true", help="Output as Markdown with collapsible folds."
     )
     parser.add_argument("--json", "-j", action="store_true", help="Output as raw JSON.")
+    parser.add_argument(
+        "--model",
+        "-M",
+        help="Gemini model identifier (e.g. gemini-2.5-flash, gemini-2.5-pro).",
+    )
 
     args = parser.parse_args()
 
@@ -251,6 +269,7 @@ def main():
         tool_args=tool_args,
         workspace_paths=[os.path.abspath(args.workspace)],
         prior_prompts=args.history,
+        model=args.model,
     )
 
     if args.json:

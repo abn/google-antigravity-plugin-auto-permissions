@@ -228,12 +228,18 @@ def is_path_in_workspaces(target_path: str, workspace_paths: list[str] | None) -
     return False
 
 
-def load_policy_file(file_path: str) -> dict[str, list[str]]:
+def load_policy_file(file_path: str) -> dict[str, Any]:
     """
     Loads a policy JSON file returning a dict with keys
-    'allow', 'ask', 'deny', 'custom_guidelines'.
+    'allow', 'ask', 'deny', 'custom_guidelines', 'model'.
     """
-    policy = {"allow": [], "ask": [], "deny": [], "custom_guidelines": []}
+    policy: dict[str, Any] = {
+        "allow": [],
+        "ask": [],
+        "deny": [],
+        "custom_guidelines": [],
+        "model": None,
+    }
     if not file_path or not os.path.isfile(file_path):
         return policy
 
@@ -245,9 +251,50 @@ def load_policy_file(file_path: str) -> dict[str, list[str]]:
                     val = data.get(k, [])
                     if isinstance(val, list):
                         policy[k] = [str(x) for x in val]
+                if "model" in data and isinstance(data["model"], str) and data["model"].strip():
+                    policy["model"] = data["model"].strip()
     except Exception:
         pass
     return policy
+
+
+def resolve_configured_model(
+    session_dir: str | None = None,
+    workspace_paths: list[str] | None = None,
+    default_model: str = "gemini-2.5-flash",
+) -> str:
+    """
+    Resolves the configured Gemini model identifier across the hierarchy:
+    Session -> Project -> Global -> Environment Variable -> Default.
+    """
+    # 1. Session scope
+    if session_dir:
+        session_file = os.path.join(session_dir, SESSION_OVERRIDES_FILENAME)
+        policy = load_policy_file(session_file)
+        if policy.get("model"):
+            return policy["model"]
+
+    # 2. Project scope
+    if workspace_paths:
+        for ws in workspace_paths:
+            proj_file = os.path.join(ws, PROJECT_CONFIG_REL_PATH)
+            policy = load_policy_file(proj_file)
+            if policy.get("model"):
+                return policy["model"]
+
+    # 3. Global scope
+    if os.path.isfile(GLOBAL_CONFIG_PATH):
+        policy = load_policy_file(GLOBAL_CONFIG_PATH)
+        if policy.get("model"):
+            return policy["model"]
+
+    # 4. Environment variable
+    env_model = os.environ.get("AUTO_PERMISSIONS_MODEL") or os.environ.get("GEMINI_MODEL")
+    if env_model and env_model.strip():
+        return env_model.strip()
+
+    # 5. Default
+    return default_model
 
 
 def load_custom_guidelines(

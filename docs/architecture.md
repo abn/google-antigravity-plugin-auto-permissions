@@ -268,6 +268,16 @@ The `auto-permissions` gate intercepts all MCP tool invocations (`call_mcp_tool`
   - `mcp(*:delete_*)`: Wildcard pattern across all MCP servers.
 * **Classifier Evaluation:** Unmatched MCP calls are evaluated by the Gemini 2.5 Flash classifier, ensuring destructive operations or external data modifications align with active user intent.
 
+### 8.5 Model Selection & Precedence Hierarchy
+Teams can specify custom Gemini models (e.g. `gemini-2.5-pro` for higher reasoning or `gemini-3.5-flash`) by adding `"model"` to their configuration.
+
+The model is resolved using this strict priority cascade:
+1. **Session Scope:** `<session_dir>/session_overrides.json` (`"model": "..."`)
+2. **Project Scope:** `<workspace>/.agents/auto-permissions.json` (`"model": "..."`)
+3. **Global Scope:** `~/.gemini/config/auto-permissions.json` (`"model": "..."`)
+4. **Environment Variable:** `AUTO_PERMISSIONS_MODEL` or `GEMINI_MODEL`
+5. **Default:** `gemini-2.5-flash`
+
 ---
 
 ## 9. Two-Tier Security Architecture: Plugin Gate vs. Platform Container Sandbox

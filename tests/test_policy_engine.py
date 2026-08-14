@@ -15,6 +15,7 @@ from hooks.policy_engine import (
     match_tool_against_rule,
     match_url,
     parse_resource_rule,
+    resolve_configured_model,
 )
 
 
@@ -165,6 +166,35 @@ class TestPolicyEngine(unittest.TestCase):
             guidelines = load_custom_guidelines(workspace_paths=[ws])
             self.assertIn("Treat *.corp.internal requests as safe.", guidelines)
             self.assertIn("Do not modify migrations without ask.", guidelines)
+
+    def test_resolve_configured_model(self):
+        with tempfile.TemporaryDirectory() as ws, tempfile.TemporaryDirectory() as session_dir:
+            # 1. Default fallback
+            self.assertEqual(
+                resolve_configured_model(session_dir=session_dir, workspace_paths=[ws]),
+                "gemini-2.5-flash",
+            )
+
+            # 2. Project config override
+            config_file = os.path.join(ws, PROJECT_CONFIG_REL_PATH)
+            os.makedirs(os.path.dirname(config_file), exist_ok=True)
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump({"model": "gemini-2.5-pro"}, f)
+
+            self.assertEqual(
+                resolve_configured_model(session_dir=session_dir, workspace_paths=[ws]),
+                "gemini-2.5-pro",
+            )
+
+            # 3. Session config override takes precedence
+            session_file = os.path.join(session_dir, "session_overrides.json")
+            with open(session_file, "w", encoding="utf-8") as f:
+                json.dump({"model": "gemini-3.5-flash"}, f)
+
+            self.assertEqual(
+                resolve_configured_model(session_dir=session_dir, workspace_paths=[ws]),
+                "gemini-3.5-flash",
+            )
 
     def test_add_rule_and_evaluate_hierarchy(self):
         with tempfile.TemporaryDirectory() as session_dir, tempfile.TemporaryDirectory() as ws_dir:

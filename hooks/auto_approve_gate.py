@@ -17,7 +17,11 @@ if current_dir not in sys.path:
 
 from audit_logger import log_audit_event_async, resolve_session_log_path  # noqa: E402
 from classifier import classify_tool_call  # noqa: E402
-from policy_engine import evaluate_static_policies, load_custom_guidelines  # noqa: E402
+from policy_engine import (  # noqa: E402
+    evaluate_static_policies,
+    load_custom_guidelines,
+    resolve_configured_model,
+)
 from transcript_parser import read_user_prompts_from_transcript  # noqa: E402
 
 
@@ -111,7 +115,13 @@ def main():
         session_dir=session_dir,
     )
 
-    # 4. Invoke Gemini security classifier
+    # 4. Resolve configured model identifier
+    model_name = resolve_configured_model(
+        session_dir=session_dir,
+        workspace_paths=workspace_paths,
+    )
+
+    # 5. Invoke Gemini security classifier
     raw_prompt, classification, error, latency_ms = classify_tool_call(
         workspace_paths=workspace_paths,
         prior_prompts=prior_prompts,
@@ -121,6 +131,7 @@ def main():
         tool_action=tool_action,
         tool_summary=tool_summary,
         custom_guidelines=custom_guidelines,
+        model=model_name,
     )
 
     # 4. Map classification verdict to Antigravity PreToolUse decision
