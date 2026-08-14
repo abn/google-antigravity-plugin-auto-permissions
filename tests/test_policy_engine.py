@@ -313,6 +313,33 @@ class TestPolicyEngine(unittest.TestCase):
             self.assertEqual(decision, "allow")
             self.assertEqual(scope, "skill_resource")
 
+    def test_is_safe_skill_read_symlinked_plugin(self):
+        with tempfile.TemporaryDirectory() as ws, tempfile.TemporaryDirectory() as plugin_src:
+            # Create a skill inside a source plugin repo
+            skill_md = os.path.join(plugin_src, "skills", "auto-permissions-audit", "SKILL.md")
+            os.makedirs(os.path.dirname(skill_md), exist_ok=True)
+            with open(skill_md, "w", encoding="utf-8") as f:
+                f.write("# Audit Skill")
+
+            # Symlink this plugin into workspace .agents/plugins/
+            ws_plugins = os.path.join(ws, ".agents", "plugins")
+            os.makedirs(ws_plugins, exist_ok=True)
+            os.symlink(plugin_src, os.path.join(ws_plugins, "my-plugin"))
+
+            # Reading via logical symlink path in workspace
+            logical_path = os.path.join(
+                ws_plugins, "my-plugin", "skills", "auto-permissions-audit", "SKILL.md"
+            )
+            res = evaluate_static_policies(
+                tool_name="view_file",
+                tool_args={"AbsolutePath": logical_path, "IsSkillFile": True},
+                workspace_paths=[ws],
+            )
+            self.assertIsNotNone(res)
+            decision, _reason, scope = res
+            self.assertEqual(decision, "allow")
+            self.assertEqual(scope, "skill_resource")
+
     def test_match_subagents_and_schedule_and_image(self):
         # Subagent matching
         self.assertTrue(
