@@ -34,6 +34,7 @@ def evaluate_simulated_permission(
     tool_args: dict[str, Any],
     workspace_paths: list[str],
     prior_prompts: list[str] | None = None,
+    session_goal: str | None = None,
     tool_action: str | None = None,
     tool_summary: str | None = None,
     provider: str | None = None,
@@ -71,6 +72,7 @@ def evaluate_simulated_permission(
             tool_action=tool_action,
             tool_summary=tool_summary,
             custom_guidelines=custom_guidelines,
+            session_goal=session_goal,
         )
         return {
             "mode": f"static_policy_{scope}",
@@ -99,6 +101,7 @@ def evaluate_simulated_permission(
         tool_action=tool_action,
         tool_summary=tool_summary,
         custom_guidelines=custom_guidelines,
+        session_goal=session_goal,
         provider=resolved_provider,
         model=resolved_model,
         endpoint_url=resolved_endpoint,
@@ -203,6 +206,11 @@ def main():
         help="Workspace root path (default: current directory).",
     )
     parser.add_argument(
+        "--goal",
+        "-g",
+        help="Explicit overarching session goal to test against (e.g. 'Refactor auth service').",
+    )
+    parser.add_argument(
         "--history",
         "-H",
         action="append",
@@ -288,6 +296,7 @@ def main():
         tool_args=tool_args,
         workspace_paths=[os.path.abspath(args.workspace)],
         prior_prompts=args.history,
+        session_goal=args.goal,
         provider=args.provider,
         model=args.model,
         endpoint_url=args.endpoint_url,

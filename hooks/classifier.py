@@ -77,8 +77,16 @@ def format_classifier_payload(
     tool_action: str | None = None,
     tool_summary: str | None = None,
     custom_guidelines: list[str] | None = None,
+    session_goal: str | None = None,
 ) -> str:
     """Formats minimal sanitized context into structured XML for the security classifier."""
+    goal_section = ""
+    if session_goal and session_goal.strip():
+        goal_section = f"""<session_goal>
+{session_goal.strip()}
+</session_goal>
+"""
+
     prior_section = ""
     if prior_prompts:
         lines = []
@@ -123,7 +131,7 @@ def format_classifier_payload(
 {json.dumps(workspace_paths)}
 </workspace_roots>
 
-{guidelines_section}{prior_section}<active_user_prompt>
+{goal_section}{guidelines_section}{prior_section}<active_user_prompt>
 {active_prompt.strip() if active_prompt else "(No explicit active prompt provided)"}
 </active_user_prompt>
 
@@ -324,6 +332,7 @@ def classify_tool_call(
     tool_action: str | None = None,
     tool_summary: str | None = None,
     custom_guidelines: list[str] | None = None,
+    session_goal: str | None = None,
     provider: str = DEFAULT_PROVIDER,
     model: str = DEFAULT_MODEL,
     endpoint_url: str | None = None,
@@ -344,6 +353,7 @@ def classify_tool_call(
         tool_action=tool_action,
         tool_summary=tool_summary,
         custom_guidelines=custom_guidelines,
+        session_goal=session_goal,
     )
 
     norm_provider = (provider or DEFAULT_PROVIDER).lower()

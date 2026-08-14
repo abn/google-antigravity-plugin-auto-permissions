@@ -231,6 +231,44 @@ class TestGateE2E(unittest.TestCase):
                 self.assertEqual(res["reason"], "Subagent research requested by user")
                 mock_classify.assert_called_once()
 
+    @patch("hooks.auto_approve_gate.classify_tool_call")
+    def test_gate_e2e_with_goal(self, mock_classify):
+        mock_classify.return_value = (
+            "<raw_prompt>",
+            {
+                "decision": "allow",
+                "reason": "Aligned with session goal",
+                "risk_category": "safe_routine",
+            },
+            None,
+            35.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_payload = {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "make deploy"}},
+                "stepIdx": 7,
+                "conversationId": "test-e2e-goal",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+                "goal": "Deploy backend to staging",
+            }
+
+            stdin_data = json.dumps(input_payload)
+            with (
+                patch("sys.stdin", io.StringIO(stdin_data)),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout,
+            ):
+                gate.main()
+                output_text = mock_stdout.getvalue().strip()
+                res = json.loads(output_text)
+                self.assertEqual(res["decision"], "allow")
+
+                # Verify session_goal was forwarded to classify_tool_call
+                mock_classify.assert_called_once()
+                call_kwargs = mock_classify.call_args.kwargs
+                self.assertEqual(call_kwargs.get("session_goal"), "Deploy backend to staging")
+
 
 if __name__ == "__main__":
     unittest.main()

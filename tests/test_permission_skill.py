@@ -34,6 +34,18 @@ class TestPermissionSkill(unittest.TestCase):
             self.assertIn("model_response", res)
             self.assertIn("<proposed_tool_call>", res["raw_prompt"])
 
+    def test_evaluate_simulated_permission_with_goal(self):
+        with tempfile.TemporaryDirectory() as ws:
+            res = evaluate_simulated_permission(
+                active_prompt="run tests",
+                tool_name="run_command",
+                tool_args={"CommandLine": "pytest -v"},
+                workspace_paths=[ws],
+                session_goal="Upgrade Python to 3.14 and verify test suite",
+            )
+            self.assertIn("<session_goal>", res["raw_prompt"])
+            self.assertIn("Upgrade Python to 3.14 and verify test suite", res["raw_prompt"])
+
     @patch("hooks.classifier.urllib.request.urlopen")
     def test_evaluate_simulated_permission_classifier_mock(self, mock_urlopen):
         import json

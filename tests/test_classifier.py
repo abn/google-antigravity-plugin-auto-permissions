@@ -54,6 +54,19 @@ class TestClassifier(unittest.TestCase):
         self.assertIn("- [Turn -1]: Update unit tests", payload)
         self.assertIn("Tool: run_command", payload)
 
+    def test_format_classifier_payload_with_session_goal(self):
+        payload = format_classifier_payload(
+            workspace_paths=["/home/abn/workspace/test"],
+            prior_prompts=["Step 1"],
+            active_prompt="Step 2",
+            tool_name="run_command",
+            tool_args={"CommandLine": "pytest"},
+            session_goal="Refactor backend authentication service",
+        )
+        self.assertIn("<session_goal>", payload)
+        self.assertIn("Refactor backend authentication service", payload)
+        self.assertIn("<active_user_prompt>", payload)
+
     @patch("urllib.request.urlopen")
     def test_classify_tool_call_mock_success(self, mock_urlopen):
         mock_response = MagicMock()

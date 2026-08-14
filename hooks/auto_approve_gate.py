@@ -59,6 +59,25 @@ def main():
     transcript_path = payload.get("transcriptPath", "")
     artifact_dir = payload.get("artifactDirectoryPath", "")
 
+    # Extract optional explicit goal object or string
+    raw_goal = (
+        payload.get("goal")
+        or payload.get("sessionGoal")
+        or payload.get("activeGoal")
+        or payload.get("session_goal")
+    )
+    if isinstance(raw_goal, dict):
+        session_goal = (
+            raw_goal.get("description")
+            or raw_goal.get("text")
+            or raw_goal.get("goal")
+            or json.dumps(raw_goal)
+        )
+    elif isinstance(raw_goal, str):
+        session_goal = raw_goal.strip()
+    else:
+        session_goal = None
+
     # Resolve session directory for overrides and audit logging
     log_path = resolve_session_log_path(artifact_dir, transcript_path, conversation_id)
     session_dir = os.path.dirname(os.path.abspath(log_path))
@@ -173,6 +192,7 @@ def main():
         tool_action=tool_action,
         tool_summary=tool_summary,
         custom_guidelines=custom_guidelines,
+        session_goal=session_goal,
         provider=classifier_cfg["provider"],
         model=classifier_cfg["model"],
         endpoint_url=classifier_cfg["endpoint_url"],
@@ -209,6 +229,8 @@ def main():
         "prior_prompts_count": len(prior_prompts),
         "workspace_roots": workspace_paths,
     }
+    if session_goal:
+        context_summary["session_goal"] = session_goal
 
     log_thread = log_audit_event_async(
         artifact_dir=artifact_dir,
