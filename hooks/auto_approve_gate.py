@@ -17,7 +17,7 @@ if current_dir not in sys.path:
 
 from audit_logger import log_audit_event_async, resolve_session_log_path  # noqa: E402
 from classifier import classify_tool_call  # noqa: E402
-from policy_engine import evaluate_static_policies  # noqa: E402
+from policy_engine import evaluate_static_policies, load_custom_guidelines  # noqa: E402
 from transcript_parser import read_user_prompts_from_transcript  # noqa: E402
 
 
@@ -105,7 +105,13 @@ def main():
     # 2. Parse user prompt history from transcript.jsonl
     prior_prompts, active_prompt = read_user_prompts_from_transcript(transcript_path, max_history=4)
 
-    # 3. Invoke Gemini security classifier
+    # 3. Load custom semantic guidelines from policy configurations
+    custom_guidelines = load_custom_guidelines(
+        workspace_paths=workspace_paths,
+        session_dir=session_dir,
+    )
+
+    # 4. Invoke Gemini security classifier
     raw_prompt, classification, error, latency_ms = classify_tool_call(
         workspace_paths=workspace_paths,
         prior_prompts=prior_prompts,
@@ -114,6 +120,7 @@ def main():
         tool_args=tool_args,
         tool_action=tool_action,
         tool_summary=tool_summary,
+        custom_guidelines=custom_guidelines,
     )
 
     # 4. Map classification verdict to Antigravity PreToolUse decision

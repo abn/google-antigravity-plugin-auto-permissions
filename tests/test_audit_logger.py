@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 from hooks.audit_logger import (
+    diagnose_audit_records,
     log_audit_event_async,
     resolve_session_log_path,
     write_audit_record_sync,
@@ -71,6 +72,47 @@ class TestAuditLogger(unittest.TestCase):
                 self.assertEqual(data["conversationId"], "test-conv-123")
                 self.assertEqual(data["classification"]["decision"], "allow")
                 self.assertEqual(data["classification"]["latency_ms"], 123.4)
+
+    def test_diagnose_audit_records(self):
+        records = [
+            {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "pytest -v"}},
+                "hook_output": {"decision": "allow", "reason": "Tests safe"},
+                "classification": {
+                    "decision": "allow",
+                    "risk_category": "safe_routine",
+                    "latency_ms": 320.0,
+                },
+            },
+            {
+                "toolCall": {
+                    "name": "run_command",
+                    "args": {"CommandLine": "git push --force origin main"},
+                },
+                "hook_output": {"decision": "deny", "reason": "Destructive wipe"},
+                "classification": {
+                    "decision": "deny",
+                    "risk_category": "data_exfiltration_or_destruction",
+                    "latency_ms": 2500.0,
+                },
+            },
+            {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "npm publish"}},
+                "hook_output": {"decision": "ask", "reason": "Missing GEMINI_API_KEY"},
+                "classification": {
+                    "decision": "ask",
+                    "risk_category": "missing_credentials",
+                    "latency_ms": 0.0,
+                },
+            },
+        ]
+
+        diag = diagnose_audit_records(records)
+        self.assertEqual(diag["total_evaluated"], 3)
+        self.assertEqual(len(diag["denials"]), 1)
+        self.assertEqual(len(diag["high_latency"]), 1)
+        self.assertEqual(len(diag["error_fallbacks"]), 1)
+        self.assertTrue(len(diag["recommendations"]) >= 2)
 
     def test_generate_markdown_summary(self):
         records = [

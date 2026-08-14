@@ -244,6 +244,20 @@ python3 skills/auto-permissions-fix/scripts/fix_permissions.py --last --allow --
 python3 skills/auto-permissions-fix/scripts/fix_permissions.py --last --allow --scope project
 ```
 
+### 8.3 Structured Semantic Guidelines (`custom_guidelines`)
+When teams require domain-specific context for the Gemini security classifier (e.g. recognizing internal development endpoints), rules can be specified in `.agents/auto-permissions.json` under `"custom_guidelines"`:
+
+```json
+{
+  "custom_guidelines": [
+    "Treat requests to internal endpoints *.corp.internal as safe testing operations.",
+    "Require explicit confirmation before modifying database migrations under migrations/."
+  ]
+}
+```
+
+* **System Invariant:** Core safety invariants (credential protection, destructive branch wipes, unprompted external publishing) strictly supersede custom guidelines in case of conflict.
+
 ---
 
 ## 9. Two-Tier Security Architecture: Plugin Gate vs. Platform Container Sandbox

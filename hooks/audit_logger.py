@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Thread-safe, rotatable asynchronous audit logger for Google Antigravity Auto-Permissions Hook.
-Records JSON Lines audit traces in the session directory and provides summary helpers.
+Rotatable Asynchronous Audit Logger for Google Antigravity Auto-Permissions Hook.
+Appends atomic JSON Lines records to <session_dir>/audit.jsonl and manages log rotation.
+Also provides audit diagnostics and summary formatters.
 """
 
-import contextlib
 import datetime
 import json
 import os
@@ -13,6 +13,7 @@ from typing import Any
 
 DEFAULT_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 DEFAULT_BACKUP_COUNT = 3
+DEFAULT_LOG_NAME = "audit.jsonl"
 
 
 def resolve_session_log_path(
@@ -20,62 +21,51 @@ def resolve_session_log_path(
     transcript_path: str | None = None,
     conversation_id: str | None = None,
 ) -> str:
-    """Resolves the canonical path for audit.jsonl within the active session directory."""
-    if artifact_dir:
-        target_dir = os.path.abspath(os.path.expanduser(artifact_dir))
-        os.makedirs(target_dir, exist_ok=True)
-        return os.path.join(target_dir, "audit.jsonl")
+    """Resolves the active conversation's audit log file path."""
+    if artifact_dir and os.path.isabs(artifact_dir):
+        return os.path.join(artifact_dir, DEFAULT_LOG_NAME)
 
-    if transcript_path:
-        norm_path = os.path.abspath(os.path.expanduser(transcript_path))
-        parent = os.path.dirname(norm_path)
-        if parent.endswith(".system_generated/logs") or parent.endswith(".system_generated/logs/"):
-            session_dir = os.path.abspath(os.path.join(parent, "../.."))
-            os.makedirs(session_dir, exist_ok=True)
-            return os.path.join(session_dir, "audit.jsonl")
-        elif parent:
-            os.makedirs(parent, exist_ok=True)
-            return os.path.join(parent, "audit.jsonl")
+    if transcript_path and os.path.isfile(transcript_path):
+        session_root = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(transcript_path)))
+        )
+        return os.path.join(session_root, DEFAULT_LOG_NAME)
 
-    cid = conversation_id or "default_session"
-    home_dir = os.path.expanduser("~")
-    fallback_dir = os.path.join(home_dir, ".gemini", "antigravity", "brain", cid)
-    with contextlib.suppress(OSError):
-        os.makedirs(fallback_dir, exist_ok=True)
-        return os.path.join(fallback_dir, "audit.jsonl")
+    if conversation_id:
+        fallback = os.path.expanduser(f"~/.gemini/antigravity/brain/{conversation_id}")
+        return os.path.join(fallback, DEFAULT_LOG_NAME)
 
-    # Safe fallback if home directory is read-only in sandbox
-    tmp_fallback = os.path.join("/tmp", f"antigravity_audit_{cid}")
-    with contextlib.suppress(OSError):
-        os.makedirs(tmp_fallback, exist_ok=True)
-        return os.path.join(tmp_fallback, "audit.jsonl")
-
-    return os.path.abspath("./audit.jsonl")
+    # Local fallback for standalone testing
+    return os.path.abspath(DEFAULT_LOG_NAME)
 
 
-def rotate_log_file_if_needed(file_path: str, max_bytes: int, backup_count: int) -> None:
-    """Rotates log file if it exceeds max_bytes (e.g. audit.jsonl -> audit.1.jsonl)."""
-    if not os.path.exists(file_path):
+def rotate_log_file_if_needed(
+    log_path: str,
+    max_bytes: int = DEFAULT_MAX_BYTES,
+    backup_count: int = DEFAULT_BACKUP_COUNT,
+) -> None:
+    """Rotates the log file if its size exceeds max_bytes."""
+    if not os.path.exists(log_path):
         return
 
     try:
-        if os.path.getsize(file_path) < max_bytes:
+        if os.path.getsize(log_path) < max_bytes:
             return
 
         for i in range(backup_count - 1, 0, -1):
-            sfn = f"{file_path}.{i}"
-            dfn = f"{file_path}.{i + 1}"
+            sfn = f"{log_path}.{i}"
+            dfn = f"{log_path}.{i + 1}"
             if os.path.exists(sfn):
                 if os.path.exists(dfn):
                     os.remove(dfn)
                 os.rename(sfn, dfn)
 
-        dfn = f"{file_path}.1"
+        dfn = f"{log_path}.1"
         if os.path.exists(dfn):
             os.remove(dfn)
-        os.rename(file_path, dfn)
+        os.rename(log_path, dfn)
     except Exception:
-        # Ignore rotation race conditions or permissions issues gracefully
+        # Rotation failure should never crash the permission gate
         pass
 
 
@@ -146,6 +136,82 @@ def load_audit_records(audit_path: str) -> list[dict[str, Any]]:
                 except json.JSONDecodeError:
                     continue
     return records
+
+
+def diagnose_audit_records(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """
+    Analyzes audit records to identify issues, anomalies, and optimization opportunities.
+    Returns structured findings and actionable recommendations.
+    """
+    total = len(records)
+    denials = []
+    high_latency = []
+    error_fallbacks = []
+    asks = []
+
+    for r in records:
+        hook_out = r.get("hook_output", {})
+        dec = hook_out.get("decision", "").lower()
+        reason = hook_out.get("reason", "")
+        tool = r.get("toolCall", {}).get("name", "unknown")
+        args = r.get("toolCall", {}).get("args", {})
+        target = args.get("CommandLine") or args.get("TargetFile") or json.dumps(args)[:60]
+        classification = r.get("classification", {})
+        latency = classification.get("latency_ms", 0.0)
+        risk_cat = classification.get("risk_category", "")
+
+        if dec == "deny":
+            denials.append(
+                {
+                    "tool": tool,
+                    "target": target,
+                    "reason": reason,
+                    "risk_category": risk_cat,
+                }
+            )
+        elif dec in ("ask", "force_ask"):
+            asks.append(
+                {
+                    "tool": tool,
+                    "target": target,
+                    "reason": reason,
+                    "risk_category": risk_cat,
+                }
+            )
+
+        if latency > 2000.0 and "static_policy" not in risk_cat:
+            high_latency.append({"tool": tool, "target": target, "latency_ms": latency})
+
+        if risk_cat in ("missing_credentials", "classifier_error"):
+            error_fallbacks.append({"reason": reason, "risk_category": risk_cat})
+
+    recommendations = []
+    if denials:
+        recommendations.append(
+            f"Found {len(denials)} denied action(s). If these actions are intended, use "
+            "`python3 skills/auto-permissions-fix/scripts/fix_permissions.py --last --allow` "
+            "to generate ACL rules."
+        )
+    if error_fallbacks:
+        recommendations.append(
+            "Classifier fallback detected (missing GEMINI_API_KEY or connection error). "
+            "Ensure GEMINI_API_KEY is exported in your environment."
+        )
+    if high_latency:
+        recommendations.append(
+            f"{len(high_latency)} call(s) had high latency (>2000ms). Consider adding static "
+            "ACL rules in `.agents/auto-permissions.json` for frequent commands to enable "
+            "0.1ms fast-path execution."
+        )
+
+    return {
+        "total_evaluated": total,
+        "denials": denials,
+        "asks": asks,
+        "high_latency": high_latency,
+        "error_fallbacks": error_fallbacks,
+        "recommendations": recommendations,
+    }
 
 
 def generate_markdown_summary(records: list[dict[str, Any]], limit: int = 5) -> str:

@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
+import json
 import os
 import tempfile
 import unittest
 
 from hooks.policy_engine import (
+    PROJECT_CONFIG_REL_PATH,
     add_rule_to_scope,
     evaluate_static_policies,
     is_path_in_workspaces,
+    load_custom_guidelines,
     match_command,
     match_path,
     match_tool_against_rule,
@@ -105,6 +108,26 @@ class TestPolicyEngine(unittest.TestCase):
             decision, _reason, scope = res
             self.assertEqual(decision, "allow")
             self.assertEqual(scope, "workspace_boundary")
+
+    def test_load_custom_guidelines(self):
+        with tempfile.TemporaryDirectory() as ws:
+            config_file = os.path.join(ws, PROJECT_CONFIG_REL_PATH)
+            os.makedirs(os.path.dirname(config_file), exist_ok=True)
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "allow": [],
+                        "custom_guidelines": [
+                            "Treat *.corp.internal requests as safe.",
+                            "Do not modify migrations without ask.",
+                        ],
+                    },
+                    f,
+                )
+
+            guidelines = load_custom_guidelines(workspace_paths=[ws])
+            self.assertIn("Treat *.corp.internal requests as safe.", guidelines)
+            self.assertIn("Do not modify migrations without ask.", guidelines)
 
     def test_add_rule_and_evaluate_hierarchy(self):
         with tempfile.TemporaryDirectory() as session_dir, tempfile.TemporaryDirectory() as ws_dir:

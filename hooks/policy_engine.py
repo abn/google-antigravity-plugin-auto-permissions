@@ -176,8 +176,11 @@ def is_path_in_workspaces(target_path: str, workspace_paths: list[str] | None) -
 
 
 def load_policy_file(file_path: str) -> dict[str, list[str]]:
-    """Loads a policy JSON file returning a dict with keys 'allow', 'ask', 'deny'."""
-    policy = {"allow": [], "ask": [], "deny": []}
+    """
+    Loads a policy JSON file returning a dict with keys
+    'allow', 'ask', 'deny', 'custom_guidelines'.
+    """
+    policy = {"allow": [], "ask": [], "deny": [], "custom_guidelines": []}
     if not file_path or not os.path.isfile(file_path):
         return policy
 
@@ -185,13 +188,48 @@ def load_policy_file(file_path: str) -> dict[str, list[str]]:
         with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
             if isinstance(data, dict):
-                for k in ("allow", "ask", "deny"):
+                for k in ("allow", "ask", "deny", "custom_guidelines"):
                     val = data.get(k, [])
                     if isinstance(val, list):
                         policy[k] = [str(x) for x in val]
     except Exception:
         pass
     return policy
+
+
+def load_custom_guidelines(
+    workspace_paths: list[str] | None = None,
+    session_dir: str | None = None,
+) -> list[str]:
+    """
+    Loads and aggregates custom semantic guidelines across Global, Project, and Session scopes.
+    Returns a deduplicated list of strings.
+    """
+    guidelines: list[str] = []
+    seen: set[str] = set()
+
+    scope_files = []
+    # 1. Global
+    scope_files.append(GLOBAL_CONFIG_PATH)
+    # 2. Project
+    if workspace_paths:
+        for ws in workspace_paths:
+            scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
+    # 3. Session
+    if session_dir and os.path.isdir(session_dir):
+        scope_files.append(os.path.join(session_dir, SESSION_OVERRIDES_FILENAME))
+
+    for file_path in scope_files:
+        if not os.path.isfile(file_path):
+            continue
+        policy = load_policy_file(file_path)
+        for g in policy.get("custom_guidelines", []):
+            clean_g = g.strip()
+            if clean_g and clean_g not in seen:
+                seen.add(clean_g)
+                guidelines.append(clean_g)
+
+    return guidelines
 
 
 def save_policy_file(file_path: str, policy: dict[str, list[str]]) -> None:

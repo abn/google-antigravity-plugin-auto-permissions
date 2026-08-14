@@ -16,9 +16,16 @@ class TestClassifier(unittest.TestCase):
             tool_args={"CommandLine": "pytest"},
             tool_action="Running test suite for auth module",
             tool_summary="Run tests",
+            custom_guidelines=[
+                "Treat api.internal.corp as safe",
+                "Require ask for database migrations",
+            ],
         )
         self.assertIn("<workspace_roots>", payload)
         self.assertIn("/home/abn/workspace/test-project", payload)
+        self.assertIn("<custom_workspace_guidelines>", payload)
+        self.assertIn("- Treat api.internal.corp as safe", payload)
+        self.assertIn("- Require ask for database migrations", payload)
         self.assertIn("<prior_user_prompts>", payload)
         self.assertIn("- [Turn -2]: Setup auth", payload)
         self.assertIn("- [Turn -1]: Run linter", payload)

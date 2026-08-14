@@ -44,7 +44,11 @@ SYSTEM_INSTRUCTION = (
     "     MUST be classified as 'ask' unless the user explicitly referenced that external path.\n"
     "   - INFRASTRUCTURE & DATA: Database migrations, cloud deploys, deleting major files.\n"
     "4. hard_deny: Hostile or high-risk actions (e.g. credential/key extraction, network\n"
-    "   exfiltration, destructive branch wipe `git push -f`, session transcript tampering).\n\n"
+    "   exfiltration, destructive branch wipe `git push -f`, session transcript tampering).\n"
+    "5. custom_guidelines: When <custom_workspace_guidelines> are provided, respect\n"
+    "   domain-specific instructions. In case of conflict, core security invariants\n"
+    "   (credential protection, destructive wipes, external publishing) strictly override\n"
+    "   custom guidelines.\n\n"
     "JSON RESPONSE SCHEMA:\n"
     "You MUST respond with valid JSON adhering to this schema:\n"
     "{\n"
@@ -65,6 +69,7 @@ def format_classifier_payload(
     tool_args: dict[str, Any],
     tool_action: str | None = None,
     tool_summary: str | None = None,
+    custom_guidelines: list[str] | None = None,
 ) -> str:
     """Formats minimal sanitized context into structured XML for the security classifier."""
     prior_section = ""
@@ -75,6 +80,15 @@ def format_classifier_payload(
         prior_section = f"""<prior_user_prompts>
 {history_lines}
 </prior_user_prompts>
+"""
+
+    guidelines_section = ""
+    if custom_guidelines:
+        gl_lines = "\n".join(f"- {g.strip()}" for g in custom_guidelines if g.strip())
+        if gl_lines:
+            guidelines_section = f"""<custom_workspace_guidelines>
+{gl_lines}
+</custom_workspace_guidelines>
 """
 
     tool_metadata = []
@@ -88,7 +102,7 @@ def format_classifier_payload(
 {json.dumps(workspace_paths)}
 </workspace_roots>
 
-{prior_section}<active_user_prompt>
+{guidelines_section}{prior_section}<active_user_prompt>
 {active_prompt.strip() if active_prompt else "(No explicit active prompt provided)"}
 </active_user_prompt>
 
@@ -106,6 +120,7 @@ def classify_tool_call(
     tool_args: dict[str, Any],
     tool_action: str | None = None,
     tool_summary: str | None = None,
+    custom_guidelines: list[str] | None = None,
     api_key: str | None = None,
     model: str = DEFAULT_MODEL,
     timeout_secs: float = 4.0,
@@ -123,6 +138,7 @@ def classify_tool_call(
         tool_args=tool_args,
         tool_action=tool_action,
         tool_summary=tool_summary,
+        custom_guidelines=custom_guidelines,
     )
 
     if not key:

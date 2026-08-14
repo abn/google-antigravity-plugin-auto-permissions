@@ -60,18 +60,20 @@ This plugin includes two specialized skills accessible via chat commands or stan
 ### 1. `/auto-permissions-audit` (Audit & Inspection)
 Inspects session audit traces, decision breakdowns, latency metrics, and failure states.
 
-* **View human-readable summary of the active session:**
+* **Inspect active session audit log:**
   ```bash
-  python3 skills/auto-permissions-audit/scripts/view_audit.py <path_to_audit.jsonl>
+  python3 skills/auto-permissions-audit/scripts/view_audit.py <path_to_session_audit.jsonl>
   ```
-* **Render as a compact, collapsible Markdown table:**
+* **Run automated issue diagnosis & prescriptive recommendations:**
   ```bash
-  python3 skills/auto-permissions-audit/scripts/view_audit.py <path_to_audit.jsonl> --markdown
+  python3 skills/auto-permissions-audit/scripts/view_audit.py <path_to_session_audit.jsonl> --diagnose
+  ```
+* **Render compact Markdown summary:**
+  ```bash
+  python3 skills/auto-permissions-audit/scripts/view_audit.py <path_to_session_audit.jsonl> --markdown
   ```
 
----
-
-### 2. `/auto-permissions-fix` (SELinux `audit2allow` for Antigravity)
+### 2. `auto-permissions-fix` (SELinux `audit2allow` Paradigm)
 Parses denials from `audit.jsonl` and generates persistent ACL grants across Session, Project, or Global scopes.
 
 * **Auto-allow the most recent denied action in the current session:**
@@ -90,6 +92,35 @@ Parses denials from `audit.jsonl` and generates persistent ACL grants across Ses
   ```bash
   python3 skills/auto-permissions-fix/scripts/fix_permissions.py
   ```
+
+---
+
+## Configuration: Static ACLs & Custom Semantic Guidelines
+
+You can configure project-level policies in `.agents/auto-permissions.json` or global user policies in `~/.gemini/config/auto-permissions.json`:
+
+```json
+{
+  "allow": [
+    "command(uv lock)",
+    "command(pytest -v)"
+  ],
+  "ask": [
+    "command(git push .*)",
+    "command(gh pr .*)"
+  ],
+  "deny": [
+    "write_file(.github/workflows/.*)"
+  ],
+  "custom_guidelines": [
+    "Treat requests to internal endpoints *.corp.internal as safe testing operations.",
+    "Require explicit confirmation before modifying database migrations under migrations/."
+  ]
+}
+```
+
+* **`allow` / `ask` / `deny`:** Deterministic static ACLs evaluated with `0.1ms` latency before invoking the Gemini classifier.
+* **`custom_guidelines`:** Structured semantic guidelines injected into the security classifier prompt. Core security invariants (credential protection, destructive branch wipes, unprompted remote publishing) strictly supersede custom guidelines in case of conflict.
 
 ---
 
