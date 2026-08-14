@@ -232,12 +232,27 @@ def diagnose_audit_records(records: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def generate_markdown_summary(records: list[dict[str, Any]], limit: int = 5) -> str:
+def generate_markdown_summary(
+    records: list[dict[str, Any]],
+    limit: int = 10,
+    since_step_idx: int | None = None,
+    turn_scoped: bool = False,
+) -> str | None:
     """Generates a compact, collapsible Markdown summary table of recent decisions."""
     if not records:
-        return "🛡️ *No security gate decisions recorded for this session.*"
+        return None
 
-    subset = records[-limit:]
+    if turn_scoped and since_step_idx is not None:
+        subset = [r for r in records if r.get("stepIdx", 0) >= since_step_idx]
+        if not subset:
+            return None
+        header_scope = "in this turn"
+    else:
+        subset = records[-limit:]
+        if not subset:
+            return None
+        header_scope = "evaluated"
+
     allowed = sum(
         1 for r in subset if r.get("hook_output", {}).get("decision", "").lower() == "allow"
     )
@@ -246,7 +261,7 @@ def generate_markdown_summary(records: list[dict[str, Any]], limit: int = 5) -> 
     )
     asked = len(subset) - allowed - denied
 
-    header_status = f"{len(subset)} actions evaluated ({allowed} allowed, {denied} denied"
+    header_status = f"{len(subset)} actions {header_scope} ({allowed} allowed, {denied} denied"
     if asked > 0:
         header_status += f", {asked} escalated"
     header_status += ")"

@@ -89,3 +89,27 @@ def read_user_prompts_from_transcript(
         prior_prompts = rolling_recent
 
     return prior_prompts, active_prompt
+
+
+def get_last_user_step_index(transcript_path: str) -> int | None:
+    """
+    Finds the step index of the most recent user prompt in transcript.jsonl.
+    """
+    if not transcript_path or not os.path.isfile(transcript_path):
+        return None
+
+    last_step_idx = None
+    try:
+        with open(transcript_path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                with contextlib.suppress(json.JSONDecodeError):
+                    step = json.loads(line)
+                    text = extract_user_content(step)
+                    if text is not None:
+                        last_step_idx = step.get("step_index", step.get("step_idx", 0))
+    except Exception:
+        return None
+    return last_step_idx

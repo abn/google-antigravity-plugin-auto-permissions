@@ -4,10 +4,33 @@ import os
 import tempfile
 import unittest
 
-from hooks.transcript_parser import extract_user_content, read_user_prompts_from_transcript
+from hooks.transcript_parser import (
+    extract_user_content,
+    get_last_user_step_index,
+    read_user_prompts_from_transcript,
+)
 
 
 class TestTranscriptParser(unittest.TestCase):
+    def test_get_last_user_step_index(self):
+        with tempfile.NamedTemporaryFile("w+", suffix=".jsonl", delete=False) as f:
+            lines = [
+                {"type": "USER_INPUT", "step_index": 1, "content": "Turn 1"},
+                {"type": "PLANNER_RESPONSE", "step_index": 2, "content": "Working"},
+                {"type": "USER_INPUT", "step_index": 15, "content": "Turn 2"},
+                {"type": "PLANNER_RESPONSE", "step_index": 16, "content": "Working 2"},
+            ]
+            for line in lines:
+                f.write(json.dumps(line) + "\n")
+            temp_path = f.name
+
+        try:
+            self.assertEqual(get_last_user_step_index(temp_path), 15)
+            self.assertIsNone(get_last_user_step_index("/non/existent/path"))
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
     def test_extract_user_content_types(self):
         # Step with type USER_INPUT and string content
         step1 = {"type": "USER_INPUT", "content": "Run the tests"}

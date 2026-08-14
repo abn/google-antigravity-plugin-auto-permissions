@@ -20,6 +20,7 @@ from audit_logger import (  # noqa: E402
     load_audit_records,
     resolve_session_log_path,
 )
+from transcript_parser import get_last_user_step_index  # noqa: E402
 
 
 def main():
@@ -49,15 +50,28 @@ def main():
             sys.stdout.flush()
             return
 
-        # Generate collapsible Markdown table from recent records
-        md_summary = generate_markdown_summary(records, limit=10)
+        # Find starting step index of the active user turn
+        last_user_step_idx = get_last_user_step_index(transcript_path)
+
+        # Generate turn-scoped Markdown summary (records evaluated since active prompt)
+        md_summary = generate_markdown_summary(
+            records=records,
+            since_step_idx=last_user_step_idx,
+            turn_scoped=True,
+        )
+
+        # If no security gate actions were evaluated during this turn, suppress summary
+        if not md_summary:
+            print(json.dumps({"injectSteps": []}))
+            sys.stdout.flush()
+            return
 
         ephemeral_text = (
-            "[Auto-Permissions Security Gate Advisory]\n"
-            "The following tool operations were evaluated by the security gate:\n\n"
-            f"{md_summary}\n\n"
-            "Instruction: At the conclusion of your final response to the user, please append "
-            "the collapsible Security Gate Summary above to provide visibility into decisions."
+            "### 🛡️ MANDATORY SECURITY DISCLOSURE\n"
+            "The security gate evaluated the following tool actions during this active turn. "
+            "At the conclusion of your final response, append the exact collapsible "
+            "Markdown summary below:\n\n"
+            f"{md_summary}\n"
         )
 
         output = {
