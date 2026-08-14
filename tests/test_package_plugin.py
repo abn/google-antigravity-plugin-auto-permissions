@@ -25,6 +25,8 @@ class TestPackagePlugin(unittest.TestCase):
 
             self.assertTrue(tar_path.exists())
             self.assertTrue(zip_path.exists())
+            self.assertTrue((out_dir / "auto-permissions.tar.gz").exists())
+            self.assertTrue((out_dir / "auto-permissions.zip").exists())
 
             with tarfile.open(tar_path, "r:gz") as tar:
                 names = tar.getnames()

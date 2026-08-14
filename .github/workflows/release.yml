@@ -27,7 +27,7 @@ jobs:
         run: |
           python3 .contrib/package_plugin.py --output-dir dist
           cd dist
-          sha256sum auto-permissions-* > SHA256SUMS.txt
+          sha256sum auto-permissions* > SHA256SUMS.txt
 
       - name: Upload Release Assets
         if: ${{ steps.release.outputs.release_created }}
@@ -35,8 +35,8 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           gh release upload ${{ steps.release.outputs.tag_name }} \
-            dist/auto-permissions-*.tar.gz \
-            dist/auto-permissions-*.zip \
+            dist/auto-permissions*.tar.gz \
+            dist/auto-permissions*.zip \
             dist/SHA256SUMS.txt \
             --clobber
 
