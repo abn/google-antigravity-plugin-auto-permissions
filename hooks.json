@@ -15,13 +15,9 @@
     ],
     "PreInvocation": [
       {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 hooks/pre_invocation.py || python hooks/pre_invocation.py",
-            "timeout": 5
-          }
-        ]
+        "type": "command",
+        "command": "python3 hooks/pre_invocation.py || python hooks/pre_invocation.py",
+        "timeout": 5
       }
     ]
   }
