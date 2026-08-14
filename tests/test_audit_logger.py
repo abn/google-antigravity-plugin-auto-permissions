@@ -105,14 +105,27 @@ class TestAuditLogger(unittest.TestCase):
                     "latency_ms": 0.0,
                 },
             },
+            {
+                "toolCall": {
+                    "name": "run_command",
+                    "args": {"CommandLine": "git commit -m 'feat'", "BypassSandbox": True},
+                },
+                "hook_output": {"decision": "allow", "reason": "User requested commit"},
+                "classification": {
+                    "decision": "allow",
+                    "risk_category": "safe_routine",
+                    "latency_ms": 1200.0,
+                },
+            },
         ]
 
         diag = diagnose_audit_records(records)
-        self.assertEqual(diag["total_evaluated"], 3)
+        self.assertEqual(diag["total_evaluated"], 4)
         self.assertEqual(len(diag["denials"]), 1)
+        self.assertEqual(len(diag["sandbox_bypasses"]), 1)
         self.assertEqual(len(diag["high_latency"]), 1)
         self.assertEqual(len(diag["error_fallbacks"]), 1)
-        self.assertTrue(len(diag["recommendations"]) >= 2)
+        self.assertTrue(len(diag["recommendations"]) >= 3)
 
     def test_generate_markdown_summary(self):
         records = [

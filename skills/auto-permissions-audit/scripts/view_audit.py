@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 CLI helper to inspect and summarize auto-permissions audit records from audit.jsonl.
-Supports plain terminal output, compact Markdown summary tables, and issue diagnostics.
+Supports plain terminal output, compact Markdown summary tables, issue diagnostics,
+and container sandbox elevation detection.
 """
 
 import argparse
@@ -80,7 +81,11 @@ def inspect_audit_log(
 
     # Diagnostic section
     diagnostics = diagnose_audit_records(records)
-    if diagnose or diagnostics["denials"] or diagnostics["error_fallbacks"]:
+    has_issues = (
+        diagnostics["denials"] or diagnostics["error_fallbacks"] or diagnostics["sandbox_bypasses"]
+    )
+
+    if diagnose or has_issues:
         print("=" * 80)
         print("🔍 SECURITY GATE ISSUE DIAGNOSTICS & RECOMMENDATIONS")
         print("=" * 80)
@@ -92,6 +97,17 @@ def inspect_audit_log(
                 print(f"    Reason: {den['reason']}")
             print()
 
+        if diagnostics["sandbox_bypasses"]:
+            print(
+                f"📦 Host Sandbox Elevation Events ({len(diagnostics['sandbox_bypasses'])}):\n"
+                "  These commands were ALLOWED by auto-permissions but used BypassSandbox: true.\n"
+                "  (Antigravity Container Sandbox mounted .git/ or target paths as read-only,\n"
+                "  causing the host platform to display an interactive confirmation dialog.)"
+            )
+            for sb in diagnostics["sandbox_bypasses"]:
+                print(f"  - [{sb['tool']}] {sb['target']}")
+            print()
+
         if diagnostics["error_fallbacks"]:
             print(f"⚠️  Fallback Errors ({len(diagnostics['error_fallbacks'])}):")
             for err in diagnostics["error_fallbacks"]:
@@ -99,7 +115,7 @@ def inspect_audit_log(
             print()
 
         if diagnostics["recommendations"]:
-            print("💡 Actionable Recommendations:")
+            print("💡 Actionable Recommendations & Mitigations:")
             for rec in diagnostics["recommendations"]:
                 print(f"  * {rec}")
             print()
@@ -118,7 +134,7 @@ def main():
         "--diagnose",
         "-d",
         action="store_true",
-        help="Display automated issue diagnosis and recommendations.",
+        help="Display automated issue diagnosis, sandbox bypass events, and recommendations.",
     )
 
     args = parser.parse_args()

@@ -140,14 +140,15 @@ def load_audit_records(audit_path: str) -> list[dict[str, Any]]:
 
 def diagnose_audit_records(records: list[dict[str, Any]]) -> dict[str, Any]:
     """
-    Analyzes audit records to identify issues, anomalies, and optimization opportunities.
-    Returns structured findings and actionable recommendations.
+    Analyzes audit records to identify issues, anomalies, sandbox bypass events,
+    and optimization opportunities. Returns structured findings and actionable recommendations.
     """
     total = len(records)
     denials = []
     high_latency = []
     error_fallbacks = []
     asks = []
+    sandbox_bypasses = []
 
     for r in records:
         hook_out = r.get("hook_output", {})
@@ -159,6 +160,7 @@ def diagnose_audit_records(records: list[dict[str, Any]]) -> dict[str, Any]:
         classification = r.get("classification", {})
         latency = classification.get("latency_ms", 0.0)
         risk_cat = classification.get("risk_category", "")
+        bypass_sandbox = args.get("BypassSandbox", False)
 
         if dec == "deny":
             denials.append(
@@ -179,6 +181,15 @@ def diagnose_audit_records(records: list[dict[str, Any]]) -> dict[str, Any]:
                 }
             )
 
+        if bypass_sandbox is True and dec == "allow":
+            sandbox_bypasses.append(
+                {
+                    "tool": tool,
+                    "target": target,
+                    "reason": reason,
+                }
+            )
+
         if latency > 2000.0 and "static_policy" not in risk_cat:
             high_latency.append({"tool": tool, "target": target, "latency_ms": latency})
 
@@ -191,6 +202,12 @@ def diagnose_audit_records(records: list[dict[str, Any]]) -> dict[str, Any]:
             f"Found {len(denials)} denied action(s). If these actions are intended, use "
             "`python3 skills/auto-permissions-fix/scripts/fix_permissions.py --last --allow` "
             "to generate ACL rules."
+        )
+    if sandbox_bypasses:
+        recommendations.append(
+            f"{len(sandbox_bypasses)} action(s) were approved by the gate but required "
+            "Host Sandbox Elevation (`BypassSandbox: true`), which prompts the IDE platform. "
+            "Select 'Always allow for this workspace' on the prompt modal for unattended runs."
         )
     if error_fallbacks:
         recommendations.append(
@@ -208,6 +225,7 @@ def diagnose_audit_records(records: list[dict[str, Any]]) -> dict[str, Any]:
         "total_evaluated": total,
         "denials": denials,
         "asks": asks,
+        "sandbox_bypasses": sandbox_bypasses,
         "high_latency": high_latency,
         "error_fallbacks": error_fallbacks,
         "recommendations": recommendations,
