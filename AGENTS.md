@@ -43,6 +43,8 @@ auto-permissions/
 │   └── workflows/
 │       ├── ci.yml                           # Matrix testing, linting, and hook validation
 │       └── release.yml                      # Automated semantic versioning & release PRs
+├── .contrib/
+│   └── package_plugin.py                    # Release packaging & artifact builder
 ├── .agents/
 │   └── auto-permissions.json               # Project-level static ACL policy grants
 ├── hooks/

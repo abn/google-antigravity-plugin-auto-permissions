@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 script_path = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "../scripts/package_plugin.py")
+    os.path.join(os.path.dirname(__file__), "../.contrib/package_plugin.py")
 )
 spec = importlib.util.spec_from_file_location("package_plugin", script_path)
 package_plugin = importlib.util.module_from_spec(spec)
@@ -43,6 +43,7 @@ class TestPackagePlugin(unittest.TestCase):
                     self.assertNotIn("tests/", name)
                     self.assertNotIn("docs/", name)
                     self.assertNotIn(".github", name)
+                    self.assertNotIn(".contrib", name)
                     self.assertNotIn(".pre-commit", name)
                     self.assertNotIn("pyproject.toml", name)
                     self.assertNotIn("uv.lock", name)
