@@ -1,0 +1,13 @@
+{
+  "allow": [
+    "command(uv lock)",
+    "command(uv run ruff .*)",
+    "command(uv run pytest .*)"
+  ],
+  "ask": [
+    "command(git push .*)"
+  ],
+  "deny": [
+    "command(rm -rf /.*)"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "auto-permissions-gate": {
+    "enabled": true,
+    "PreToolUse": [
+      {
+        "matcher": "run_command|write_to_file|replace_file_content|multi_replace_file_content|read_url_content|manage_task|view_file|list_dir|grep_search",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 hooks/auto_approve_gate.py || python hooks/auto_approve_gate.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreInvocation": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 hooks/pre_invocation.py || python hooks/pre_invocation.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
