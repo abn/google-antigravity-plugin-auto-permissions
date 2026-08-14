@@ -23,6 +23,11 @@ When working in this repository, all AI agents and subagents must strictly adher
 4. **Non-Blocking Audit Logging:**
    - All audit writes must be non-blocking and rotatable (`max_bytes=5MB`, `backup_count=3`), appending atomic JSON Lines records to `<session_dir>/audit.jsonl`.
 
+5. **PR-First & Release Please Invariant:**
+   - All code, rule, skill, and documentation modifications must be submitted via Pull Requests targeting `main`. **Never push directly to `main`.**
+   - PR titles must strictly follow Conventional Commits format (`feat:`, `fix:`, `docs:`, `chore:`, `build:`, `refactor:`, `test:`, `ci:`) because Release Please parses PR titles to calculate semantic version increments and generate release notes.
+   - All PRs must be merged using **Squash and Merge** (`gh pr merge <id> --squash --delete-branch`) with the PR title preserved as the squash commit headline on `main`.
+
 ---
 
 ## 2. Directory Structure
@@ -145,4 +150,5 @@ python3 skills/auto-permissions-audit/scripts/view_audit.py /tmp/test_audit/audi
 - **Ruff Standards:** Code must strictly pass `uv run ruff check .` (rules: `E`, `W`, `F`, `I`, `B`, `UP`, `SIM`, `N`) and `uv run ruff format --check .` (max line length: 100).
 - **Clean Exception Handling (B110):** Silent exceptions in cleanup routines must use `contextlib.suppress(...)` rather than bare `pass`.
 - **Status Quo Comments:** Comments describe the current active state only. Never include historical narratives ("changed from X") or self-evident line paraphrasing.
-- **Conventional Commits:** Use standard Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`). Summary-only by default; descriptions must focus on the "why" and "what".
+- **Conventional Commits & PR Titles:** Use standard Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `build:`, `refactor:`, `test:`, `ci:`). PR titles must be formatted identically since they become the squash commit message on `main`.
+- **Squash-and-Merge Enforcement:** Always merge via squash (`gh pr merge <id> --squash --delete-branch`) to maintain clean linear history and allow Release Please to automate version bumps.
