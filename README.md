@@ -189,16 +189,44 @@ You can configure project-level policies in `.agents/auto-permissions.json` (tra
 }
 ```
 
-* **`provider`:** `"google"` *(default)*, `"openai"`, or `"anthropic"`. If omitted, automatically inferred from `endpoint_url` or `model`.
-* **`model`:** Model identifier (e.g. `gemini-2.5-flash`, `gpt-4o-mini`, `claude-3-5-haiku-20241022`).
-* **`endpoint_url`:** Custom REST endpoint URI. Supports local inference (`http://localhost:8000/v1/chat/completions`), proxies, or official OpenAI wire gateways.
-* **`api_key`:** Optional direct API token. (Tip: Store direct tokens in `.agents/auto-permissions.local.json` to keep them gitignored).
-* **`api_key_env`:** Custom environment variable to read the token from (defaults to `GEMINI_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`).
-* **`AUTO_PERMISSIONS_TIMEOUT`:** Optional environment variable (in seconds, defaults to `4.0s`) to increase timeout for cold-loading large local inference models (e.g. `AUTO_PERMISSIONS_TIMEOUT=60`).
-* **`allow` / `ask` / `deny`:** Deterministic static ACLs evaluated with `0.1ms` latency before invoking the classifier. Supports `command(...)`, `write_file(...)`, `read_file(...)`, `read_url(...)`, `mcp(server:tool)`, `subagent(name_pattern)`, `schedule(cron|timer|*)`, and `image(*)`.
-* **`govern_subagents` / `govern_schedule` / `govern_images`:** Opt-in governance toggles (default: `false`). When `false`, subagents, scheduling, and image generation are fast-path auto-approved in `0.1ms` (unless blocked by an explicit static `deny` rule). When set to `true` (or via `govern_surfaces: ["subagents", "schedule", "images"]`), candidate tool calls are evaluated by the full security classifier against active user prompts.
-* **`custom_guidelines`:** Structured semantic guidelines injected into the security classifier prompt. Core security invariants (credential protection, destructive branch wipes, unprompted remote publishing) strictly supersede custom guidelines in case of conflict.
-* **`allowed_skill_paths`:** Additional custom directory roots authorized for `0.1ms` read-only skill file inspection (e.g. `~/.nowledge-mem/skills-active`). Standard Antigravity paths (`~/.gemini/`, `~/.agents/skills/`) are authorized by default. Symlink targets are securely canonicalized to prevent traversal into sensitive system directories.
+### Complete Configuration Levers Reference
+
+#### 1. JSON Policy Configuration Levers (`auto-permissions.json`, `auto-permissions.local.json`, `session_overrides.json`)
+
+| Configuration Field | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `provider` | `string` | `"google"` | Classification provider/protocol (`"google"`, `"openai"`, `"anthropic"`). |
+| `model` | `string` | `"gemini-2.5-flash"` | Target LLM model name (e.g. `gemini-2.5-flash`, `gpt-4o-mini`, `claude-3-5-haiku-20241022`). |
+| `endpoint_url` | `string` | *Provider default* | Custom REST API endpoint URI (e.g. local vLLM/Lemonade/Ollama or reverse proxy). |
+| `api_key` | `string` | `null` | Direct API token string (recommended only in `.agents/auto-permissions.local.json`). |
+| `api_key_env` | `string` | *Provider default* | Name of custom environment variable holding the API key. |
+| `allow` | `array[string]` | `[]` | Static ACL rules auto-approved in `0.1ms` without invoking LLM classifier. |
+| `ask` | `array[string]` | `[]` | Static ACL rules forcing interactive human prompt in `0.1ms`. |
+| `deny` | `array[string]` | `[]` | Static ACL rules blocked in `0.1ms` (highest priority). |
+| `custom_guidelines` | `array[string]` | `[]` | Semantic domain guidelines injected into the classifier prompt. |
+| `allowed_skill_paths` | `array[string]` | `[]` | Extra directory roots permitted for safe `0.1ms` skill file reads. |
+| `govern_subagents` | `boolean` | `false` | When `true`, intercepts `invoke_subagent` and evaluates via classifier. |
+| `govern_schedule` | `boolean` | `false` | When `true`, intercepts `schedule` (cron/timers) and evaluates via classifier. |
+| `govern_images` | `boolean` | `false` | When `true`, intercepts `generate_image` and evaluates via classifier. |
+| `govern_surfaces` | `array[string]` | `[]` | Array alias for toggling governed surfaces (`["subagents", "schedule", "images"]`). |
+
+#### 2. Environment Variable Levers
+
+| Environment Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `GEMINI_API_KEY` / `GOOGLE_API_KEY` | - | Primary API key for Google Gemini provider. |
+| `OPENAI_API_KEY` | - | API key for OpenAI-compatible endpoints. |
+| `ANTHROPIC_API_KEY` | - | API key for Anthropic Claude provider. |
+| `AUTO_PERMISSIONS_API_KEY` | - | Generic provider API key override. |
+| `AUTO_PERMISSIONS_PROVIDER` | - | Override active provider globally (`google`, `openai`, `anthropic`). |
+| `AUTO_PERMISSIONS_MODEL` | - | Override active model identifier globally (or `GEMINI_MODEL`, `OPENAI_MODEL`, `ANTHROPIC_MODEL`). |
+| `AUTO_PERMISSIONS_ENDPOINT_URL` | - | Override custom REST endpoint globally (or `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`). |
+| `AUTO_PERMISSIONS_TIMEOUT` | `4.0` | HTTP classifier timeout in seconds. Increase for large local LLMs (e.g. `60.0`). |
+| `AUTO_PERMISSIONS_GOVERN_SUBAGENTS` | `0` | Set `1` to enable classifier evaluation for `invoke_subagent`. |
+| `AUTO_PERMISSIONS_GOVERN_SCHEDULE` | `0` | Set `1` to enable classifier evaluation for `schedule`. |
+| `AUTO_PERMISSIONS_GOVERN_IMAGES` | `0` | Set `1` to enable classifier evaluation for `generate_image`. |
+| `AUTO_PERMISSIONS_GOVERN_SURFACES` | - | Comma-separated list of surfaces to govern (e.g. `subagents,schedule,images`). |
+| `AUTO_PERMISSIONS_SESSION_DIR` | - | Override session directory path for audit logs and overrides (or `ANTIGRAVITY_ARTIFACT_DIR`). |
 
 ---
 
