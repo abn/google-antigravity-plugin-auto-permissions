@@ -303,3 +303,57 @@ flowchart TD
 * **Platform Invariant:** Antigravity requires interactive user confirmation whenever a tool requests to leave the sandbox.
 * **Mitigation:** Checking **"Always allow for this workspace"** on the platform modal whitelists the command pattern in the IDE's internal sandbox policy, enabling unattended execution for subsequent commits.
 
+---
+
+## 10. Threat Model & Indirect Prompt Injection (IPI) Defense
+
+### 10.1 Threat Vectors Addressed
+
+| Threat Vector | Attack Scenario | Plugin Defense Mechanism |
+| :--- | :--- | :--- |
+| **Indirect Prompt Injection (IPI)** | Untrusted repository files (e.g. `README.md`, issues) contain hidden instructions telling the agent to exfiltrate files or run malware. | **The Decoupled Classifier (Blinding Principle):** Tool outputs and agent reasoning are never fed to the classifier. The classifier evaluates *only* clean user turns against the proposed action. |
+| **Credential & Key Exfiltration** | Attacker tricks the agent into curling `~/.ssh/id_rsa` or printing environment variables. | **Hard Deny Rule:** Any access to credential stores, private keys, or foreign network targets without explicit user intent triggers instant termination (`hard_deny`). |
+| **Destructive Repository Wipe** | Rogue or confused agent executes `git push -f`, `git reset --hard`, or `rm -rf /`. | **Destructive Operation Invariant:** Destructive mutations are permanently rejected or escalated to `ask`. |
+| **Unprompted Remote Mutation** | Agent attempts to comment on PRs (`gh pr comment`) or publish packages (`npm publish`) during routine tasks. | **Explicit Remote Publishing Requirement:** Publishing commands require unambiguous user intent (e.g. "publish package", "post comment"). |
+| **External Directory Escape** | Agent attempts to read or inspect files in other repositories or parent directories. | **Workspace Boundary Fast-Path & Scope Check:** Files outside `<workspace_roots>` require interactive approval (`ask`). |
+
+---
+
+## 11. Operational Skills Architecture
+
+```mermaid
+flowchart LR
+    subgraph Skills Subsystem
+        Audit[skills/auto-permissions-audit<br>Session Trace & Issue Diagnostics]
+        Fix[skills/auto-permissions-fix<br>audit2allow ACL Rule Generator]
+        Test[skills/auto-permissions-test<br>Policy & Classifier Simulation]
+    end
+
+    Audit -->|Parses Session| SessionLog[(audit.jsonl)]
+    Fix -->|Reads Denials| SessionLog
+    Fix -->|Writes Rules| PolicyConfig[(.agents/auto-permissions.json)]
+    Test -->|Simulates Evaluation| PolicyConfig
+    Test -->|Invokes Classifier| GeminiAPI[Gemini 2.5 Flash]
+```
+
+### 11.1 `auto-permissions-audit`
+* **Purpose:** Inspects active session traces, provides decision breakdowns, detects high latency ($>2000\text{ms}$), and identifies container sandbox bypass events.
+* **Boundaries:** Strictly scoped to `<session_dir>/audit.jsonl`. Gracefully reports if no actions have been evaluated.
+
+### 11.2 `auto-permissions-fix` (`audit2allow`)
+* **Purpose:** Parses denial and ask records from `audit.jsonl` and translates them into persistent ACL grants across Session, Project, or Global scopes.
+* **Granularity:** Derives exact commands, prefix commands, directory patterns, and MCP server/tool rules.
+
+### 11.3 `auto-permissions-test`
+* **Purpose:** Simulates how any user prompt and candidate tool action would be classified before execution.
+* **Output:** Renders a rich Markdown report with collapsible `<details>` folds containing the exact XML payload and model JSON response.
+
+---
+
+## 12. References & Related Documents
+
+* **[README.md](../README.md):** Quickstart guide, installation instructions, and basic configuration recipes.
+* **[AGENTS.md](../AGENTS.md):** Operational guidelines and safety invariants for autonomous agents working in this repository.
+* **[hooks.json](../hooks.json):** Lifecycle hook declarations for Google Antigravity 2.0.
+
+

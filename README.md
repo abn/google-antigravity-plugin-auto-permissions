@@ -53,9 +53,15 @@ export GEMINI_API_KEY="your-api-key"
 
 ---
 
+## Architecture & Design Specification
+
+For complete details on the security principles, decoupled classifier blinding mechanics, threat modeling, state machine taxonomy, and latency benchmarks, see the **[Architecture & Technical Design Specification](docs/architecture.md)**.
+
+---
+
 ## Included Skills & Minimal Usage Examples
 
-This plugin includes two specialized skills accessible via chat commands or standalone CLI scripts:
+This plugin includes three specialized skills accessible via chat commands or standalone CLI scripts:
 
 ### 1. `/auto-permissions-audit` (Audit & Inspection)
 Inspects session audit traces, decision breakdowns, latency metrics, and failure states.
