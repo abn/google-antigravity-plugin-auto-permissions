@@ -131,11 +131,8 @@ def format_markdown_report(
         if decision == "ALLOW"
         else ("🔴 **DENY**" if decision in ("DENY", "SOFT_DENY", "HARD_DENY") else "🟡 **ASK**")
     )
-    mode_str = (
-        f"Static ACL ({result['latency_ms']:.1f}ms)"
-        if "static_acl" in result["mode"]
-        else f"Gemini 2.5 Flash ({result['latency_ms']:.0f}ms)"
-    )
+    mode_label = result.get("mode", "classifier").replace("_", " ").title()
+    mode_str = f"{mode_label} ({result['latency_ms']:.1f}ms)"
 
     args_preview = (
         tool_args.get("CommandLine")
@@ -233,6 +230,10 @@ def main():
         "-k",
         help="API key / bearer token.",
     )
+    parser.add_argument(
+        "--markdown", "-m", action="store_true", help="Output as Markdown with collapsible folds."
+    )
+    parser.add_argument("--json", "-j", action="store_true", help="Output as raw JSON.")
 
     args = parser.parse_args()
 

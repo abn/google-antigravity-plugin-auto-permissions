@@ -5,6 +5,7 @@ Evaluates proposed tool actions against user intent using Google Gemini, OpenAI-
 or Anthropic Claude endpoints with zero external runtime dependencies.
 """
 
+import contextlib
 import json
 import os
 import time
@@ -350,6 +351,11 @@ def classify_tool_call(
         norm_provider = "google"
     elif norm_provider == "claude":
         norm_provider = "anthropic"
+
+    env_timeout = os.environ.get("AUTO_PERMISSIONS_TIMEOUT")
+    if env_timeout:
+        with contextlib.suppress(ValueError, TypeError):
+            timeout_secs = float(env_timeout)
 
     start_time = time.perf_counter()
     try:
