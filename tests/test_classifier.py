@@ -9,7 +9,7 @@ from hooks.classifier import classify_tool_call, format_classifier_payload
 class TestClassifier(unittest.TestCase):
     def test_format_classifier_payload_structure(self):
         payload = format_classifier_payload(
-            workspace_paths=["/home/abn/workspace/test-project"],
+            workspace_paths=["/workspace/test-project"],
             prior_prompts=["Setup auth", "Run linter"],
             active_prompt="Run pytest",
             tool_name="run_command",
@@ -22,7 +22,7 @@ class TestClassifier(unittest.TestCase):
             ],
         )
         self.assertIn("<workspace_roots>", payload)
-        self.assertIn("/home/abn/workspace/test-project", payload)
+        self.assertIn("/workspace/test-project", payload)
         self.assertIn("<custom_workspace_guidelines>", payload)
         self.assertIn("- Treat api.internal.corp as safe", payload)
         self.assertIn("- Require ask for database migrations", payload)
@@ -56,7 +56,7 @@ class TestClassifier(unittest.TestCase):
 
     def test_format_classifier_payload_with_session_goal(self):
         payload = format_classifier_payload(
-            workspace_paths=["/home/abn/workspace/test"],
+            workspace_paths=["/workspace/test"],
             prior_prompts=["Step 1"],
             active_prompt="Step 2",
             tool_name="run_command",

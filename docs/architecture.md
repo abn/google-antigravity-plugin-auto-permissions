@@ -143,7 +143,7 @@ To resolve referential commands (e.g. *"Proceed"*, *"Run it again"*, *"Delete th
 
 ```xml
 <workspace_roots>
-["/home/abn/workspace/my-app"]
+["/workspace/my-app"]
 </workspace_roots>
 
 <prior_user_prompts>
@@ -160,7 +160,7 @@ To resolve referential commands (e.g. *"Proceed"*, *"Run it again"*, *"Delete th
 Tool: run_command
 Arguments: {
   "CommandLine": "pytest tests/test_auth.py -v",
-  "Cwd": "/home/abn/workspace/my-app"
+  "Cwd": "/workspace/my-app"
 }
 </proposed_tool_call>
 ```
@@ -174,20 +174,20 @@ Every classification event produces an atomic single-line JSON record:
 
 ```json
 {
-  "timestamp": "2026-08-14T12:50:33.439252+00:00",
-  "conversationId": "b7123065-f74d-495e-ad66-f0075d54c406",
+  "timestamp": "2026-08-14T12:00:00.000000+00:00",
+  "conversationId": "conv-12345-sample",
   "stepIdx": 1,
   "toolCall": {
     "name": "run_command",
     "args": {
       "CommandLine": "pytest -v",
-      "Cwd": "/home/abn/workspace/my-app"
+      "Cwd": "/workspace/my-app"
     }
   },
   "context": {
     "active_prompt": "Run tests",
     "prior_prompts_count": 2,
-    "workspace_roots": ["/home/abn/workspace/my-app"]
+    "workspace_roots": ["/workspace/my-app"]
   },
   "raw_prompt": "<workspace_roots>...",
   "classification": {
