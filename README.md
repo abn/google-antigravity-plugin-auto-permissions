@@ -172,6 +172,7 @@ You can configure project-level policies in `.agents/auto-permissions.json` (tra
 * **`endpoint_url`:** Custom REST endpoint URI. Supports local inference (`http://localhost:8000/v1/chat/completions`), proxies, or official OpenAI wire gateways.
 * **`api_key`:** Optional direct API token. (Tip: Store direct tokens in `.agents/auto-permissions.local.json` to keep them gitignored).
 * **`api_key_env`:** Custom environment variable to read the token from (defaults to `GEMINI_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`).
+* **`AUTO_PERMISSIONS_TIMEOUT`:** Optional environment variable (in seconds, defaults to `4.0s`) to increase timeout for cold-loading large local inference models (e.g. `AUTO_PERMISSIONS_TIMEOUT=60`).
 * **`allow` / `ask` / `deny`:** Deterministic static ACLs evaluated with `0.1ms` latency before invoking the classifier. Supports `command(...)`, `write_file(...)`, `read_file(...)`, `read_url(...)`, and `mcp(server:tool)`.
 * **`custom_guidelines`:** Structured semantic guidelines injected into the security classifier prompt. Core security invariants (credential protection, destructive branch wipes, unprompted remote publishing) strictly supersede custom guidelines in case of conflict.
 * **`allowed_skill_paths`:** Additional custom directory roots authorized for `0.1ms` read-only skill file inspection (e.g. `~/.nowledge-mem/skills-active`). Standard Antigravity paths (`~/.gemini/`, `~/.agents/skills/`) are authorized by default. Symlink targets are securely canonicalized to prevent traversal into sensitive system directories.

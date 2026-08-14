@@ -297,7 +297,7 @@ The `auto-permissions` gate intercepts all MCP tool invocations (`call_mcp_tool`
   2. **Local Project Scope (Untracked Secrets):** `<workspace>/.agents/auto-permissions.local.json` *(Ignored by `.gitignore`)*
   3. **Project Scope (Tracked Repository Policy):** `<workspace>/.agents/auto-permissions.json`
   4. **Global Scope:** `~/.gemini/config/auto-permissions.json`
-  5. **Environment Variables:** `AUTO_PERMISSIONS_PROVIDER`, `AUTO_PERMISSIONS_MODEL`, `AUTO_PERMISSIONS_ENDPOINT_URL`, `AUTO_PERMISSIONS_API_KEY` (or provider-specific vars like `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`)
+  5. **Environment Variables:** `AUTO_PERMISSIONS_PROVIDER`, `AUTO_PERMISSIONS_MODEL`, `AUTO_PERMISSIONS_ENDPOINT_URL`, `AUTO_PERMISSIONS_API_KEY` (or provider-specific vars like `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`). Timeouts can be extended for large local models via `AUTO_PERMISSIONS_TIMEOUT` (seconds, defaults to `4.0s`).
   6. **Defaults:** Provider `google`, Model `gemini-2.5-flash`
 
 ### 8.6 Symlink Canonicalization, Safe Skill Reading & Traversal Defense
