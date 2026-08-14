@@ -106,6 +106,40 @@ class TestPackagePlugin(unittest.TestCase):
                 "description:", fm, f"Skill file {skill_file} missing 'description' in frontmatter"
             )
 
+    def test_hooks_json_schema_contract(self):
+        import json
+
+        repo_root = Path(__file__).resolve().parent.parent
+        hooks_json_path = repo_root / "hooks.json"
+        self.assertTrue(hooks_json_path.exists())
+
+        with open(hooks_json_path, encoding="utf-8") as f:
+            data = json.load(f)
+
+        self.assertIn("auto-permissions-gate", data)
+        gate = data["auto-permissions-gate"]
+        self.assertTrue(gate.get("enabled"))
+
+        # PreToolUse is grouped with matcher and hooks
+        pre_tool_use = gate.get("PreToolUse", [])
+        self.assertIsInstance(pre_tool_use, list)
+        for group in pre_tool_use:
+            self.assertIn("matcher", group)
+            self.assertIn("hooks", group)
+            self.assertIsInstance(group["hooks"], list)
+            for h in group["hooks"]:
+                self.assertIn("command", h)
+                self.assertIn("type", h)
+
+        # PreInvocation is a flat list of handler objects (NOT grouped with matcher or nested hooks)
+        pre_invocation = gate.get("PreInvocation", [])
+        self.assertIsInstance(pre_invocation, list)
+        for handler in pre_invocation:
+            self.assertIn("command", handler)
+            self.assertIn("type", handler)
+            self.assertNotIn("matcher", handler)
+            self.assertNotIn("hooks", handler)
+
 
 if __name__ == "__main__":
     unittest.main()
