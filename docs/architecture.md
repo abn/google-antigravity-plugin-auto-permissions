@@ -308,6 +308,19 @@ Agent skills and configurations frequently involve symbolic links (e.g. skills s
 * **Sensitive Target Blacklist:** Paths targeting known credential/system stores (`~/.ssh`, `~/.aws`, `~/.gnupg`, `/etc/shadow`, `.env`, `id_rsa`, etc.) are permanently denied fast-path access.
 * **Safe Skill Fast-Path:** Read-only inspection of standard Antigravity skill definitions (`~/.gemini/`, `~/.agents/skills/`) is fast-path approved in `0.1ms`. Non-standard custom skill directories (e.g. `~/.nowledge-mem/skills-active`) can be added to `"allowed_skill_paths"` in configuration files.
 
+### 8.7 Opt-in Tool Surfaces Governance (Subagents, Scheduling, Image Generation)
+While commands, file mutations, network URL scraping, and MCP tools are strictly governed by default, certain internal agent orchestration tools are configured as **opt-in governance surfaces**:
+
+1. **Subagents (`invoke_subagent`, `define_subagent`, `manage_subagents`):**
+   * *Default Behavior:* Fast-path auto-approved in `0.1ms` without classifier overhead unless blocked by an explicit static `deny` rule (e.g. `deny: ["subagent(unauthorized_role)"]`).
+   * *Opt-In Setting:* Set `"govern_subagents": true` (or `--govern-subagents`) to route all subagent spawns through the classifier to verify alignment with user intent.
+2. **Scheduling (`schedule` for cron jobs & timers):**
+   * *Default Behavior:* Fast-path auto-approved in `0.1ms`.
+   * *Opt-In Setting:* Set `"govern_schedule": true` (or `--govern-schedule`) to require user authorization or classifier verification for recurring background crons.
+3. **Generative Assets (`generate_image`):**
+   * *Default Behavior:* Fast-path auto-approved in `0.1ms`.
+   * *Opt-In Setting:* Set `"govern_images": true` (or `--govern-images`).
+
 ---
 
 ## 9. Two-Tier Security Architecture: Plugin Gate vs. Platform Container Sandbox

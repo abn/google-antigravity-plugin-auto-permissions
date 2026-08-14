@@ -10,14 +10,20 @@ from hooks.policy_engine import (
     add_rule_to_scope,
     evaluate_static_policies,
     is_path_in_workspaces,
+    is_ungoverned_surface,
     load_custom_guidelines,
     match_command,
+    match_image,
     match_path,
+    match_schedule,
+    match_subagent,
     match_tool_against_rule,
     match_url,
     parse_resource_rule,
     resolve_classifier_config,
     resolve_configured_model,
+    resolve_governed_surfaces,
+    update_governed_surfaces_in_scope,
 )
 
 
@@ -306,6 +312,101 @@ class TestPolicyEngine(unittest.TestCase):
             decision, _reason, scope = res2
             self.assertEqual(decision, "allow")
             self.assertEqual(scope, "skill_resource")
+
+    def test_match_subagents_and_schedule_and_image(self):
+        # Subagent matching
+        self.assertTrue(
+            match_subagent(
+                "research",
+                "invoke_subagent",
+                {"Subagents": [{"TypeName": "research", "Role": "Researcher"}]},
+            )
+        )
+        self.assertTrue(
+            match_subagent(
+                "*",
+                "invoke_subagent",
+                {"Subagents": [{"TypeName": "code_refactor", "Role": "Refactorer"}]},
+            )
+        )
+        self.assertFalse(
+            match_subagent(
+                "tester",
+                "invoke_subagent",
+                {"Subagents": [{"TypeName": "research", "Role": "Researcher"}]},
+            )
+        )
+        self.assertTrue(
+            match_tool_against_rule(
+                "subagent(research)",
+                "invoke_subagent",
+                {"Subagents": [{"TypeName": "research", "Role": "Researcher"}]},
+            )
+        )
+
+        # Schedule matching
+        self.assertTrue(
+            match_schedule(
+                "cron",
+                "schedule",
+                {"CronExpression": "*/5 * * * *", "Prompt": "Run check"},
+            )
+        )
+        self.assertTrue(
+            match_schedule(
+                "timer",
+                "schedule",
+                {"DurationSeconds": 60, "Prompt": "Reminder"},
+            )
+        )
+        self.assertTrue(
+            match_tool_against_rule(
+                "schedule(cron)",
+                "schedule",
+                {"CronExpression": "*/5 * * * *", "Prompt": "Run check"},
+            )
+        )
+
+        # Image matching
+        self.assertTrue(
+            match_image(
+                "mockup",
+                "generate_image",
+                {"ImageName": "dashboard_mockup", "Prompt": "Draw dashboard"},
+            )
+        )
+        self.assertTrue(
+            match_tool_against_rule(
+                "image(*)",
+                "generate_image",
+                {"ImageName": "dashboard_mockup", "Prompt": "Draw dashboard"},
+            )
+        )
+
+    def test_governed_surfaces_opt_in(self):
+        with tempfile.TemporaryDirectory() as ws:
+            # 1. By default, subagents, schedule, and images are UNGOVERNED (opt-in is False)
+            self.assertTrue(is_ungoverned_surface("invoke_subagent", workspace_paths=[ws]))
+            self.assertTrue(is_ungoverned_surface("schedule", workspace_paths=[ws]))
+            self.assertTrue(is_ungoverned_surface("generate_image", workspace_paths=[ws]))
+            self.assertFalse(is_ungoverned_surface("run_command", workspace_paths=[ws]))
+
+            # 2. Opt-in to subagents and schedule in project config
+            update_governed_surfaces_in_scope(
+                governed={"subagents": True, "schedule": True},
+                scope="project",
+                workspace_dir=ws,
+            )
+
+            # 3. Now subagents and schedule are governed, but images remains ungoverned
+            gov = resolve_governed_surfaces(workspace_paths=[ws])
+            self.assertTrue(gov["subagents"])
+            self.assertTrue(gov["schedule"])
+            self.assertFalse(gov["images"])
+
+            self.assertFalse(is_ungoverned_surface("invoke_subagent", workspace_paths=[ws]))
+            self.assertFalse(is_ungoverned_surface("schedule", workspace_paths=[ws]))
+            self.assertTrue(is_ungoverned_surface("generate_image", workspace_paths=[ws]))
 
 
 if __name__ == "__main__":

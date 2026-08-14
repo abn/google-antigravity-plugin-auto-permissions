@@ -29,8 +29,10 @@ from hooks.policy_engine import (  # noqa: E402
     remove_guideline_from_scope,
     remove_rule_from_scope,
     resolve_classifier_config,
+    resolve_governed_surfaces,
     resolve_scope_file_path,
     update_classifier_settings_in_scope,
+    update_governed_surfaces_in_scope,
 )
 
 
@@ -68,9 +70,14 @@ def get_effective_configuration(
         session_dir=session_dir,
         workspace_paths=[ws],
     )
+    governed_surfaces = resolve_governed_surfaces(
+        session_dir=session_dir,
+        workspace_paths=[ws],
+    )
 
     return {
         "effective_classifier": classifier_config,
+        "effective_governed_surfaces": governed_surfaces,
         "scopes": policies_by_scope,
     }
 
@@ -78,6 +85,7 @@ def get_effective_configuration(
 def format_markdown_summary(config_info: dict[str, Any]) -> str:
     """Formats configuration status into a clean Markdown table."""
     eff = config_info["effective_classifier"]
+    gov = config_info.get("effective_governed_surfaces", {})
     scopes = config_info["scopes"]
 
     lines = ["### ⚙️ Auto-Permissions Effective Configuration\n"]
@@ -89,6 +97,31 @@ def format_markdown_summary(config_info: dict[str, Any]) -> str:
     lines.append(f"| **Endpoint URI** | `{endpoint_display}` |")
     key_display = "Set (hidden)" if eff.get("api_key") else "None (Using environment fallback)"
     lines.append(f"| **API Key Status** | {key_display} |")
+    lines.append("")
+
+    lines.append("#### 🛡️ Governed Tool Surfaces\n")
+    lines.append("| Surface Category | Tools | Active Status |")
+    lines.append("| :--- | :--- | :--- |")
+    sub_mode = (
+        "🔒 **Governed** (Full Classifier)"
+        if gov.get("subagents")
+        else "⚡ **Fast-Path Allowed** *(Default opt-in)*"
+    )
+    sched_mode = (
+        "🔒 **Governed** (Full Classifier)"
+        if gov.get("schedule")
+        else "⚡ **Fast-Path Allowed** *(Default opt-in)*"
+    )
+    img_mode = (
+        "🔒 **Governed** (Full Classifier)"
+        if gov.get("images")
+        else "⚡ **Fast-Path Allowed** *(Default opt-in)*"
+    )
+    lines.append(
+        f"| **Subagents** | `invoke_subagent`, `define_subagent`, `manage_subagents` | {sub_mode} |"
+    )
+    lines.append(f"| **Scheduling** | `schedule` (cron / timers) | {sched_mode} |")
+    lines.append(f"| **Image Generation** | `generate_image` | {img_mode} |")
     lines.append("")
 
     lines.append("#### 📂 Policy Scopes & Rules\n")
@@ -195,6 +228,42 @@ def main():
         help="Allowed skill directory path to whitelist for fast-path reading.",
     )
     parser.add_argument(
+        "--govern-subagents",
+        action="store_true",
+        default=None,
+        help="Opt-in to security gate governance for subagent invocations.",
+    )
+    parser.add_argument(
+        "--no-govern-subagents",
+        action="store_true",
+        default=None,
+        help="Disable security gate governance for subagents (fast-path allow).",
+    )
+    parser.add_argument(
+        "--govern-schedule",
+        action="store_true",
+        default=None,
+        help="Opt-in to security gate governance for scheduled crons and timers.",
+    )
+    parser.add_argument(
+        "--no-govern-schedule",
+        action="store_true",
+        default=None,
+        help="Disable security gate governance for schedule (fast-path allow).",
+    )
+    parser.add_argument(
+        "--govern-images",
+        action="store_true",
+        default=None,
+        help="Opt-in to security gate governance for generate_image calls.",
+    )
+    parser.add_argument(
+        "--no-govern-images",
+        action="store_true",
+        default=None,
+        help="Disable security gate governance for images (fast-path allow).",
+    )
+    parser.add_argument(
         "--json",
         "-j",
         action="store_true",
@@ -294,6 +363,32 @@ def main():
             session_dir=session_dir,
         )
         actions_performed.append(f"Added allowed skill path to {scope} ({target_file})")
+
+    # 7. Update Governed Surfaces (opt-in subagents, schedule, images)
+    governed_updates = {}
+    if args.govern_subagents:
+        governed_updates["subagents"] = True
+    elif args.no_govern_subagents:
+        governed_updates["subagents"] = False
+
+    if args.govern_schedule:
+        governed_updates["schedule"] = True
+    elif args.no_govern_schedule:
+        governed_updates["schedule"] = False
+
+    if args.govern_images:
+        governed_updates["images"] = True
+    elif args.no_govern_images:
+        governed_updates["images"] = False
+
+    if governed_updates:
+        target_file = update_governed_surfaces_in_scope(
+            governed=governed_updates,
+            scope=scope,
+            workspace_dir=workspace_dir,
+            session_dir=session_dir,
+        )
+        actions_performed.append(f"Updated governed surfaces in {scope} ({target_file})")
 
     config_info = get_effective_configuration(
         workspace_dir=workspace_dir,

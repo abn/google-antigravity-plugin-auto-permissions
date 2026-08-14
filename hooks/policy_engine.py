@@ -214,7 +214,75 @@ def match_tool_against_rule(rule_str: str, tool_name: str, tool_args: dict[str, 
         if action in ("mcp", "read_resource", "list_resources"):
             return match_mcp(target_pattern, server, tool_name)
 
+    elif tool_name in ("invoke_subagent", "define_subagent", "manage_subagents", "send_message"):
+        if action in ("subagent", "agent", tool_name):
+            return match_subagent(target_pattern, tool_name, tool_args)
+
+    elif tool_name == "schedule":
+        if action in ("schedule", "timer", "cron"):
+            return match_schedule(target_pattern, tool_name, tool_args)
+
+    elif tool_name == "generate_image":
+        if action in ("image", "generate_image"):
+            return match_image(target_pattern, tool_name, tool_args)
+
     return False
+
+
+def match_subagent(pattern: str, tool_name: str, tool_args: dict[str, Any]) -> bool:
+    """Matches subagent invocation or definition against a pattern."""
+    if pattern == "*":
+        return True
+    pattern = pattern.strip().lower()
+
+    if tool_name == "invoke_subagent":
+        subagents = tool_args.get("Subagents", [])
+        if isinstance(subagents, list):
+            for sa in subagents:
+                if isinstance(sa, dict):
+                    t_name = str(sa.get("TypeName", "")).lower()
+                    role = str(sa.get("Role", "")).lower()
+                    if pattern in (t_name, role) or pattern in t_name or pattern in role:
+                        return True
+        return False
+
+    if tool_name == "define_subagent":
+        name = str(tool_args.get("name", "")).lower()
+        return pattern in name or pattern == name
+
+    if tool_name == "manage_subagents":
+        action = str(tool_args.get("Action", "")).lower()
+        return pattern == "*" or pattern == action
+
+    if tool_name == "send_message":
+        recipient = str(tool_args.get("Recipient", "")).lower()
+        return pattern == "*" or pattern == recipient
+
+    return False
+
+
+def match_schedule(pattern: str, tool_name: str, tool_args: dict[str, Any]) -> bool:
+    """Matches scheduled timers or cron jobs against a pattern."""
+    if tool_name != "schedule":
+        return False
+    if pattern == "*":
+        return True
+    pattern = pattern.strip().lower()
+    if pattern == "cron" and "CronExpression" in tool_args:
+        return True
+    return bool(pattern == "timer" and "DurationSeconds" in tool_args)
+
+
+def match_image(pattern: str, tool_name: str, tool_args: dict[str, Any]) -> bool:
+    """Matches generate_image calls against a pattern."""
+    if tool_name != "generate_image":
+        return False
+    if pattern == "*":
+        return True
+    pattern = pattern.strip().lower()
+    img_name = str(tool_args.get("ImageName", "")).lower()
+    prompt = str(tool_args.get("Prompt", "")).lower()
+    return pattern in img_name or pattern in prompt
 
 
 SENSITIVE_PATH_PATTERNS = (
@@ -296,6 +364,10 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
         "deny": [],
         "custom_guidelines": [],
         "allowed_skill_paths": [],
+        "govern_surfaces": [],
+        "govern_subagents": None,
+        "govern_schedule": None,
+        "govern_images": None,
         "provider": None,
         "model": None,
         "endpoint_url": None,
@@ -309,10 +381,20 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
         with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
             if isinstance(data, dict):
-                for k in ("allow", "ask", "deny", "custom_guidelines", "allowed_skill_paths"):
+                for k in (
+                    "allow",
+                    "ask",
+                    "deny",
+                    "custom_guidelines",
+                    "allowed_skill_paths",
+                    "govern_surfaces",
+                ):
                     val = data.get(k, [])
                     if isinstance(val, list):
                         policy[k] = [str(x) for x in val]
+                for bool_k in ("govern_subagents", "govern_schedule", "govern_images"):
+                    if bool_k in data and isinstance(data[bool_k], bool):
+                        policy[bool_k] = data[bool_k]
                 for str_k in (
                     "provider",
                     "protocol",
@@ -339,6 +421,76 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
     except Exception:
         pass
     return policy
+
+
+def resolve_governed_surfaces(
+    session_dir: str | None = None,
+    workspace_paths: list[str] | None = None,
+) -> dict[str, bool]:
+    """
+    Resolves whether subagents, schedule, and images require security gate classification.
+    Defaults to False (opt-in) unless configured in Session, Project, Global, or env vars.
+    """
+    scope_files = []
+    if session_dir and os.path.isdir(session_dir):
+        scope_files.append(os.path.join(session_dir, SESSION_OVERRIDES_FILENAME))
+    if workspace_paths:
+        for ws in workspace_paths:
+            scope_files.append(os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH))
+            scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
+    scope_files.append(GLOBAL_CONFIG_PATH)
+
+    governed = {
+        "subagents": False,
+        "schedule": False,
+        "images": False,
+    }
+
+    for f_path in scope_files:
+        if not os.path.isfile(f_path):
+            continue
+        pol = load_policy_file(f_path)
+        for k in ("subagents", "schedule", "images"):
+            pol_key = f"govern_{k}"
+            if pol.get(pol_key) is not None and not governed[k]:
+                governed[k] = bool(pol[pol_key])
+        for s in pol.get("govern_surfaces", []):
+            clean_s = s.strip().lower()
+            if clean_s in governed:
+                governed[clean_s] = True
+
+    # Environment variables
+    if os.environ.get("AUTO_PERMISSIONS_GOVERN_SUBAGENTS") in ("1", "true", "yes"):
+        governed["subagents"] = True
+    if os.environ.get("AUTO_PERMISSIONS_GOVERN_SCHEDULE") in ("1", "true", "yes"):
+        governed["schedule"] = True
+    if os.environ.get("AUTO_PERMISSIONS_GOVERN_IMAGES") in ("1", "true", "yes"):
+        governed["images"] = True
+
+    env_surfaces = os.environ.get("AUTO_PERMISSIONS_GOVERN_SURFACES", "")
+    if env_surfaces:
+        for s in env_surfaces.split(","):
+            clean_s = s.strip().lower()
+            if clean_s in governed:
+                governed[clean_s] = True
+
+    return governed
+
+
+def is_ungoverned_surface(
+    tool_name: str,
+    session_dir: str | None = None,
+    workspace_paths: list[str] | None = None,
+) -> bool:
+    """Checks if a tool belongs to an opt-in governance surface that is currently disabled."""
+    governed = resolve_governed_surfaces(session_dir=session_dir, workspace_paths=workspace_paths)
+    if tool_name in ("invoke_subagent", "define_subagent", "manage_subagents", "send_message"):
+        return not governed["subagents"]
+    if tool_name == "schedule":
+        return not governed["schedule"]
+    if tool_name == "generate_image":
+        return not governed["images"]
+    return False
 
 
 def load_allowed_skill_paths(
@@ -768,6 +920,24 @@ def update_classifier_settings_in_scope(
     for k in ("provider", "model", "endpoint_url", "api_key", "api_key_env"):
         if k in settings:
             policy[k] = settings[k]
+    save_policy_file(target_path, policy)
+    return target_path
+
+
+def update_governed_surfaces_in_scope(
+    governed: dict[str, bool],
+    scope: str,
+    workspace_dir: str | None = None,
+    session_dir: str | None = None,
+) -> str:
+    """Updates govern_subagents, govern_schedule, govern_images in specified scope."""
+    target_path = resolve_scope_file_path(
+        scope, workspace_dir=workspace_dir, session_dir=session_dir
+    )
+    policy = load_policy_file(target_path)
+    for k, val in governed.items():
+        pol_key = f"govern_{k}"
+        policy[pol_key] = val
     save_policy_file(target_path, policy)
     return target_path
 

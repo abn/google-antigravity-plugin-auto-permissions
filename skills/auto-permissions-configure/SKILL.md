@@ -117,6 +117,19 @@ python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
   --add-skill-path "~/.nowledge-mem/skills-active"
 ```
 
+### 6. Toggle Governed Tool Surfaces (Opt-In)
+```bash
+# Enable security gate classification for subagents
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --scope project \
+  --govern-subagents
+
+# Disable governance for schedule (restore fast-path allow)
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --scope project \
+  --no-govern-schedule
+```
+
 ---
 
 ## Step 3: Validate with `auto-permissions-test`

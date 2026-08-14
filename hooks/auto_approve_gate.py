@@ -19,6 +19,7 @@ from audit_logger import log_audit_event_async, resolve_session_log_path  # noqa
 from classifier import classify_tool_call  # noqa: E402
 from policy_engine import (  # noqa: E402
     evaluate_static_policies,
+    is_ungoverned_surface,
     load_custom_guidelines,
     resolve_classifier_config,
 )
@@ -106,7 +107,48 @@ def main():
             log_thread.join(timeout=0.2)
         return
 
-    # 2. Parse user prompt history from transcript.jsonl
+    # 2. FAST-PATH: Opt-in surface verification (subagents, schedule, images)
+    if is_ungoverned_surface(
+        tool_name=tool_name,
+        session_dir=session_dir,
+        workspace_paths=workspace_paths,
+    ):
+        ungoverned_reason = f"Tool '{tool_name}' is fast-path approved (surface not opted in)."
+        hook_output = {
+            "decision": "allow",
+            "reason": ungoverned_reason,
+        }
+        classification = {
+            "decision": "allow",
+            "reason": ungoverned_reason,
+            "risk_category": "ungoverned_surface_opt_in",
+            "confidence": 1.0,
+        }
+        context_summary = {
+            "active_prompt": "(Opt-in surface not enabled)",
+            "prior_prompts_count": 0,
+            "workspace_roots": workspace_paths,
+            "policy_scope": "ungoverned_surface",
+        }
+        log_thread = log_audit_event_async(
+            artifact_dir=artifact_dir,
+            transcript_path=transcript_path,
+            conversation_id=conversation_id,
+            step_idx=step_idx,
+            tool_call=tool_call,
+            context=context_summary,
+            raw_prompt=f"<ungoverned_surface tool='{tool_name}'/>",
+            classification=classification,
+            hook_output=hook_output,
+            latency_ms=0.1,
+        )
+        print(json.dumps(hook_output))
+        sys.stdout.flush()
+        if log_thread and log_thread.is_alive():
+            log_thread.join(timeout=0.2)
+        return
+
+    # 3. Parse user prompt history from transcript.jsonl
     prior_prompts, active_prompt = read_user_prompts_from_transcript(transcript_path, max_history=4)
 
     # 3. Load custom semantic guidelines from policy configurations

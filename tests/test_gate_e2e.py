@@ -159,15 +159,77 @@ class TestGateE2E(unittest.TestCase):
                 self.assertEqual(res["decision"], "ask")
                 self.assertEqual(res["reason"], "Escalating external Stripe mutation")
 
-    def test_gate_e2e_empty_stdin(self):
-        with (
-            patch("sys.stdin", io.StringIO("")),
-            patch("sys.stdout", new=io.StringIO()) as mock_stdout,
-        ):
-            gate.main()
-            output_text = mock_stdout.getvalue().strip()
-            res = json.loads(output_text)
-            self.assertEqual(res["decision"], "ask")
+    def test_gate_e2e_subagent_ungoverned_fast_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_payload = {
+                "toolCall": {
+                    "name": "invoke_subagent",
+                    "args": {
+                        "Subagents": [{"TypeName": "research", "Role": "Codebase Researcher"}]
+                    },
+                },
+                "stepIdx": 5,
+                "conversationId": "test-e2e-subagent-fastpath",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+            }
+
+            stdin_data = json.dumps(input_payload)
+            with (
+                patch("sys.stdin", io.StringIO(stdin_data)),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout,
+            ):
+                gate.main()
+                output_text = mock_stdout.getvalue().strip()
+                res = json.loads(output_text)
+                self.assertEqual(res["decision"], "allow")
+                self.assertIn("fast-path approved (surface not opted in)", res["reason"])
+
+    @patch("hooks.auto_approve_gate.classify_tool_call")
+    def test_gate_e2e_subagent_governed_when_opted_in(self, mock_classify):
+        mock_classify.return_value = (
+            "<raw_prompt>",
+            {
+                "decision": "allow",
+                "reason": "Subagent research requested by user",
+                "risk_category": "safe_routine",
+            },
+            None,
+            30.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Opt-in to govern subagents
+            agents_dir = os.path.join(tmpdir, ".agents")
+            os.makedirs(agents_dir, exist_ok=True)
+            cfg_path = os.path.join(agents_dir, "auto-permissions.json")
+            with open(cfg_path, "w", encoding="utf-8") as f:
+                json.dump({"govern_subagents": True}, f)
+
+            input_payload = {
+                "toolCall": {
+                    "name": "invoke_subagent",
+                    "args": {
+                        "Subagents": [{"TypeName": "research", "Role": "Codebase Researcher"}]
+                    },
+                },
+                "stepIdx": 6,
+                "conversationId": "test-e2e-subagent-optin",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+            }
+
+            stdin_data = json.dumps(input_payload)
+            with (
+                patch("sys.stdin", io.StringIO(stdin_data)),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout,
+            ):
+                gate.main()
+                output_text = mock_stdout.getvalue().strip()
+                res = json.loads(output_text)
+                self.assertEqual(res["decision"], "allow")
+                self.assertEqual(res["reason"], "Subagent research requested by user")
+                mock_classify.assert_called_once()
 
 
 if __name__ == "__main__":
