@@ -243,3 +243,40 @@ python3 skills/auto-permissions-fix/scripts/fix_permissions.py --last --allow --
 # Allow last denied command at project level:
 python3 skills/auto-permissions-fix/scripts/fix_permissions.py --last --allow --scope project
 ```
+
+---
+
+## 9. Two-Tier Security Architecture: Plugin Gate vs. Platform Container Sandbox
+
+Google Antigravity enforces security across two distinct, complementary layers:
+
+```mermaid
+flowchart TD
+    ToolCall[Candidate Tool Call] --> L1{Layer 1: auto-permissions Plugin Gate}
+    L1 -->|Intent Classification / Static ACL| L1Decision{Decision}
+    L1Decision -->|deny| Block[Action Blocked / Self-Correction]
+    L1Decision -->|ask| AskUser[Platform Confirmation Modal]
+    L1Decision -->|allow| L2{Layer 2: Antigravity Container Sandbox}
+
+    L2 -->|Sandboxed: BypassSandbox=false| ContainerExec[Runs in Isolated Container / .git Read-Only]
+    L2 -->|Unsandboxed: BypassSandbox=true| HostModal[Antigravity Platform Sandbox Modal]
+    HostModal -->|Approved| UnsandboxedExec[Runs Directly on Host System]
+```
+
+### 9.1 The Separation of Responsibilities
+1. **Layer 1: Intent & Safety Authorization (`auto-permissions` Plugin)**
+   * Answers: *Is this tool call aligned with what the human requested, and does it respect security invariants?*
+   * Operates at the lifecycle level (`PreToolUse`).
+   * Decides whether the agent is allowed to attempt the action.
+
+2. **Layer 2: Platform Container Sandbox (Host OS Isolation)**
+   * Answers: *Is this process allowed to execute directly on the host with raw filesystem and network access?*
+   * Operates at the process level (Linux namespaces / container mounts).
+   * Mounts `.git/` as read-only inside the sandbox to prevent unauthorized internal repository corruption.
+
+### 9.2 The `.git` Write Invariant & Sandbox Bypass
+* Commands that write to repository state (`git commit`, `git merge`, `git checkout`) cannot modify `.git/` from within the read-only sandbox.
+* When such commands run, the tool call sets `BypassSandbox: true`.
+* **Platform Invariant:** Antigravity requires interactive user confirmation whenever a tool requests to leave the sandbox.
+* **Mitigation:** Checking **"Always allow for this workspace"** on the platform modal whitelists the command pattern in the IDE's internal sandbox policy, enabling unattended execution for subsequent commits.
+

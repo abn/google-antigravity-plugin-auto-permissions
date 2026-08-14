@@ -150,6 +150,42 @@ uv run ruff format --check .
 
 ---
 
+## Security Layers: Plugin Gate vs. Platform Container Sandbox
+
+Google Antigravity enforces security across two distinct layers:
+
+```text
+[ Proposed Tool Call ]
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Layer 1: auto-permissions Plugin Gate (Intent Authorization)│
+│  - Evaluates user prompt vs proposed tool action.           │
+│  - Emits: allow, ask, or deny.                              │
+└────────────────────────┬────────────────────────────────────┘
+                         │ (allow)
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Layer 2: Antigravity Container Sandbox (System Isolation)   │
+│  - Sandboxed (BypassSandbox: false): Workspace isolated,    │
+│    .git/ mounted as read-only.                              │
+│  - Unsandboxed (BypassSandbox: true): Required for commands │
+│    writing to .git/ (git commit, git merge, git checkout).  │
+│  - Triggers host platform confirmation modal.               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Why does `git commit` trigger a host prompt even if the plugin auto-approves it?
+1. The **`auto-permissions` gate (Layer 1)** checks your prompt and auto-approves the commit because you explicitly requested it.
+2. The **Antigravity container sandbox (Layer 2)** protects `.git/` by mounting it read-only.
+3. When git commands write to `.git/`, the tool must run unsandboxed (`BypassSandbox: true`), which causes the **Antigravity host IDE** to display an interactive platform modal.
+
+### How to Mitigate
+* When the Antigravity Sandbox bypass modal appears for `git commit`, click **"Always allow for this workspace"**.
+* This whitelists unsandboxed execution for that command pattern in your workspace, allowing subsequent commits to run completely unattended.
+
+---
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
