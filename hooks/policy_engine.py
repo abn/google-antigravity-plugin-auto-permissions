@@ -500,6 +500,7 @@ def load_allowed_skill_paths(
     """
     Loads allowed skill directory paths from default standard locations plus
     any user-configured 'allowed_skill_paths' in Global, Project, or Session policies.
+    Also automatically discovers realpaths of installed and symlinked plugins.
     """
     # Standard Antigravity defaults
     allowed: list[str] = [
@@ -509,6 +510,28 @@ def load_allowed_skill_paths(
     if workspace_paths:
         for ws in workspace_paths:
             allowed.append(os.path.abspath(os.path.join(ws, ".agents", "skills")))
+            ws_plugins = os.path.abspath(os.path.join(ws, ".agents", "plugins"))
+            if os.path.isdir(ws_plugins):
+                try:
+                    for entry in os.listdir(ws_plugins):
+                        p_dir = os.path.join(ws_plugins, entry)
+                        real_p = os.path.realpath(p_dir)
+                        if os.path.isdir(real_p) and real_p not in allowed:
+                            allowed.append(real_p)
+                except OSError:
+                    pass
+
+    # Automatically discover global installed/symlinked plugins in ~/.gemini/config/plugins/
+    global_plugins = os.path.abspath(os.path.expanduser("~/.gemini/config/plugins"))
+    if os.path.isdir(global_plugins):
+        try:
+            for entry in os.listdir(global_plugins):
+                p_dir = os.path.join(global_plugins, entry)
+                real_p = os.path.realpath(p_dir)
+                if os.path.isdir(real_p) and real_p not in allowed:
+                    allowed.append(real_p)
+        except OSError:
+            pass
 
     # Load configured overrides
     scope_files = []
