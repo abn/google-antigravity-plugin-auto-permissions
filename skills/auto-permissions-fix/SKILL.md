@@ -33,6 +33,12 @@ Add a custom permission rule directly to a target scope:
 # Allow a command at project level:
 python3 skills/auto-permissions-fix/scripts/fix_permissions.py --rule "command(uv lock)" --decision allow --scope project
 
+# Whitelist all git operations for the project:
+python3 skills/auto-permissions-fix/scripts/fix_permissions.py --rule "command(git)" --decision allow --scope project
+
+# Whitelist GitHub CLI globally:
+python3 skills/auto-permissions-fix/scripts/fix_permissions.py --rule "command(gh)" --decision allow --scope global
+
 # Allow all MCP tools on a specific server for the active session:
 python3 skills/auto-permissions-fix/scripts/fix_permissions.py --rule "mcp(nowledge-mem:*)" --decision allow --scope session
 ```

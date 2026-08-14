@@ -114,7 +114,14 @@ Parses denials from `audit.jsonl` and generates persistent ACL grants across Ses
   ```
 * **Add an explicit custom rule directly:**
   ```bash
+  # Allow dependency sync in project:
   python3 skills/auto-permissions-fix/scripts/fix_permissions.py --rule "command(uv lock)" --allow --scope project
+
+  # Fast-path whitelist git commands for the project:
+  python3 skills/auto-permissions-fix/scripts/fix_permissions.py --rule "command(git)" --allow --scope project
+
+  # Fast-path whitelist GitHub CLI globally:
+  python3 skills/auto-permissions-fix/scripts/fix_permissions.py --rule "command(gh)" --allow --scope global
   ```
 * **Interactive Mode (browse all recent denials and select scope interactively):**
   ```bash
