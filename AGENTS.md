@@ -57,7 +57,7 @@ auto-permissions/
 │   │   └── scripts/
 │   │       └── view_audit.py                # Audit log reader CLI
 │   ├── auto-permissions-fix/
-│   │   ├── SKILL.md                         # ACL rule generator from denials (audit2allow)
+│   │   ├── SKILL.md                         # ACL rule generator from denials (policy remediation)
 │   │   └── scripts/
 │   │       └── fix_permissions.py          # Policy rule fixer CLI
 │   └── auto-permissions-test/
@@ -73,7 +73,7 @@ auto-permissions/
 │   ├── test_classifier.py                   # Unit tests for multi-provider classifier
 │   ├── test_policy_engine.py                # Unit tests for static ACL policy engine
 │   ├── test_pre_invocation.py               # Unit tests for PreInvocation hook
-│   ├── test_fix_permissions.py              # Unit tests for audit2allow rule derivation
+│   ├── test_fix_permissions.py              # Unit tests for policy remediation rule derivation
 │   ├── test_permission_skill.py             # Unit tests for test_permission simulation CLI
 │   └── test_gate_e2e.py                     # End-to-end hook simulation tests
 ├── README.md                                # General project documentation

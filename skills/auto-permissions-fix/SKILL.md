@@ -1,10 +1,10 @@
 ---
 name: auto-permissions-fix
 description: >-
-  Generate and apply Antigravity permission ACL rules (allow, ask, deny) from audit log denials (audit2allow style) across Session, Project, or Global scopes.
+  Generate and apply Antigravity permission ACL rules (allow, ask, deny) from audit log denials across Session, Project, or Global scopes.
 ---
 
-# Auto-Permissions Fix Skill (`audit2allow` for Antigravity)
+# Auto-Permissions Fix Skill (Denial Remediation & ACL Generator)
 
 Use this skill when the user asks to fix or allow a blocked tool call from the audit log, or configure explicit static rules to auto-approve, prompt, or hard-block specific commands and files.
 

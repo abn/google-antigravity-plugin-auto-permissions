@@ -15,7 +15,7 @@ The plugin intercepts sensitive tool operations (commands, file writes, web requ
 3. **Hierarchical Fast-Path Static ACL Engine:**
    - Evaluates static permission rules (`command(...)`, `write_file(...)`, `read_url(...)`) across **Session**, **Project** (`.agents/auto-permissions.json`), and **Global** scopes with strict `Deny > Ask > Allow` priority.
    - Matching static rules execute with **sub-millisecond latency (0ms)** with zero API cost.
-4. **Audit2Allow Policy Generator (`auto-permissions-fix`):**
+4. **Denial Remediation & Policy Rule Generator (`auto-permissions-fix`):**
    - Automatically translates denials in `audit.jsonl` into candidate Antigravity ACL rules and writes them to Session, Project, or Global scopes.
 5. **End-of-Round Collapsible Security Gate Summary:**
    - Appends a non-intrusive, collapsible Markdown summary table at the end of each round showing evaluated actions, verdicts (`🟢 ALLOW`, `🔴 DENY`, `🟡 ASK`), and evaluation modes (`Static ACL` vs `Gemini`).
@@ -101,7 +101,7 @@ Inspects session audit traces, decision breakdowns, latency metrics, and failure
   python3 skills/auto-permissions-audit/scripts/view_audit.py <path_to_session_audit.jsonl> --markdown
   ```
 
-### 3. `auto-permissions-fix` (SELinux `audit2allow` Paradigm)
+### 3. `auto-permissions-fix` (Denial Remediation & Rule Generator)
 Parses denials from `audit.jsonl` and generates persistent ACL grants across Session, Project, or Global scopes.
 
 * **Auto-allow the most recent denied action in the current session:**
@@ -232,7 +232,7 @@ auto-permissions/
 │   │   └── scripts/
 │   │       └── view_audit.py                # Audit log summary CLI
 │   ├── auto-permissions-fix/
-│   │   ├── SKILL.md                         # ACL rule generator from denials (audit2allow)
+│   │   ├── SKILL.md                         # ACL rule generator from denials (policy remediation)
 │   │   └── scripts/
 │   │       └── fix_permissions.py          # Policy rule fixer CLI
 │   └── auto-permissions-test/

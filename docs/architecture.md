@@ -223,7 +223,7 @@ Every classification event produces an atomic single-line JSON record:
 
 ---
 
-## 8. Fast-Path Static Policy Engine & Audit2Allow Workflow
+## 8. Fast-Path Static Policy Engine & Denial Remediation Workflow
 
 ### 8.1 Hierarchical Policy Scopes
 To achieve sub-millisecond execution for known commands and eliminate LLM API costs for trusted operations, the plugin implements a hierarchical policy engine (`hooks/policy_engine.py`) evaluated prior to the classifier:
@@ -234,8 +234,8 @@ To achieve sub-millisecond execution for known commands and eliminate LLM API co
 
 Rules are strictly evaluated with Antigravity's **`Deny > Ask > Allow`** precedence model.
 
-### 8.2 The `auto-permissions-fix` Tooling
-Inspired by SELinux's `audit2allow`, the `auto-permissions-fix` CLI tool (`skills/auto-permissions-fix/scripts/fix_permissions.py`) allows developers to parse recent audit denials and generate static permission grants:
+### 8.2 The `auto-permissions-fix` Policy Remediation Tooling
+The `auto-permissions-fix` CLI tool (`skills/auto-permissions-fix/scripts/fix_permissions.py`) allows developers to parse recent audit denials and generate static permission grants:
 
 ```bash
 # Allow last denied command in current session:
@@ -380,7 +380,7 @@ flowchart LR
     subgraph Skills Subsystem
         Configure[skills/auto-permissions-configure<br>Interactive Policy & Provider Setup]
         Audit[skills/auto-permissions-audit<br>Session Trace & Issue Diagnostics]
-        Fix[skills/auto-permissions-fix<br>audit2allow ACL Rule Generator]
+        Fix[skills/auto-permissions-fix<br>Denial Remediation & Rule Generator]
         Test[skills/auto-permissions-test<br>Policy & Classifier Simulation]
     end
 
@@ -400,7 +400,7 @@ flowchart LR
 * **Purpose:** Inspects active session traces, provides decision breakdowns, detects high latency ($>2000\text{ms}$), and identifies container sandbox bypass events.
 * **Boundaries:** Strictly scoped to `<session_dir>/audit.jsonl`. Gracefully reports if no actions have been evaluated.
 
-### 11.3 `auto-permissions-fix` (`audit2allow`)
+### 11.3 `auto-permissions-fix` (Denial Remediation)
 * **Purpose:** Parses denial and ask records from `audit.jsonl` and translates them into persistent ACL grants across Session, Project, or Global scopes.
 * **Granularity:** Derives exact commands, prefix commands, directory patterns, and MCP server/tool rules.
 
