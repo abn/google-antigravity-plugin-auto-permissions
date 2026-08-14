@@ -22,6 +22,10 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+      - name: Checkout Code
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v7
+
       - name: Package Plugin Distribution Artifacts
         if: ${{ steps.release.outputs.release_created }}
         run: |
