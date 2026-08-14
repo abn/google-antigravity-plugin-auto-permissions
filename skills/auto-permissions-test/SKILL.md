@@ -45,12 +45,21 @@ python3 skills/auto-permissions-test/scripts/test_permission.py "apply the migra
   --markdown
 ```
 
-### 5. Test with Custom Model
+### 5. Test with Custom Model & Provider (Google, OpenAI Wire, Anthropic)
 
 ```bash
+# Test with Anthropic Claude
 python3 skills/auto-permissions-test/scripts/test_permission.py "deploy to staging" \
   --command "kubectl apply -f k8s/staging.yaml" \
-  --model gemini-2.5-pro \
+  --provider anthropic \
+  --model claude-3-5-haiku-20241022 \
+  --markdown
+
+# Test with local OpenAI-compatible endpoint (e.g. Lemonade / vLLM)
+python3 skills/auto-permissions-test/scripts/test_permission.py "run test suite" \
+  --command "pytest -v" \
+  --provider openai \
+  --endpoint-url "http://localhost:8000/v1/chat/completions" \
   --markdown
 ```
 

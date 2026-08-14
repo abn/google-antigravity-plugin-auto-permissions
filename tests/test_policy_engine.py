@@ -6,6 +6,7 @@ import unittest
 
 from hooks.policy_engine import (
     PROJECT_CONFIG_REL_PATH,
+    PROJECT_LOCAL_CONFIG_REL_PATH,
     add_rule_to_scope,
     evaluate_static_policies,
     is_path_in_workspaces,
@@ -15,6 +16,7 @@ from hooks.policy_engine import (
     match_tool_against_rule,
     match_url,
     parse_resource_rule,
+    resolve_classifier_config,
     resolve_configured_model,
 )
 
@@ -195,6 +197,28 @@ class TestPolicyEngine(unittest.TestCase):
                 resolve_configured_model(session_dir=session_dir, workspace_paths=[ws]),
                 "gemini-3.5-flash",
             )
+
+    def test_resolve_classifier_config_multi_provider(self):
+        with tempfile.TemporaryDirectory() as ws:
+            # 1. Test local untracked config with direct api_key
+            local_config = os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH)
+            os.makedirs(os.path.dirname(local_config), exist_ok=True)
+            with open(local_config, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "provider": "openai",
+                        "model": "gemma-2-9b-it",
+                        "endpoint_url": "http://localhost:8000/v1/chat/completions",
+                        "api_key": "custom-inline-key",
+                    },
+                    f,
+                )
+
+            cfg = resolve_classifier_config(workspace_paths=[ws])
+            self.assertEqual(cfg["provider"], "openai")
+            self.assertEqual(cfg["model"], "gemma-2-9b-it")
+            self.assertEqual(cfg["endpoint_url"], "http://localhost:8000/v1/chat/completions")
+            self.assertEqual(cfg["api_key"], "custom-inline-key")
 
     def test_add_rule_and_evaluate_hierarchy(self):
         with tempfile.TemporaryDirectory() as session_dir, tempfile.TemporaryDirectory() as ws_dir:

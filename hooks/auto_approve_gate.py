@@ -20,7 +20,7 @@ from classifier import classify_tool_call  # noqa: E402
 from policy_engine import (  # noqa: E402
     evaluate_static_policies,
     load_custom_guidelines,
-    resolve_configured_model,
+    resolve_classifier_config,
 )
 from transcript_parser import read_user_prompts_from_transcript  # noqa: E402
 
@@ -115,13 +115,13 @@ def main():
         session_dir=session_dir,
     )
 
-    # 4. Resolve configured model identifier
-    model_name = resolve_configured_model(
+    # 4. Resolve configured classifier settings (provider, model, endpoint_url, api_key)
+    classifier_cfg = resolve_classifier_config(
         session_dir=session_dir,
         workspace_paths=workspace_paths,
     )
 
-    # 5. Invoke Gemini security classifier
+    # 5. Invoke security classifier
     raw_prompt, classification, error, latency_ms = classify_tool_call(
         workspace_paths=workspace_paths,
         prior_prompts=prior_prompts,
@@ -131,7 +131,10 @@ def main():
         tool_action=tool_action,
         tool_summary=tool_summary,
         custom_guidelines=custom_guidelines,
-        model=model_name,
+        provider=classifier_cfg["provider"],
+        model=classifier_cfg["model"],
+        endpoint_url=classifier_cfg["endpoint_url"],
+        api_key=classifier_cfg["api_key"],
     )
 
     # 4. Map classification verdict to Antigravity PreToolUse decision

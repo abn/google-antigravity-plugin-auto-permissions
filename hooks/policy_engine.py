@@ -13,6 +13,7 @@ from typing import Any
 
 GLOBAL_CONFIG_PATH = os.path.expanduser("~/.gemini/config/auto-permissions.json")
 PROJECT_CONFIG_REL_PATH = os.path.join(".agents", "auto-permissions.json")
+PROJECT_LOCAL_CONFIG_REL_PATH = os.path.join(".agents", "auto-permissions.local.json")
 SESSION_OVERRIDES_FILENAME = "session_overrides.json"
 
 
@@ -286,7 +287,8 @@ def is_path_in_workspaces(target_path: str, workspace_paths: list[str] | None) -
 def load_policy_file(file_path: str) -> dict[str, Any]:
     """
     Loads a policy JSON file returning a dict with keys
-    'allow', 'ask', 'deny', 'custom_guidelines', 'allowed_skill_paths', 'model'.
+    'allow', 'ask', 'deny', 'custom_guidelines', 'allowed_skill_paths',
+    'provider', 'model', 'endpoint_url', 'api_key', 'api_key_env'.
     """
     policy: dict[str, Any] = {
         "allow": [],
@@ -294,7 +296,11 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
         "deny": [],
         "custom_guidelines": [],
         "allowed_skill_paths": [],
+        "provider": None,
         "model": None,
+        "endpoint_url": None,
+        "api_key": None,
+        "api_key_env": None,
     }
     if not file_path or not os.path.isfile(file_path):
         return policy
@@ -307,8 +313,29 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
                     val = data.get(k, [])
                     if isinstance(val, list):
                         policy[k] = [str(x) for x in val]
-                if "model" in data and isinstance(data["model"], str) and data["model"].strip():
-                    policy["model"] = data["model"].strip()
+                for str_k in (
+                    "provider",
+                    "protocol",
+                    "model",
+                    "endpoint_url",
+                    "uri",
+                    "api_base",
+                    "api_key",
+                    "api_key_env",
+                ):
+                    val = data.get(str_k)
+                    if isinstance(val, str) and val.strip():
+                        clean_v = val.strip()
+                        if str_k in ("provider", "protocol"):
+                            policy["provider"] = clean_v.lower()
+                        elif str_k in ("endpoint_url", "uri", "api_base"):
+                            policy["endpoint_url"] = clean_v
+                        elif str_k == "model":
+                            policy["model"] = clean_v
+                        elif str_k == "api_key":
+                            policy["api_key"] = clean_v
+                        elif str_k == "api_key_env":
+                            policy["api_key_env"] = clean_v
     except Exception:
         pass
     return policy
@@ -336,6 +363,7 @@ def load_allowed_skill_paths(
     scope_files.append(GLOBAL_CONFIG_PATH)
     if workspace_paths:
         for ws in workspace_paths:
+            scope_files.append(os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH))
             scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
     if session_dir and os.path.isdir(session_dir):
         scope_files.append(os.path.join(session_dir, SESSION_OVERRIDES_FILENAME))
@@ -401,43 +429,141 @@ def is_safe_skill_read(
     return False
 
 
+def resolve_classifier_config(
+    session_dir: str | None = None,
+    workspace_paths: list[str] | None = None,
+) -> dict[str, Any]:
+    """
+    Resolves the complete classifier configuration (provider, model, endpoint_url, api_key)
+    across the hierarchy:
+    Session -> Local Project (.agents/*.local.json) -> Project (.agents/*.json)
+    -> Global -> Environment Variables -> Defaults.
+    """
+    scope_files = []
+    # 1. Session scope
+    if session_dir and os.path.isdir(session_dir):
+        scope_files.append(os.path.join(session_dir, SESSION_OVERRIDES_FILENAME))
+
+    # 2. Local Project scope (untracked)
+    if workspace_paths:
+        for ws in workspace_paths:
+            scope_files.append(os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH))
+
+    # 3. Project scope (tracked)
+    if workspace_paths:
+        for ws in workspace_paths:
+            scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
+
+    # 4. Global scope
+    scope_files.append(GLOBAL_CONFIG_PATH)
+
+    merged: dict[str, Any] = {
+        "provider": None,
+        "model": None,
+        "endpoint_url": None,
+        "api_key": None,
+        "api_key_env": None,
+    }
+
+    for f_path in scope_files:
+        if not os.path.isfile(f_path):
+            continue
+        pol = load_policy_file(f_path)
+        for k in ("provider", "model", "endpoint_url", "api_key", "api_key_env"):
+            if merged[k] is None and pol.get(k):
+                merged[k] = pol[k]
+
+    # Environment variable overrides/fallbacks
+    env_provider = os.environ.get("AUTO_PERMISSIONS_PROVIDER") or os.environ.get(
+        "AUTO_PERMISSIONS_PROTOCOL"
+    )
+    if merged["provider"] is None and env_provider:
+        merged["provider"] = env_provider.strip().lower()
+
+    env_model = (
+        os.environ.get("AUTO_PERMISSIONS_MODEL")
+        or os.environ.get("GEMINI_MODEL")
+        or os.environ.get("OPENAI_MODEL")
+        or os.environ.get("ANTHROPIC_MODEL")
+    )
+    if merged["model"] is None and env_model:
+        merged["model"] = env_model.strip()
+
+    env_endpoint = (
+        os.environ.get("AUTO_PERMISSIONS_ENDPOINT_URL")
+        or os.environ.get("OPENAI_BASE_URL")
+        or os.environ.get("ANTHROPIC_BASE_URL")
+    )
+    if merged["endpoint_url"] is None and env_endpoint:
+        merged["endpoint_url"] = env_endpoint.strip()
+
+    # Determine provider (normalize 'gemini' -> 'google', 'claude' -> 'anthropic')
+    provider = (merged["provider"] or "").lower()
+    if provider == "gemini":
+        provider = "google"
+    elif provider == "claude":
+        provider = "anthropic"
+
+    model = merged["model"] or ""
+    endpoint = merged["endpoint_url"] or ""
+
+    # Auto-infer provider if omitted
+    if not provider:
+        if "anthropic" in endpoint or model.startswith("claude"):
+            provider = "anthropic"
+        elif (
+            "openai" in endpoint
+            or "/chat/completions" in endpoint
+            or model.startswith("gpt-")
+            or model.startswith("o1")
+            or model.startswith("o3")
+        ):
+            provider = "openai"
+        else:
+            provider = "google"
+
+    # Default models per provider
+    if not model:
+        if provider == "anthropic":
+            model = "claude-3-5-haiku-20241022"
+        elif provider == "openai":
+            model = "gpt-4o-mini"
+        else:
+            model = "gemini-2.5-flash"
+
+    # Resolve API Key
+    api_key = merged["api_key"]
+    if not api_key:
+        if merged["api_key_env"]:
+            api_key = os.environ.get(merged["api_key_env"])
+        elif provider == "google":
+            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        elif provider == "anthropic":
+            api_key = os.environ.get("ANTHROPIC_API_KEY")
+        elif provider == "openai":
+            api_key = os.environ.get("OPENAI_API_KEY")
+            if not api_key and "googleapis.com" in endpoint:
+                api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+
+    if not api_key:
+        api_key = os.environ.get("AUTO_PERMISSIONS_API_KEY")
+
+    return {
+        "provider": provider,
+        "model": model,
+        "endpoint_url": endpoint or None,
+        "api_key": api_key,
+    }
+
+
 def resolve_configured_model(
     session_dir: str | None = None,
     workspace_paths: list[str] | None = None,
     default_model: str = "gemini-2.5-flash",
 ) -> str:
-    """
-    Resolves the configured Gemini model identifier across the hierarchy:
-    Session -> Project -> Global -> Environment Variable -> Default.
-    """
-    # 1. Session scope
-    if session_dir:
-        session_file = os.path.join(session_dir, SESSION_OVERRIDES_FILENAME)
-        policy = load_policy_file(session_file)
-        if policy.get("model"):
-            return policy["model"]
-
-    # 2. Project scope
-    if workspace_paths:
-        for ws in workspace_paths:
-            proj_file = os.path.join(ws, PROJECT_CONFIG_REL_PATH)
-            policy = load_policy_file(proj_file)
-            if policy.get("model"):
-                return policy["model"]
-
-    # 3. Global scope
-    if os.path.isfile(GLOBAL_CONFIG_PATH):
-        policy = load_policy_file(GLOBAL_CONFIG_PATH)
-        if policy.get("model"):
-            return policy["model"]
-
-    # 4. Environment variable
-    env_model = os.environ.get("AUTO_PERMISSIONS_MODEL") or os.environ.get("GEMINI_MODEL")
-    if env_model and env_model.strip():
-        return env_model.strip()
-
-    # 5. Default
-    return default_model
+    """Resolves the configured model identifier across the hierarchy."""
+    cfg = resolve_classifier_config(session_dir=session_dir, workspace_paths=workspace_paths)
+    return cfg.get("model") or default_model
 
 
 def load_custom_guidelines(
@@ -457,6 +583,7 @@ def load_custom_guidelines(
     # 2. Project
     if workspace_paths:
         for ws in workspace_paths:
+            scope_files.append(os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH))
             scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
     # 3. Session
     if session_dir and os.path.isdir(session_dir):
@@ -543,12 +670,17 @@ def evaluate_static_policies(
     if session_dir and os.path.isdir(session_dir):
         scope_files.append(("session", os.path.join(session_dir, SESSION_OVERRIDES_FILENAME)))
 
-    # 2. Project scope
+    # 2. Local Project scope (untracked local overrides)
+    if workspace_paths:
+        for ws in workspace_paths:
+            scope_files.append(("project_local", os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH)))
+
+    # 3. Project scope (tracked project rules)
     if workspace_paths:
         for ws in workspace_paths:
             scope_files.append(("project", os.path.join(ws, PROJECT_CONFIG_REL_PATH)))
 
-    # 3. Global scope
+    # 4. Global scope
     scope_files.append(("global", GLOBAL_CONFIG_PATH))
 
     # Evaluate each scope with strict Deny > Ask > Allow precedence

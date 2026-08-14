@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Security Authorization Classifier for Google Antigravity Auto-Permissions Hook.
-Evaluates proposed tool actions against user intent using Gemini 2.5 Flash.
+Evaluates proposed tool actions against user intent using Google Gemini, OpenAI-wire,
+or Anthropic Claude endpoints with zero external runtime dependencies.
 """
 
 import json
@@ -11,10 +12,13 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+DEFAULT_PROVIDER = "google"
 DEFAULT_MODEL = "gemini-2.5-flash"
-API_ENDPOINT_TEMPLATE = (
+GOOGLE_ENDPOINT_TEMPLATE = (
     "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
 )
+OPENAI_DEFAULT_ENDPOINT = "https://api.openai.com/v1/chat/completions"
+ANTHROPIC_DEFAULT_ENDPOINT = "https://api.anthropic.com/v1/messages"
 
 SYSTEM_INSTRUCTION = (
     "You are a strict security authorization classifier for an autonomous coding agent workspace.\n"
@@ -28,6 +32,8 @@ SYSTEM_INSTRUCTION = (
     "     manifests, running linters/formatters like `ruff` or `eslint` on changed files, or\n"
     "     running local tests like `pytest` to verify edits) are IN-SCOPE and MUST be classified\n"
     "     as 'allow'.\n"
+    "   - SKILL DEFINITIONS: Reading installed Antigravity skill definitions (e.g. `SKILL.md`)\n"
+    "     when executing relevant skills is safe and authorized as 'allow'.\n"
     "2. soft_deny: Tool call modifies unrequested resources, touches unrelated repositories,\n"
     "   or begins unprompted refactoring of unrelated subsystems. Triggers agent self-correction.\n"
     "   Do NOT soft_deny routine compilation, lockfile updates, linting, or testing of the\n"
@@ -126,6 +132,188 @@ Arguments: {json.dumps(tool_args, indent=2)}
 </proposed_tool_call>"""
 
 
+def _clean_json_text(text: str) -> str:
+    """Strips markdown code fences and surrounding whitespace from model response."""
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    return text
+
+
+def _parse_decision_text(raw_text: str) -> dict[str, Any]:
+    """Parses and validates decision JSON from text, enforcing fail-closed structure."""
+    cleaned = _clean_json_text(raw_text)
+    data = json.loads(cleaned)
+    if not isinstance(data, dict):
+        msg = "Model response is not a valid JSON dictionary."
+        raise ValueError(msg)
+
+    decision = str(data.get("decision", "ask")).strip().lower()
+    if decision not in ("allow", "soft_deny", "ask", "hard_deny", "deny"):
+        decision = "ask"
+
+    reason = str(data.get("reason", "Automated classification verdict.")).strip()
+    risk_category = str(data.get("risk_category", "unknown")).strip()
+    try:
+        confidence = float(data.get("confidence", 1.0))
+    except (ValueError, TypeError):
+        confidence = 1.0
+
+    return {
+        "decision": decision,
+        "reason": reason,
+        "risk_category": risk_category,
+        "confidence": max(0.0, min(1.0, confidence)),
+    }
+
+
+def _call_google_api(
+    raw_prompt: str,
+    model: str,
+    endpoint_url: str | None,
+    api_key: str | None,
+    timeout_secs: float,
+) -> dict[str, Any]:
+    key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not key and not endpoint_url:
+        msg = "GEMINI_API_KEY / GOOGLE_API_KEY is not configured in environment or config."
+        raise ValueError(msg)
+
+    if endpoint_url:
+        url = endpoint_url
+        headers = {"Content-Type": "application/json"}
+        if key:
+            headers["x-goog-api-key"] = key
+    else:
+        url = GOOGLE_ENDPOINT_TEMPLATE.format(model=model, key=key or "")
+        headers = {"Content-Type": "application/json"}
+
+    request_body = {
+        "system_instruction": {"parts": [{"text": SYSTEM_INSTRUCTION}]},
+        "contents": [{"role": "user", "parts": [{"text": raw_prompt}]}],
+        "generationConfig": {
+            "response_mime_type": "application/json",
+            "temperature": 0.0,
+        },
+    }
+
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(request_body).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout_secs) as resp:
+        response_json = json.loads(resp.read().decode("utf-8"))
+        candidates = response_json.get("candidates", [])
+        if not candidates:
+            msg = "No candidates returned from Google Gemini API."
+            raise ValueError(msg)
+        content_parts = candidates[0].get("content", {}).get("parts", [])
+        if not content_parts:
+            msg = "Empty content parts in Google Gemini response."
+            raise ValueError(msg)
+        raw_text = content_parts[0].get("text", "{}")
+        return _parse_decision_text(raw_text)
+
+
+def _call_openai_api(
+    raw_prompt: str,
+    model: str,
+    endpoint_url: str | None,
+    api_key: str | None,
+    timeout_secs: float,
+) -> dict[str, Any]:
+    key = api_key or os.environ.get("OPENAI_API_KEY")
+    if not key and endpoint_url and "googleapis.com" in endpoint_url:
+        key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+
+    url = endpoint_url or OPENAI_DEFAULT_ENDPOINT
+    headers = {"Content-Type": "application/json"}
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
+
+    request_body = {
+        "model": model or "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": SYSTEM_INSTRUCTION},
+            {"role": "user", "content": raw_prompt},
+        ],
+        "temperature": 0.0,
+        "response_format": {"type": "json_object"},
+    }
+
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(request_body).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout_secs) as resp:
+        response_json = json.loads(resp.read().decode("utf-8"))
+        choices = response_json.get("choices", [])
+        if not choices:
+            msg = "No choices returned from OpenAI wire endpoint."
+            raise ValueError(msg)
+        msg_obj = choices[0].get("message", {})
+        raw_text = msg_obj.get("content", "{}")
+        return _parse_decision_text(raw_text)
+
+
+def _call_anthropic_api(
+    raw_prompt: str,
+    model: str,
+    endpoint_url: str | None,
+    api_key: str | None,
+    timeout_secs: float,
+) -> dict[str, Any]:
+    key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+    if not key and not endpoint_url:
+        msg = "ANTHROPIC_API_KEY is not configured in environment or config."
+        raise ValueError(msg)
+
+    url = endpoint_url or ANTHROPIC_DEFAULT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
+    }
+    if key:
+        headers["x-api-key"] = key
+
+    request_body = {
+        "model": model or "claude-3-5-haiku-20241022",
+        "system": SYSTEM_INSTRUCTION,
+        "messages": [
+            {
+                "role": "user",
+                "content": f"{raw_prompt}\n\nRespond with valid JSON adhering to schema only.",
+            }
+        ],
+        "temperature": 0.0,
+        "max_tokens": 1000,
+    }
+
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(request_body).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout_secs) as resp:
+        response_json = json.loads(resp.read().decode("utf-8"))
+        content = response_json.get("content", [])
+        if not content:
+            msg = "No content returned from Anthropic API."
+            raise ValueError(msg)
+        raw_text = content[0].get("text", "{}")
+        return _parse_decision_text(raw_text)
+
+
 def classify_tool_call(
     workspace_paths: list[str],
     prior_prompts: list[str],
@@ -135,15 +323,17 @@ def classify_tool_call(
     tool_action: str | None = None,
     tool_summary: str | None = None,
     custom_guidelines: list[str] | None = None,
-    api_key: str | None = None,
+    provider: str = DEFAULT_PROVIDER,
     model: str = DEFAULT_MODEL,
+    endpoint_url: str | None = None,
+    api_key: str | None = None,
     timeout_secs: float = 4.0,
 ) -> tuple[str, dict[str, Any], str | None, float]:
     """
-    Invokes Gemini 2.5 Flash via REST API using only standard library urllib.
+    Invokes the security classifier using the specified provider ('google', 'openai', 'anthropic').
+    Uses only standard library urllib with zero external dependencies.
     Returns: (raw_prompt, classification_dict, error_msg, latency_ms)
     """
-    key = api_key or os.environ.get("GEMINI_API_KEY")
     raw_prompt = format_classifier_payload(
         workspace_paths=workspace_paths,
         prior_prompts=prior_prompts,
@@ -155,57 +345,47 @@ def classify_tool_call(
         custom_guidelines=custom_guidelines,
     )
 
-    if not key:
-        fallback = {
-            "decision": "ask",
-            "reason": "GEMINI_API_KEY is not configured in environment.",
-            "risk_category": "missing_credentials",
-            "confidence": 0.0,
-        }
-        return raw_prompt, fallback, "Missing GEMINI_API_KEY", 0.0
-
-    url = API_ENDPOINT_TEMPLATE.format(model=model, key=key)
-
-    request_body = {
-        "system_instruction": {"parts": [{"text": SYSTEM_INSTRUCTION}]},
-        "contents": [{"role": "user", "parts": [{"text": raw_prompt}]}],
-        "generationConfig": {
-            "response_mime_type": "application/json",
-            "temperature": 0.0,
-        },
-    }
-
-    data_bytes = json.dumps(request_body).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data_bytes,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
+    norm_provider = (provider or DEFAULT_PROVIDER).lower()
+    if norm_provider == "gemini":
+        norm_provider = "google"
+    elif norm_provider == "claude":
+        norm_provider = "anthropic"
 
     start_time = time.perf_counter()
     try:
-        with urllib.request.urlopen(req, timeout=timeout_secs) as resp:
-            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-            response_json = json.loads(resp.read().decode("utf-8"))
+        if norm_provider == "openai":
+            classification = _call_openai_api(
+                raw_prompt=raw_prompt,
+                model=model,
+                endpoint_url=endpoint_url,
+                api_key=api_key,
+                timeout_secs=timeout_secs,
+            )
+        elif norm_provider == "anthropic":
+            classification = _call_anthropic_api(
+                raw_prompt=raw_prompt,
+                model=model,
+                endpoint_url=endpoint_url,
+                api_key=api_key,
+                timeout_secs=timeout_secs,
+            )
+        else:
+            classification = _call_google_api(
+                raw_prompt=raw_prompt,
+                model=model,
+                endpoint_url=endpoint_url,
+                api_key=api_key,
+                timeout_secs=timeout_secs,
+            )
 
-            candidates = response_json.get("candidates", [])
-            if not candidates:
-                raise ValueError("No candidates returned from Gemini API.")
-
-            content_parts = candidates[0].get("content", {}).get("parts", [])
-            if not content_parts:
-                raise ValueError("Empty content parts in Gemini response.")
-
-            raw_text = content_parts[0].get("text", "{}")
-            classification = json.loads(raw_text)
-            return raw_prompt, classification, None, elapsed_ms
+        elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+        return raw_prompt, classification, None, elapsed_ms
 
     except Exception as exc:
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
         fallback = {
             "decision": "ask",
-            "reason": f"Classifier fallback on error: {exc}",
+            "reason": f"Classifier fallback on error ({norm_provider}): {exc}",
             "risk_category": "classifier_error",
             "confidence": 0.0,
         }

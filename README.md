@@ -119,13 +119,16 @@ Simulates how the security classifier and static policies would evaluate a hypot
 
 ---
 
-## Configuration: Static ACLs & Custom Semantic Guidelines
+## Configuration: Providers, Endpoints & Static ACLs
 
-You can configure project-level policies in `.agents/auto-permissions.json` or global user policies in `~/.gemini/config/auto-permissions.json`:
+You can configure project-level policies in `.agents/auto-permissions.json` (tracked) or `.agents/auto-permissions.local.json` (untracked local secrets/overrides, ignored by git), or globally in `~/.gemini/config/auto-permissions.json`:
 
 ```json
 {
+  "provider": "google",
   "model": "gemini-2.5-flash",
+  "endpoint_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+  "api_key_env": "GEMINI_API_KEY",
   "allow": [
     "command(uv lock)",
     "command(pytest -v)",
@@ -150,8 +153,26 @@ You can configure project-level policies in `.agents/auto-permissions.json` or g
 }
 ```
 
-* **`model`:** Optional classifier model identifier (e.g. `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.5-flash`). Defaults to `gemini-2.5-flash`. Can also be set via `AUTO_PERMISSIONS_MODEL` env var.
-* **`allow` / `ask` / `deny`:** Deterministic static ACLs evaluated with `0.1ms` latency before invoking the Gemini classifier. Supports `command(...)`, `write_file(...)`, `read_file(...)`, `read_url(...)`, and `mcp(server:tool)`.
+### Multi-Provider & Local Inference Support
+
+`auto-permissions` supports Google Gemini, OpenAI-compatible servers (e.g. local Lemonade, vLLM, Ollama, Groq, OpenRouter), and Anthropic Claude using zero external dependencies:
+
+```json
+// Example: Local Self-Hosted LLM on GPU (Lemonade / vLLM / Ollama)
+{
+  "provider": "openai",
+  "model": "gemma-2-9b-it",
+  "endpoint_url": "http://localhost:8000/v1/chat/completions",
+  "api_key": "optional-local-token"
+}
+```
+
+* **`provider`:** `"google"` *(default)*, `"openai"`, or `"anthropic"`. If omitted, automatically inferred from `endpoint_url` or `model`.
+* **`model`:** Model identifier (e.g. `gemini-2.5-flash`, `gpt-4o-mini`, `claude-3-5-haiku-20241022`).
+* **`endpoint_url`:** Custom REST endpoint URI. Supports local inference (`http://localhost:8000/v1/chat/completions`), proxies, or official OpenAI wire gateways.
+* **`api_key`:** Optional direct API token. (Tip: Store direct tokens in `.agents/auto-permissions.local.json` to keep them gitignored).
+* **`api_key_env`:** Custom environment variable to read the token from (defaults to `GEMINI_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`).
+* **`allow` / `ask` / `deny`:** Deterministic static ACLs evaluated with `0.1ms` latency before invoking the classifier. Supports `command(...)`, `write_file(...)`, `read_file(...)`, `read_url(...)`, and `mcp(server:tool)`.
 * **`custom_guidelines`:** Structured semantic guidelines injected into the security classifier prompt. Core security invariants (credential protection, destructive branch wipes, unprompted remote publishing) strictly supersede custom guidelines in case of conflict.
 * **`allowed_skill_paths`:** Additional custom directory roots authorized for `0.1ms` read-only skill file inspection (e.g. `~/.nowledge-mem/skills-active`). Standard Antigravity paths (`~/.gemini/`, `~/.agents/skills/`) are authorized by default. Symlink targets are securely canonicalized to prevent traversal into sensitive system directories.
 

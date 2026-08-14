@@ -105,9 +105,88 @@ class TestClassifier(unittest.TestCase):
                 tool_name="run_command",
                 tool_args={"CommandLine": "pytest"},
                 api_key="",
+                provider="google",
             )
             self.assertEqual(decision["decision"], "ask")
-            self.assertIn("Missing GEMINI_API_KEY", err)
+            self.assertIn("GEMINI_API_KEY", err)
+
+    @patch("urllib.request.urlopen")
+    def test_classify_tool_call_openai_provider(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "decision": "allow",
+                                    "reason": "OpenAI provider verified safe action",
+                                    "risk_category": "safe_routine",
+                                    "confidence": 0.95,
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+        ).encode("utf-8")
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        raw_payload, decision, err, latency = classify_tool_call(
+            workspace_paths=["/tmp"],
+            prior_prompts=[],
+            active_prompt="Run tests",
+            tool_name="run_command",
+            tool_args={"CommandLine": "pytest"},
+            provider="openai",
+            model="gpt-4o-mini",
+            api_key="sk-mock-openai-key",
+        )
+
+        self.assertIsNone(err)
+        self.assertEqual(decision["decision"], "allow")
+        self.assertEqual(decision["reason"], "OpenAI provider verified safe action")
+
+    @patch("urllib.request.urlopen")
+    def test_classify_tool_call_anthropic_provider(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(
+            {
+                "content": [
+                    {
+                        "text": "```json\n"
+                        + json.dumps(
+                            {
+                                "decision": "allow",
+                                "reason": "Claude verified safe workspace operation",
+                                "risk_category": "safe_routine",
+                                "confidence": 1.0,
+                            }
+                        )
+                        + "\n```"
+                    }
+                ]
+            }
+        ).encode("utf-8")
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        raw_payload, decision, err, latency = classify_tool_call(
+            workspace_paths=["/tmp"],
+            prior_prompts=[],
+            active_prompt="Run tests",
+            tool_name="run_command",
+            tool_args={"CommandLine": "pytest"},
+            provider="anthropic",
+            model="claude-3-5-haiku-20241022",
+            api_key="sk-ant-mock-key",
+        )
+
+        self.assertIsNone(err)
+        self.assertEqual(decision["decision"], "allow")
+        self.assertEqual(decision["reason"], "Claude verified safe workspace operation")
 
 
 if __name__ == "__main__":

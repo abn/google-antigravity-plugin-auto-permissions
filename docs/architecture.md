@@ -268,15 +268,37 @@ The `auto-permissions` gate intercepts all MCP tool invocations (`call_mcp_tool`
   - `mcp(*:delete_*)`: Wildcard pattern across all MCP servers.
 * **Classifier Evaluation:** Unmatched MCP calls are evaluated by the Gemini 2.5 Flash classifier, ensuring destructive operations or external data modifications align with active user intent.
 
-### 8.5 Model Selection & Precedence Hierarchy
-Teams can specify custom Gemini models (e.g. `gemini-2.5-pro` for higher reasoning or `gemini-3.5-flash`) by adding `"model"` to their configuration.
+### 8.5 Multi-Provider Architecture, Custom Endpoints & Local Inference
+`auto-permissions` supports Google Gemini, OpenAI-wire compatible endpoints (e.g. self-hosted Lemonade, vLLM, Ollama, Groq, OpenRouter), and Anthropic Claude using zero external runtime dependencies.
 
-The model is resolved using this strict priority cascade:
-1. **Session Scope:** `<session_dir>/session_overrides.json` (`"model": "..."`)
-2. **Project Scope:** `<workspace>/.agents/auto-permissions.json` (`"model": "..."`)
-3. **Global Scope:** `~/.gemini/config/auto-permissions.json` (`"model": "..."`)
-4. **Environment Variable:** `AUTO_PERMISSIONS_MODEL` or `GEMINI_MODEL`
-5. **Default:** `gemini-2.5-flash`
+* **Configuration Schema:**
+  ```json
+  {
+    "provider": "google",
+    "model": "gemini-2.5-flash",
+    "endpoint_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    "api_key_env": "GEMINI_API_KEY"
+  }
+  ```
+
+* **Local / Self-Hosted Inference (Zero-Cloud Execution):**
+  Teams can run security classification completely on local GPUs without sending metadata or prompt summaries to cloud providers:
+  ```json
+  {
+    "provider": "openai",
+    "model": "gemma-2-9b-it",
+    "endpoint_url": "http://localhost:8000/v1/chat/completions"
+  }
+  ```
+
+* **Configuration Resolution Hierarchy:**
+  Settings are resolved across 5 hierarchical levels:
+  1. **Session Scope:** `<session_dir>/session_overrides.json`
+  2. **Local Project Scope (Untracked Secrets):** `<workspace>/.agents/auto-permissions.local.json` *(Ignored by `.gitignore`)*
+  3. **Project Scope (Tracked Repository Policy):** `<workspace>/.agents/auto-permissions.json`
+  4. **Global Scope:** `~/.gemini/config/auto-permissions.json`
+  5. **Environment Variables:** `AUTO_PERMISSIONS_PROVIDER`, `AUTO_PERMISSIONS_MODEL`, `AUTO_PERMISSIONS_ENDPOINT_URL`, `AUTO_PERMISSIONS_API_KEY` (or provider-specific vars like `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`)
+  6. **Defaults:** Provider `google`, Model `gemini-2.5-flash`
 
 ### 8.6 Symlink Canonicalization, Safe Skill Reading & Traversal Defense
 Agent skills and configurations frequently involve symbolic links (e.g. skills symlinked from external tool managers or virtual caches).

@@ -18,14 +18,13 @@ if plugin_root not in sys.path:
     sys.path.insert(0, plugin_root)
 
 from hooks.classifier import (  # noqa: E402
-    DEFAULT_MODEL,
     classify_tool_call,
     format_classifier_payload,
 )
 from hooks.policy_engine import (  # noqa: E402
     evaluate_static_policies,
     load_custom_guidelines,
-    resolve_configured_model,
+    resolve_classifier_config,
 )
 
 
@@ -37,14 +36,19 @@ def evaluate_simulated_permission(
     prior_prompts: list[str] | None = None,
     tool_action: str | None = None,
     tool_summary: str | None = None,
-    api_key: str | None = None,
+    provider: str | None = None,
     model: str | None = None,
+    endpoint_url: str | None = None,
+    api_key: str | None = None,
 ) -> dict[str, Any]:
     """Evaluates a simulated tool call against static policies and the security classifier."""
     prior_prompts = prior_prompts or []
-    resolved_model = model or resolve_configured_model(
-        workspace_paths=workspace_paths, default_model=DEFAULT_MODEL
-    )
+    cfg = resolve_classifier_config(workspace_paths=workspace_paths)
+
+    resolved_provider = provider or cfg.get("provider", "google")
+    resolved_model = model or cfg.get("model", "gemini-2.5-flash")
+    resolved_endpoint = endpoint_url or cfg.get("endpoint_url")
+    resolved_key = api_key or cfg.get("api_key")
 
     # 1. Fast-path static policy check
     static_verdict = evaluate_static_policies(
@@ -69,12 +73,12 @@ def evaluate_simulated_permission(
             custom_guidelines=custom_guidelines,
         )
         return {
-            "mode": f"static_acl_{scope}",
+            "mode": f"static_policy_{scope}",
             "decision": decision,
             "reason": reason,
             "risk_category": f"static_policy_{scope}",
             "confidence": 1.0,
-            "latency_ms": 0.2,
+            "latency_ms": 0.1,
             "raw_prompt": raw_prompt,
             "model_response": {
                 "decision": decision,
@@ -85,7 +89,7 @@ def evaluate_simulated_permission(
             "error": None,
         }
 
-    # 2. Invoke Gemini security classifier
+    # 2. Invoke security classifier
     raw_prompt, classification, error, latency_ms = classify_tool_call(
         workspace_paths=workspace_paths,
         prior_prompts=prior_prompts,
@@ -95,12 +99,14 @@ def evaluate_simulated_permission(
         tool_action=tool_action,
         tool_summary=tool_summary,
         custom_guidelines=custom_guidelines,
-        api_key=api_key,
+        provider=resolved_provider,
         model=resolved_model,
+        endpoint_url=resolved_endpoint,
+        api_key=resolved_key,
     )
 
     return {
-        "mode": "gemini_classifier",
+        "mode": f"{resolved_provider}_classifier",
         "decision": classification.get("decision", "ask"),
         "reason": classification.get("reason", "Automated classification."),
         "risk_category": classification.get("risk_category", "unknown"),
@@ -207,13 +213,25 @@ def main():
         help="Prior user prompt turn (can be repeated).",
     )
     parser.add_argument(
-        "--markdown", "-m", action="store_true", help="Output as Markdown with collapsible folds."
+        "--provider",
+        "-P",
+        choices=["google", "openai", "anthropic", "gemini", "claude"],
+        help="Provider / protocol (google, openai, anthropic).",
     )
-    parser.add_argument("--json", "-j", action="store_true", help="Output as raw JSON.")
     parser.add_argument(
         "--model",
         "-M",
-        help="Gemini model identifier (e.g. gemini-2.5-flash, gemini-2.5-pro).",
+        help="Model identifier (e.g. gemini-2.5-flash, gpt-4o-mini, claude-3-5-haiku-20241022).",
+    )
+    parser.add_argument(
+        "--endpoint-url",
+        "-u",
+        help="Custom API endpoint URL (for proxies, local vLLM/Lemonade, or cloud providers).",
+    )
+    parser.add_argument(
+        "--api-key",
+        "-k",
+        help="API key / bearer token.",
     )
 
     args = parser.parse_args()
@@ -269,7 +287,10 @@ def main():
         tool_args=tool_args,
         workspace_paths=[os.path.abspath(args.workspace)],
         prior_prompts=args.history,
+        provider=args.provider,
         model=args.model,
+        endpoint_url=args.endpoint_url,
+        api_key=args.api_key,
     )
 
     if args.json:
