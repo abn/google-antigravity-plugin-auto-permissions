@@ -157,6 +157,29 @@ class TestConfigureSkill(unittest.TestCase):
             self.assertFalse(is_healthy)
             self.assertIn("HTTP 401 Unauthorized", msg)
 
+    def test_configure_trust_workspace_writes(self):
+        with tempfile.TemporaryDirectory() as ws:
+            # Test disabling trust_workspace_writes
+            configure_permissions.update_trust_workspace_writes_setting(
+                enabled=False,
+                scope="project",
+                workspace_dir=ws,
+            )
+            config_info = get_effective_configuration(workspace_dir=ws)
+            self.assertFalse(config_info["effective_trust_workspace_writes"])
+
+            md = format_markdown_summary(config_info)
+            self.assertIn("Disabled", md)
+
+            # Test re-enabling trust_workspace_writes
+            configure_permissions.update_trust_workspace_writes_setting(
+                enabled=True,
+                scope="project",
+                workspace_dir=ws,
+            )
+            config_info2 = get_effective_configuration(workspace_dir=ws)
+            self.assertTrue(config_info2["effective_trust_workspace_writes"])
+
 
 if __name__ == "__main__":
     unittest.main()

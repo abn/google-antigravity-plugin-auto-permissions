@@ -226,6 +226,7 @@ You can configure project-level policies in `.agents/auto-permissions.json` (tra
 | `deny` | `array[string]` | `[]` | Static ACL rules blocked in `0.1ms` (highest priority). |
 | `custom_guidelines` | `array[string]` | `[]` | Semantic domain guidelines injected into the classifier prompt. |
 | `allowed_skill_paths` | `array[string]` | `[]` | Extra directory roots permitted for safe `0.1ms` skill file reads. |
+| `trust_workspace_writes` | `boolean` | `true` | When `true` (default), enables `0.1ms` fast-path for non-sensitive workspace writes. |
 | `govern_subagents` | `boolean` | `false` | When `true`, intercepts `invoke_subagent` and evaluates via classifier. |
 | `govern_schedule` | `boolean` | `false` | When `true`, intercepts `schedule` (cron/timers) and evaluates via classifier. |
 | `govern_images` | `boolean` | `false` | When `true`, intercepts `generate_image` and evaluates via classifier. |
@@ -242,6 +243,7 @@ You can configure project-level policies in `.agents/auto-permissions.json` (tra
 | `AUTO_PERMISSIONS_PROVIDER` | - | Override active provider globally (`google`, `openai`, `anthropic`). |
 | `AUTO_PERMISSIONS_MODEL` | - | Override active model identifier globally (or `GEMINI_MODEL`, `OPENAI_MODEL`, `ANTHROPIC_MODEL`). |
 | `AUTO_PERMISSIONS_ENDPOINT_URL` | - | Override custom REST endpoint globally (or `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`). |
+| `AUTO_PERMISSIONS_TRUST_WORKSPACE_WRITES` | `1` | Override workspace write fast-path (`1`/`0` or `true`/`false`). |
 | `AUTO_PERMISSIONS_TIMEOUT` | `4.0` | HTTP classifier timeout in seconds. Increase for large local LLMs (e.g. `60.0`). |
 | `AUTO_PERMISSIONS_GOVERN_SUBAGENTS` | `0` | Set `1` to enable classifier evaluation for `invoke_subagent`. |
 | `AUTO_PERMISSIONS_GOVERN_SCHEDULE` | `0` | Set `1` to enable classifier evaluation for `schedule`. |

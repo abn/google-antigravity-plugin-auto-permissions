@@ -309,6 +309,8 @@ def generate_markdown_summary(
             mode_str = f"Turn Cache ({latency:.1f}ms)"
         elif "same_turn_file_grant" in risk_cat:
             mode_str = f"File Grant ({latency:.1f}ms)"
+        elif "workspace_write" in risk_cat:
+            mode_str = f"Workspace Write ({latency:.1f}ms)"
         elif "safe_read_command" in risk_cat:
             mode_str = f"Safe Read ({latency:.1f}ms)"
         elif "ungoverned_surface" in risk_cat:

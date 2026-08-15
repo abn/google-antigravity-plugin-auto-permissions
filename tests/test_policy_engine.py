@@ -11,9 +11,11 @@ from hooks.policy_engine import (
     check_intra_turn_cache,
     check_same_turn_file_grant,
     evaluate_static_policies,
+    evaluate_workspace_write_fast_path,
     is_path_in_workspaces,
     is_safe_read_only_command,
     is_safe_session_artifact_read,
+    is_sensitive_write_path,
     is_ungoverned_surface,
     load_custom_guidelines,
     match_command,
@@ -28,7 +30,9 @@ from hooks.policy_engine import (
     resolve_classifier_config,
     resolve_configured_model,
     resolve_governed_surfaces,
+    resolve_trust_workspace_writes,
     update_governed_surfaces_in_scope,
+    update_trust_workspace_writes_setting,
 )
 
 
@@ -670,6 +674,82 @@ class TestPolicyEngine(unittest.TestCase):
                 workspace_paths=[tmpdir],
             )
             self.assertIsNone(miss_turn)
+
+    def test_is_sensitive_write_path(self):
+        # 1. Sensitive files & directories
+        self.assertTrue(is_sensitive_write_path(".env"))
+        self.assertTrue(is_sensitive_write_path("config/.env.local"))
+        self.assertTrue(is_sensitive_write_path(".git/config"))
+        self.assertTrue(is_sensitive_write_path(".github/workflows/ci.yml"))
+        self.assertTrue(is_sensitive_write_path(".agents/auto-permissions.json"))
+        self.assertTrue(is_sensitive_write_path("plugin.json"))
+        self.assertTrue(is_sensitive_write_path("hooks.json"))
+        self.assertTrue(is_sensitive_write_path("cert.pem"))
+        self.assertTrue(is_sensitive_write_path("id_rsa"))
+
+        # 2. Routine workspace files
+        self.assertFalse(is_sensitive_write_path("src/main.py"))
+        self.assertFalse(is_sensitive_write_path("tests/test_app.py"))
+        self.assertFalse(is_sensitive_write_path("README.md"))
+        self.assertFalse(is_sensitive_write_path("docs/index.html"))
+
+    def test_evaluate_workspace_write_fast_path(self):
+        with tempfile.TemporaryDirectory() as ws, tempfile.TemporaryDirectory() as session_dir:
+            main_file = os.path.join(ws, "src", "main.py")
+            env_file = os.path.join(ws, ".env")
+            outside_file = "/tmp/outside.txt"
+
+            # 1. Routine workspace file write -> Allowed via fast-path (0.1ms)
+            verdict = evaluate_workspace_write_fast_path(
+                tool_name="replace_file_content",
+                tool_args={"TargetFile": main_file},
+                workspace_paths=[ws],
+                session_dir=session_dir,
+            )
+            self.assertIsNotNone(verdict)
+            self.assertEqual(verdict[0], "allow")
+            self.assertEqual(verdict[2], "workspace_write_fast_path")
+
+            # 2. Multi-replace write -> Allowed via fast-path
+            multi_verdict = evaluate_workspace_write_fast_path(
+                tool_name="multi_replace_file_content",
+                tool_args={"TargetFile": main_file},
+                workspace_paths=[ws],
+                session_dir=session_dir,
+            )
+            self.assertIsNotNone(multi_verdict)
+            self.assertEqual(multi_verdict[0], "allow")
+
+            # 3. Sensitive file write -> None (falls through to classifier)
+            env_verdict = evaluate_workspace_write_fast_path(
+                tool_name="replace_file_content",
+                tool_args={"TargetFile": env_file},
+                workspace_paths=[ws],
+                session_dir=session_dir,
+            )
+            self.assertIsNone(env_verdict)
+
+            # 4. File outside workspace roots -> None (falls through to classifier)
+            out_verdict = evaluate_workspace_write_fast_path(
+                tool_name="replace_file_content",
+                tool_args={"TargetFile": outside_file},
+                workspace_paths=[ws],
+                session_dir=session_dir,
+            )
+            self.assertIsNone(out_verdict)
+
+            # 5. Opt-out in project config (trust_workspace_writes = False) -> None
+            update_trust_workspace_writes_setting(enabled=False, scope="project", workspace_dir=ws)
+            self.assertFalse(
+                resolve_trust_workspace_writes(session_dir=session_dir, workspace_paths=[ws])
+            )
+            opt_out_verdict = evaluate_workspace_write_fast_path(
+                tool_name="replace_file_content",
+                tool_args={"TargetFile": main_file},
+                workspace_paths=[ws],
+                session_dir=session_dir,
+            )
+            self.assertIsNone(opt_out_verdict)
 
 
 if __name__ == "__main__":

@@ -329,6 +329,22 @@ While commands, file mutations, network URL scraping, and MCP tools are strictly
    * *Default Behavior:* Fast-path auto-approved in `0.1ms`.
    * *Opt-In Setting:* Set `"govern_images": true` (or `--govern-images`).
 
+### 8.8 Workspace Writes Fast-Path & Perimeter Defense (`trust_workspace_writes`)
+Grounded in empirical findings from Anthropic's Claude Code Auto-Mode benchmarks and Trajectory Labs testing:
+* **The Permission Fatigue Dilemma:** When developers are prompted for every routine file write, human approval rates hit **97% reflexively**, while dangerous command catch rates collapse from **13.6% down to 5% after 50 prompts**.
+* **The Perimeter Defense Model:** Writing routine code inside workspace roots is the core domain of an agentic coding assistant. True security boundaries exist at the **repository perimeter** (credentials, git internals, CI workflows, security policies, and external network/exfiltration calls).
+
+#### Fast-Path Operation (Opt-Out by Default)
+* **Default (`trust_workspace_writes: true`):** All routine repository file mutations (`replace_file_content`, `write_to_file`, `multi_replace_file_content`) inside `<workspace_roots>` resolve instantly in **`0.1ms`** without requiring a remote classifier roundtrip on the first write of each turn.
+* **Guaranteed Sensitive Path Perimeter:** The fast-path **strictly excludes** sensitive targets:
+  - Secrets & Environment: `.env`, `.env.*`, `*.env`, `.credentials*`, `*.pem`, `*.key`, `*.pfx`, `id_rsa*`, `*.token`
+  - Version Control Internals: `.git/*`, `.gitconfig`
+  - CI/CD Workflows & Container Manifests: `.github/workflows/*`, `.gitlab-ci.yml`, `Dockerfile`, `docker-compose.yml`
+  - Security Policies & Plugin Manifests: `.agents/auto-permissions.json`, `.agents/auto-permissions.local.json`, `plugin.json`, `hooks.json`, `rules/*`
+  - External Paths: Any target outside `<workspace_roots>` or attempting symlink traversal.
+  Any write targeting these paths **immediately bypasses the fast-path** and escalates to the LLM Security Classifier.
+* **Opt-Out Configuration:** Teams operating in zero-trust or compliance-restricted environments can disable the fast-path by setting `"trust_workspace_writes": false` (or `--no-trust-workspace-writes`) at Session, Project, or Global scope.
+
 ---
 
 ## 9. Two-Tier Security Architecture: Plugin Gate vs. Platform Container Sandbox
