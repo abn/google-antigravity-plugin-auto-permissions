@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.2.0...auto-permissions-v0.3.0) (2026-08-15)
+
+
+### Features
+
+* **classifier:** optimize prompt payload for kv cache and prefix stability ([#14](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/14)) ([f521f18](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/f521f18ce3850a3637c62f4427f28b4853c66620))
+* **policy:** add session artifact and audit log read fast path ([#12](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/12)) ([a2f4996](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/a2f4996c3e8bce7268582cb8cffa069d35aa88cc))
+
+
+### Bug Fixes
+
+* **hooks:** flatten PreInvocation handler array in hooks.json ([#11](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/11)) ([c1a12aa](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/c1a12aa8e4005f33a7a82a8f28c956d7206a71ff))
+* **policy-engine:** auto-discover realpaths of installed and symlinked plugins in allowed skill paths ([#7](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/7)) ([67e627d](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/67e627dfe2e05a751d9634da5ba4f967023c5200))
+* **rules:** add missing YAML frontmatter to auto_permissions.md ([#9](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/9)) ([630e189](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/630e189a91e9eff5c7f281809a5c6a158f1f9d2d))
+
+
+### Documentation
+
+* add kv-cache and prefix stability invariant to agents.md ([#15](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/15)) ([68bc377](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/68bc3771e157a19e5b2cad89a113f3061ce54eee))
+* **agents:** document rules and skills YAML frontmatter contracts and add CI validation ([#10](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/10)) ([57fb93d](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/57fb93d2abb1da38b673c74527222eb678e7775f))
+
 ## [0.2.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.1.0...auto-permissions-v0.2.0) (2026-08-14)
 
 
