@@ -79,38 +79,18 @@ def format_classifier_payload(
     custom_guidelines: list[str] | None = None,
     session_goal: str | None = None,
 ) -> str:
-    """Formats minimal sanitized context into structured XML for the security classifier."""
-    goal_section = ""
-    if session_goal and session_goal.strip():
-        goal_section = f"""<session_goal>
-{session_goal.strip()}
-</session_goal>
+    """
+    Formats minimal sanitized context into structured XML for the security classifier.
+    Follows strict volatility ordering (static top -> volatile bottom) and absolute
+    chronological turn IDs to maximize provider prefix / KV-cache hit rates.
+    """
+    # 1. Workspace roots (Static throughout session)
+    roots_section = f"""<workspace_roots>
+{json.dumps(workspace_paths)}
+</workspace_roots>
 """
 
-    prior_section = ""
-    if prior_prompts:
-        lines = []
-        anchor = None
-        relative_prompts = []
-        for p in prior_prompts:
-            if p.startswith("[Session Goal / Turn 0]: "):
-                anchor = p[len("[Session Goal / Turn 0]: ") :].strip()
-            else:
-                relative_prompts.append(p)
-
-        if anchor:
-            lines.append(f"- [Session Goal / Turn 0]: {anchor}")
-
-        for i, p in enumerate(relative_prompts):
-            turn_idx = len(relative_prompts) - i
-            lines.append(f"- [Turn -{turn_idx}]: {p.strip()}")
-
-        history_lines = "\n".join(lines)
-        prior_section = f"""<prior_user_prompts>
-{history_lines}
-</prior_user_prompts>
-"""
-
+    # 2. Custom guidelines (Static throughout session if configured)
     guidelines_section = ""
     if custom_guidelines:
         gl_lines = "\n".join(f"- {g.strip()}" for g in custom_guidelines if g.strip())
@@ -120,6 +100,41 @@ def format_classifier_payload(
 </custom_workspace_guidelines>
 """
 
+    # 3. Session goal / anchor (Static throughout session if configured)
+    goal_section = ""
+    if session_goal and session_goal.strip():
+        goal_section = f"""<session_goal>
+{session_goal.strip()}
+</session_goal>
+"""
+
+    # 4. Prior user prompts (Monotonically appended with absolute chronological turn labels)
+    prior_section = ""
+    if prior_prompts:
+        lines = []
+        for i, p in enumerate(prior_prompts):
+            p_clean = p.strip()
+            if p_clean.startswith("[Turn ") or p_clean.startswith("[Session Goal / Turn 0]"):
+                lines.append(f"- {p_clean}")
+            else:
+                lines.append(f"- [Turn {i}]: {p_clean}")
+
+        history_lines = "\n".join(lines)
+        prior_section = f"""<prior_user_prompts>
+{history_lines}
+</prior_user_prompts>
+"""
+
+    # 5. Active user prompt (Volatile per user turn)
+    active_clean = (
+        active_prompt.strip() if active_prompt else "(No explicit active prompt provided)"
+    )
+    active_section = f"""<active_user_prompt>
+{active_clean}
+</active_user_prompt>
+"""
+
+    # 6. Proposed tool call (High-frequency evaluation payload)
     tool_metadata = []
     if tool_summary:
         tool_metadata.append(f"Summary: {tool_summary.strip()}")
@@ -127,18 +142,15 @@ def format_classifier_payload(
         tool_metadata.append(f"Action Intent: {tool_action.strip()}")
     metadata_block = ("\n" + "\n".join(tool_metadata)) if tool_metadata else ""
 
-    return f"""<workspace_roots>
-{json.dumps(workspace_paths)}
-</workspace_roots>
-
-{goal_section}{guidelines_section}{prior_section}<active_user_prompt>
-{active_prompt.strip() if active_prompt else "(No explicit active prompt provided)"}
-</active_user_prompt>
-
-<proposed_tool_call>
+    tool_section = f"""<proposed_tool_call>
 Tool: {tool_name}{metadata_block}
 Arguments: {json.dumps(tool_args, indent=2)}
 </proposed_tool_call>"""
+
+    return (
+        f"{roots_section}\n{guidelines_section}{goal_section}"
+        f"{prior_section}{active_section}\n{tool_section}"
+    )
 
 
 def _clean_json_text(text: str) -> str:
@@ -296,7 +308,13 @@ def _call_anthropic_api(
 
     request_body = {
         "model": model or "claude-3-5-haiku-20241022",
-        "system": SYSTEM_INSTRUCTION,
+        "system": [
+            {
+                "type": "text",
+                "text": SYSTEM_INSTRUCTION,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ],
         "messages": [
             {
                 "role": "user",

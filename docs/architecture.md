@@ -131,15 +131,22 @@ The plugin implements a **4-Tier Permission Taxonomy** mapped directly to Antigr
 
 ---
 
-## 5. Context Extraction & XML Payload Schema
+## 5. KV-Cache Optimization & Prefix Stability Architecture
 
-### 5.1 Token-Efficient Multi-Turn Prompt History & Session Anchor Pattern
-To resolve referential commands (e.g. *"Proceed"*, *"Run it again"*, *"Delete that old migration"*) and standing session goals (e.g. *"Push changes as you go to origin"*) across long conversations:
-1. **Session Anchor (Turn 0):** The parser always extracts and preserves the very first prompt of the conversation (`[Session Goal / Turn 0]`). This ensures session-wide directives remain visible across 50+ turns without drifting out of context.
-2. **Rolling Recent Turns (`max_history = 4`):** Extracts the most recent 4 user prompt turns (`[Turn -4]` through `[Turn -1]`) to resolve immediate context.
-3. **Decoupled Sanitization:** All intermediate assistant responses, CoT reasoning, and previous tool outputs are discarded, eliminating token bloat and indirect prompt injection vectors.
+In multi-turn autonomous coding workflows, the classifier prompt payload is carefully structured to maximize provider Prefix / KV-Cache hit rates (>90%) across Gemini, Claude, and OpenAI endpoints.
 
-### 5.2 Formatted Payload Sent to Gemini
+### 5.1 The Core Prefix-Caching Rule
+Chained-hash prefix caching algorithms require token-identical prefix matching: **any upstream change invalidates every downstream token**. To maintain high cache hit rates across hundreds of tool invocations, the payload enforces strict volatility layering:
+
+1. **Tier 1 (Constant System Instructions):** `SYSTEM_INSTRUCTION` rubric and JSON response schema (passed via provider `system_instruction` / `system` object with `cache_control` ephemeral breakpoints).
+2. **Tier 2 (Session Invariants):** `<workspace_roots>`, `<custom_workspace_guidelines>`, and `<session_goal>` (placed at the top of the user payload; 100% byte-identical across the session).
+3. **Tier 3 (Append-Only Prior History):** `<prior_user_prompts>` using absolute chronological labels (`[Turn 0]`, `[Turn 1]`, `[Turn 2]`). Previous turn labels never mutate, ensuring the history prefix grows strictly monotonically without invalidating upstream cached blocks.
+4. **Tier 4 (Volatile Dynamic Tail):** `<active_user_prompt>` and `<proposed_tool_call>` (placed strictly at the bottom).
+
+### 5.2 Envelope Sanitization
+The transcript parser (`hooks/transcript_parser.py`) strips volatile Antigravity runtime envelopes (`<ADDITIONAL_METADATA>` local timestamps, `<USER_SETTINGS_CHANGE>`, and `<SKILL>` tags), extracting strictly authentic `<USER_REQUEST>` text to prevent non-deterministic token drift.
+
+### 5.3 Formatted KV-Optimized Payload Sent to Classifier
 
 ```xml
 <workspace_roots>
@@ -147,17 +154,18 @@ To resolve referential commands (e.g. *"Proceed"*, *"Run it again"*, *"Delete th
 </workspace_roots>
 
 <prior_user_prompts>
-- [Session Goal / Turn 0]: "Refactor authentication module and push changes as you go to origin"
-- [Turn -2]: "We need to test the user authentication workflow in test_auth.py"
-- [Turn -1]: "The mock credentials test failed due to timeout"
+- [Turn 0]: "Refactor authentication module and push changes as you go to origin"
+- [Turn 1]: "We need to test the user authentication workflow in test_auth.py"
+- [Turn 2]: "The mock credentials test failed due to timeout"
 </prior_user_prompts>
-
 <active_user_prompt>
 "Run it again and make sure it passes this time"
 </active_user_prompt>
 
 <proposed_tool_call>
 Tool: run_command
+Summary: Run test suite
+Action Intent: Re-running pytest on auth module
 Arguments: {
   "CommandLine": "pytest tests/test_auth.py -v",
   "Cwd": "/workspace/my-app"

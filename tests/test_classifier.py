@@ -27,8 +27,8 @@ class TestClassifier(unittest.TestCase):
         self.assertIn("- Treat api.internal.corp as safe", payload)
         self.assertIn("- Require ask for database migrations", payload)
         self.assertIn("<prior_user_prompts>", payload)
-        self.assertIn("- [Turn -2]: Setup auth", payload)
-        self.assertIn("- [Turn -1]: Run linter", payload)
+        self.assertIn("- [Turn 0]: Setup auth", payload)
+        self.assertIn("- [Turn 1]: Run linter", payload)
         self.assertIn("<active_user_prompt>", payload)
         self.assertIn("Run pytest", payload)
         self.assertIn("Tool: run_command", payload)
@@ -40,18 +40,18 @@ class TestClassifier(unittest.TestCase):
             workspace_paths=["/tmp"],
             prior_prompts=[
                 "[Session Goal / Turn 0]: Refactor auth and push changes as you go to origin",
-                "Fix button CSS",
-                "Update unit tests",
+                "[Turn 1]: Fix button CSS",
+                "[Turn 2]: Update unit tests",
             ],
             active_prompt="Verify and push changes",
             tool_name="run_command",
             tool_args={"CommandLine": "git push origin main"},
         )
         self.assertIn(
-            "- [Session Goal / Turn 0]: Refactor auth and push changes as you go", payload
+            "- [Session Goal / Turn 0]: Refactor auth and push changes as you go to origin", payload
         )
-        self.assertIn("- [Turn -2]: Fix button CSS", payload)
-        self.assertIn("- [Turn -1]: Update unit tests", payload)
+        self.assertIn("- [Turn 1]: Fix button CSS", payload)
+        self.assertIn("- [Turn 2]: Update unit tests", payload)
         self.assertIn("Tool: run_command", payload)
 
     def test_format_classifier_payload_with_session_goal(self):

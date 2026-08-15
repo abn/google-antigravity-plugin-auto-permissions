@@ -47,6 +47,20 @@ class TestTranscriptParser(unittest.TestCase):
         step3 = {"type": "PLANNER_RESPONSE", "source": "MODEL", "content": "I will run pytest"}
         self.assertIsNone(extract_user_content(step3))
 
+    def test_extract_user_content_sanitization(self):
+        # Step with XML envelope metadata
+        raw_xml = (
+            "<USER_REQUEST>\n"
+            "Build the project and run pytest\n"
+            "</USER_REQUEST>\n"
+            "<ADDITIONAL_METADATA>\n"
+            "The current local time is: 2026-08-15T04:10:26+02:00.\n"
+            "</ADDITIONAL_METADATA>"
+        )
+        step = {"type": "USER_INPUT", "content": raw_xml}
+        extracted = extract_user_content(step)
+        self.assertEqual(extracted, "Build the project and run pytest")
+
     def test_read_user_prompts_empty_or_missing(self):
         prior, active = read_user_prompts_from_transcript("/non/existent/path.jsonl")
         self.assertEqual(prior, [])
@@ -68,7 +82,9 @@ class TestTranscriptParser(unittest.TestCase):
         try:
             prior, active = read_user_prompts_from_transcript(temp_path, max_history=4)
             self.assertEqual(active, "Turn 3: Run the test suite")
-            self.assertEqual(prior, ["Turn 1: Setup project", "Turn 2: Fix bug in auth"])
+            self.assertEqual(
+                prior, ["[Turn 0]: Turn 1: Setup project", "[Turn 1]: Turn 2: Fix bug in auth"]
+            )
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
@@ -95,10 +111,10 @@ class TestTranscriptParser(unittest.TestCase):
             self.assertEqual(
                 prior,
                 [
-                    "[Session Goal / Turn 0]: Turn 0: Push changes as you go to origin",
-                    "Turn 3: Update colors",
-                    "Turn 4: Fix responsive layout",
-                    "Turn 5: Update tests",
+                    "[Turn 0 / Anchor]: Turn 0: Push changes as you go to origin",
+                    "[Turn 3]: Turn 3: Update colors",
+                    "[Turn 4]: Turn 4: Fix responsive layout",
+                    "[Turn 5]: Turn 5: Update tests",
                 ],
             )
         finally:
