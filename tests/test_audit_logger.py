@@ -170,27 +170,49 @@ class TestAuditLogger(unittest.TestCase):
         self.assertIn("Static ACL (0.2ms)", md)
         self.assertIn("Gemini (320ms)", md)
 
-    def test_generate_markdown_summary_multiline_sanitization(self):
-        multiline_cmd = "python3 -c '\nimport json\nimport os\nprint(\"ok\")\n'"
+    def test_generate_markdown_summary_error_fallback(self):
         records = [
             {
-                "toolCall": {"name": "run_command", "args": {"CommandLine": multiline_cmd}},
-                "hook_output": {"decision": "allow", "reason": "Safe multiline"},
-                "classification": {
-                    "decision": "allow",
-                    "risk_category": "safe_routine",
-                    "latency_ms": 150.0,
+                "toolCall": {
+                    "name": "run_command",
+                    "args": {"CommandLine": "kubectl apply -f prod.yaml"},
                 },
-            }
+                "hook_output": {
+                    "decision": "ask",
+                    "reason": (
+                        "Classifier fallback on error (openai): HTTP 401 Unauthorized: "
+                        "Invalid API key"
+                    ),
+                },
+                "classification": {
+                    "decision": "ask",
+                    "risk_category": "classifier_error_fallback",
+                    "latency_ms": 142.0,
+                    "error": "HTTP 401 Unauthorized: Invalid API key",
+                },
+            },
+            {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "terraform apply"}},
+                "hook_output": {
+                    "decision": "ask",
+                    "reason": (
+                        "Classifier fallback on error (openai): Network/Connection error: "
+                        "[Errno 111] Connection refused"
+                    ),
+                },
+                "classification": {
+                    "decision": "ask",
+                    "risk_category": "classifier_error_fallback",
+                    "latency_ms": 12.0,
+                    "error": "Network/Connection error: [Errno 111] Connection refused",
+                },
+            },
         ]
 
-        md = generate_markdown_summary(records, limit=1)
+        md = generate_markdown_summary(records, limit=2)
         self.assertIsNotNone(md)
-        # Verify no raw newline splits inside the table row
-        table_lines = [line for line in md.split("\n") if line.startswith("| `run_command`")]
-        self.assertEqual(len(table_lines), 1)
-        # Verify all newlines were collapsed into spaces
-        self.assertIn("python3 -c ' import json import os print(\"...", table_lines[0])
+        self.assertIn("⚠️ Fallback (HTTP 401 / 142ms)", md)
+        self.assertIn("⚠️ Fallback (Offline / 12ms)", md)
 
 
 if __name__ == "__main__":

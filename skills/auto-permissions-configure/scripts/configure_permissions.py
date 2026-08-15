@@ -17,6 +17,7 @@ plugin_root = os.path.abspath(os.path.join(current_dir, "../../.."))
 if plugin_root not in sys.path:
     sys.path.insert(0, plugin_root)
 
+import hooks.classifier as classifier_module  # noqa: E402
 from hooks.policy_engine import (  # noqa: E402
     GLOBAL_CONFIG_PATH,
     PROJECT_CONFIG_REL_PATH,
@@ -34,6 +35,35 @@ from hooks.policy_engine import (  # noqa: E402
     update_classifier_settings_in_scope,
     update_governed_surfaces_in_scope,
 )
+
+
+def probe_classifier_provider(
+    provider: str,
+    model: str,
+    endpoint_url: str | None = None,
+    api_key: str | None = None,
+    timeout_secs: float = 3.5,
+) -> tuple[bool, str, float]:
+    """
+    Sends a lightweight pre-flight probe to verify endpoint connectivity and credentials.
+    Returns: (is_healthy, status_message, latency_ms)
+    """
+    _, classification, error, latency = classifier_module.classify_tool_call(
+        workspace_paths=[os.getcwd()],
+        prior_prompts=[],
+        active_prompt="Health-check probe verification",
+        tool_name="run_command",
+        tool_args={"CommandLine": "echo 'connectivity-probe'"},
+        provider=provider,
+        model=model,
+        endpoint_url=endpoint_url,
+        api_key=api_key,
+        timeout_secs=timeout_secs,
+    )
+    if error or classification.get("risk_category") == "classifier_error_fallback":
+        err_msg = error or classification.get("reason", "Unknown connection error")
+        return False, err_msg, latency
+    return True, f"Connected to {provider} ({model})", latency
 
 
 def get_effective_configuration(
@@ -264,6 +294,23 @@ def main():
         help="Disable security gate governance for images (fast-path allow).",
     )
     parser.add_argument(
+        "--probe",
+        action="store_true",
+        default=True,
+        help="Run pre-flight health check probe when updating provider/endpoint (default: True).",
+    )
+    parser.add_argument(
+        "--no-probe",
+        dest="probe",
+        action="store_false",
+        help="Bypass pre-flight health check probe (e.g. for offline local setup).",
+    )
+    parser.add_argument(
+        "--health-check",
+        action="store_true",
+        help="Test connectivity of current or specified classifier provider and exit.",
+    )
+    parser.add_argument(
         "--json",
         "-j",
         action="store_true",
@@ -289,6 +336,47 @@ def main():
         session_dir = os.path.abspath(session_dir)
     scope = args.scope
 
+    # Dedicated standalone health-check mode
+    if args.health_check:
+        eff_config = resolve_classifier_config(
+            session_dir=session_dir, workspace_paths=[workspace_dir]
+        )
+        provider = (args.provider or eff_config["provider"]).lower()
+        if provider == "gemini":
+            provider = "google"
+        elif provider == "claude":
+            provider = "anthropic"
+        model = args.model or eff_config["model"]
+        endpoint_url = args.endpoint_url or eff_config["endpoint_url"]
+        api_key = args.api_key or eff_config["api_key"]
+
+        is_healthy, status_msg, latency = probe_classifier_provider(
+            provider=provider,
+            model=model,
+            endpoint_url=endpoint_url,
+            api_key=api_key,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "healthy": is_healthy,
+                        "provider": provider,
+                        "model": model,
+                        "endpoint_url": endpoint_url,
+                        "message": status_msg,
+                        "latency_ms": round(latency, 1),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            status_icon = "✅" if is_healthy else "❌"
+            print(f"{status_icon} Provider Health Check ({provider} / {model}):")
+            print(f"   Status: {status_msg}")
+            print(f"   Latency: {latency:.1f}ms")
+        sys.exit(0 if is_healthy else 1)
+
     actions_performed = []
 
     # 1. Update classifier settings if specified
@@ -310,6 +398,30 @@ def main():
         classifier_settings["api_key_env"] = args.api_key_env.strip()
 
     if classifier_settings:
+        # Pre-flight health probe if enabled
+        if args.probe:
+            eff_current = resolve_classifier_config(
+                session_dir=session_dir, workspace_paths=[workspace_dir]
+            )
+            probe_prov = classifier_settings.get("provider", eff_current["provider"])
+            probe_model = classifier_settings.get("model", eff_current["model"])
+            probe_url = classifier_settings.get("endpoint_url", eff_current["endpoint_url"])
+            probe_key = classifier_settings.get("api_key", eff_current["api_key"])
+
+            is_healthy, status_msg, latency = probe_classifier_provider(
+                provider=probe_prov,
+                model=probe_model,
+                endpoint_url=probe_url,
+                api_key=probe_key,
+            )
+            if is_healthy:
+                actions_performed.append(
+                    f"Pre-flight health check passed ({probe_prov} / {probe_model}, "
+                    f"{latency:.1f}ms)"
+                )
+            else:
+                actions_performed.append(f"⚠️ Pre-flight health check warning: {status_msg}")
+
         target_file = update_classifier_settings_in_scope(
             settings=classifier_settings,
             scope=scope,

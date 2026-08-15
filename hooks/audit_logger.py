@@ -286,6 +286,10 @@ def generate_markdown_summary(
         classification = r.get("classification", {})
         risk_cat = classification.get("risk_category", "")
         latency = classification.get("latency_ms", 0.0)
+        provider = str(classification.get("provider", "gemini")).lower()
+        provider_name = (
+            "Claude" if provider == "anthropic" else "OpenAI" if provider == "openai" else "Gemini"
+        )
 
         if "static_policy" in risk_cat:
             mode_str = f"Static ACL ({latency:.1f}ms)"
@@ -297,8 +301,26 @@ def generate_markdown_summary(
             mode_str = f"Safe Read ({latency:.1f}ms)"
         elif "ungoverned_surface" in risk_cat:
             mode_str = f"Opt-in Surface ({latency:.1f}ms)"
+        elif "classifier_error" in risk_cat or classification.get("error"):
+            reason = r.get("hook_output", {}).get("reason", "") or classification.get("reason", "")
+            err_tag = "Offline"
+            if "HTTP 401" in reason or "401" in reason:
+                err_tag = "HTTP 401"
+            elif "HTTP 404" in reason or "404" in reason:
+                err_tag = "HTTP 404"
+            elif "HTTP 403" in reason or "403" in reason:
+                err_tag = "HTTP 403"
+            elif "HTTP 5" in reason or "500" in reason or "502" in reason or "503" in reason:
+                err_tag = "HTTP 5xx"
+            elif "timed out" in reason.lower() or "timeout" in reason.lower():
+                err_tag = "Timeout"
+            elif "refused" in reason.lower():
+                err_tag = "Offline"
+            elif "not configured" in reason.lower() or "missing" in reason.lower():
+                err_tag = "No Key"
+            mode_str = f"⚠️ Fallback ({err_tag} / {latency:.0f}ms)"
         else:
-            mode_str = f"Gemini ({latency:.0f}ms)"
+            mode_str = f"{provider_name} ({latency:.0f}ms)"
 
         rows.append(f"| `{tool}` | `{cmd_snippet}` | {badge} | {mode_str} |")
 
