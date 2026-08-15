@@ -32,6 +32,16 @@ When working in this repository, all AI agents and subagents must strictly adher
    - All rule files (`rules/*.md`) must begin with valid YAML frontmatter specifying `name`, `description`, and `always_on: true`. Omission or malformed YAML causes Antigravity's plugin loader (`plugins.go`) to fail initialization and silently disable all hooks and skills.
    - All skill files (`skills/*/SKILL.md`) must begin with valid YAML frontmatter specifying `name` and `description`.
 
+7. **KV-Cache & Prefix Stability Invariant:**
+   - Chained-hash prefix caching requires token-identical prefix matching: **any upstream change invalidates every downstream cached block**.
+   - The classifier prompt payload must strictly enforce **top-to-bottom volatility layering**:
+     1. `SYSTEM_INSTRUCTION` (passed via provider `system` / `system_instruction` with cache control).
+     2. `<workspace_roots>`, `<custom_workspace_guidelines>`, and `<session_goal>` (session invariants at the top).
+     3. `<prior_user_prompts>` using absolute chronological labels (`[Turn 0]`, `[Turn 1]`, `[Turn 2]`). **Never use relative indices (e.g. `[Turn -N]`)** which mutate historical prefixes on each turn.
+     4. `<active_user_prompt>` and `<proposed_tool_call>` at the dynamic tail.
+   - Always strip volatile runtime envelopes (`<ADDITIONAL_METADATA>` timestamps, `<USER_SETTINGS_CHANGE>`, `<SKILL>`) from user prompt history to prevent non-deterministic token drift.
+   - Any modifications to classifier prompts, system instructions, or context formatting must be carefully considered and empirically benchmarked (`scratch/benchmark_kv_cache.py`) to verify prefix stability and cache retention.
+
 ---
 
 ## 2. Directory Structure
