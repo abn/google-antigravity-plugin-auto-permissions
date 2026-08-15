@@ -646,6 +646,52 @@ def is_safe_session_artifact_read(
     return is_norm_in and is_real_in
 
 
+def check_intra_turn_cache(
+    tool_name: str,
+    tool_args: dict[str, Any],
+    log_path: str | None,
+    last_user_step_idx: int | None,
+) -> tuple[str, str] | None:
+    """
+    Checks if an exact match for (tool_name, tool_args) was already evaluated and recorded
+    in the active conversation turn (stepIdx >= last_user_step_idx).
+    Reuses the verdict instantly in ~0.1ms without remote LLM latency or token overhead.
+
+    Returns:
+        Tuple of (decision, reason) if cached, or None if no intra-turn cache match exists.
+    """
+    if last_user_step_idx is None or not log_path or not os.path.isfile(log_path):
+        return None
+
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                with contextlib.suppress(json.JSONDecodeError):
+                    record = json.loads(line)
+                    step_idx = record.get("stepIdx", 0)
+                    if step_idx < last_user_step_idx:
+                        continue
+
+                    tool_call = record.get("toolCall", {})
+                    if tool_call.get("name") != tool_name:
+                        continue
+                    if tool_call.get("args") != tool_args:
+                        continue
+
+                    hook_output = record.get("hook_output", {})
+                    decision = hook_output.get("decision")
+                    reason = hook_output.get("reason", "Intra-turn cached verdict.")
+                    if decision in ("allow", "deny", "soft_deny", "ask"):
+                        return decision, f"{reason} (Intra-turn cache hit)"
+    except Exception:
+        return None
+
+    return None
+
+
 def resolve_classifier_config(
     session_dir: str | None = None,
     workspace_paths: list[str] | None = None,

@@ -269,6 +269,65 @@ class TestGateE2E(unittest.TestCase):
                 call_kwargs = mock_classify.call_args.kwargs
                 self.assertEqual(call_kwargs.get("session_goal"), "Deploy backend to staging")
 
+    @patch("hooks.auto_approve_gate.classify_tool_call")
+    def test_gate_e2e_intra_turn_cache(self, mock_classify):
+        mock_classify.return_value = (
+            "<raw_prompt>",
+            {
+                "decision": "allow",
+                "reason": "Test verified",
+                "risk_category": "safe_routine",
+            },
+            None,
+            40.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a transcript with active user prompt at step 10
+            transcript_path = os.path.join(tmpdir, "transcript.jsonl")
+            with open(transcript_path, "w", encoding="utf-8") as f:
+                f.write(
+                    json.dumps(
+                        {"type": "USER_INPUT", "step_index": 10, "content": "Run custom test"}
+                    )
+                    + "\n"
+                )
+
+            input_payload = {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "./custom_test.sh"}},
+                "stepIdx": 12,
+                "conversationId": "test-e2e-intra-turn",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+                "transcriptPath": transcript_path,
+            }
+
+            # 1. First execution in turn: Invokes classifier
+            stdin_data1 = json.dumps(input_payload)
+            with (
+                patch("sys.stdin", io.StringIO(stdin_data1)),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout1,
+            ):
+                gate.main()
+                res1 = json.loads(mock_stdout1.getvalue().strip())
+                self.assertEqual(res1["decision"], "allow")
+                self.assertEqual(mock_classify.call_count, 1)
+
+            # 2. Second execution with identical args in SAME turn (stepIdx: 15 >= 10):
+            # Should hit intra_turn_cache and NOT call mock_classify again
+            input_payload["stepIdx"] = 15
+            stdin_data2 = json.dumps(input_payload)
+            with (
+                patch("sys.stdin", io.StringIO(stdin_data2)),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout2,
+            ):
+                gate.main()
+                res2 = json.loads(mock_stdout2.getvalue().strip())
+                self.assertEqual(res2["decision"], "allow")
+                self.assertIn("Intra-turn cache hit", res2["reason"])
+                # mock_classify call count must still be 1 (zero new network calls!)
+                self.assertEqual(mock_classify.call_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

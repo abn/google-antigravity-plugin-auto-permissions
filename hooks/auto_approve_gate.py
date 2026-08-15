@@ -18,12 +18,16 @@ if current_dir not in sys.path:
 from audit_logger import log_audit_event_async, resolve_session_log_path  # noqa: E402
 from classifier import classify_tool_call  # noqa: E402
 from policy_engine import (  # noqa: E402
+    check_intra_turn_cache,
     evaluate_static_policies,
     is_ungoverned_surface,
     load_custom_guidelines,
     resolve_classifier_config,
 )
-from transcript_parser import read_user_prompts_from_transcript  # noqa: E402
+from transcript_parser import (  # noqa: E402
+    get_last_user_step_index,
+    read_user_prompts_from_transcript,
+)
 
 
 def main():
@@ -167,10 +171,54 @@ def main():
             log_thread.join(timeout=0.2)
         return
 
-    # 3. Parse user prompt history from transcript.jsonl
+    # 3. FAST-PATH: Check Intra-Turn Decision Cache
+    last_user_step_idx = get_last_user_step_index(transcript_path)
+    cached_verdict = check_intra_turn_cache(
+        tool_name=tool_name,
+        tool_args=tool_args,
+        log_path=log_path,
+        last_user_step_idx=last_user_step_idx,
+    )
+    if cached_verdict:
+        cached_decision, cached_reason = cached_verdict
+        hook_output = {
+            "decision": cached_decision,
+            "reason": cached_reason,
+        }
+        classification = {
+            "decision": cached_decision,
+            "reason": cached_reason,
+            "risk_category": "intra_turn_cache",
+            "confidence": 1.0,
+        }
+        context_summary = {
+            "active_prompt": "(Intra-turn exact match cache)",
+            "prior_prompts_count": 0,
+            "workspace_roots": workspace_paths,
+            "policy_scope": "intra_turn_cache",
+        }
+        log_thread = log_audit_event_async(
+            artifact_dir=artifact_dir,
+            transcript_path=transcript_path,
+            conversation_id=conversation_id,
+            step_idx=step_idx,
+            tool_call=tool_call,
+            context=context_summary,
+            raw_prompt=f"<intra_turn_cache tool='{tool_name}' decision='{cached_decision}'/>",
+            classification=classification,
+            hook_output=hook_output,
+            latency_ms=0.1,
+        )
+        print(json.dumps(hook_output))
+        sys.stdout.flush()
+        if log_thread and log_thread.is_alive():
+            log_thread.join(timeout=0.2)
+        return
+
+    # 4. Parse user prompt history from transcript.jsonl
     prior_prompts, active_prompt = read_user_prompts_from_transcript(transcript_path, max_history=4)
 
-    # 3. Load custom semantic guidelines from policy configurations
+    # 5. Load custom semantic guidelines from policy configurations
     custom_guidelines = load_custom_guidelines(
         workspace_paths=workspace_paths,
         session_dir=session_dir,

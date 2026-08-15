@@ -289,6 +289,10 @@ def generate_markdown_summary(
 
         if "static_policy" in risk_cat:
             mode_str = f"Static ACL ({latency:.1f}ms)"
+        elif "intra_turn_cache" in risk_cat:
+            mode_str = f"Turn Cache ({latency:.1f}ms)"
+        elif "ungoverned_surface" in risk_cat:
+            mode_str = f"Opt-in Surface ({latency:.1f}ms)"
         else:
             mode_str = f"Gemini ({latency:.0f}ms)"
 

@@ -8,6 +8,7 @@ from hooks.policy_engine import (
     PROJECT_CONFIG_REL_PATH,
     PROJECT_LOCAL_CONFIG_REL_PATH,
     add_rule_to_scope,
+    check_intra_turn_cache,
     evaluate_static_policies,
     is_path_in_workspaces,
     is_safe_session_artifact_read,
@@ -503,6 +504,78 @@ class TestPolicyEngine(unittest.TestCase):
             self.assertIsNotNone(res)
             self.assertEqual(res[0], "allow")
             self.assertEqual(res[2], "session_artifact")
+
+    def test_check_intra_turn_cache(self):
+        with tempfile.NamedTemporaryFile("w+", suffix=".jsonl", delete=False) as f:
+            records = [
+                # Turn 0 record (step 5)
+                {
+                    "stepIdx": 5,
+                    "toolCall": {"name": "run_command", "args": {"CommandLine": "pytest -v"}},
+                    "hook_output": {"decision": "allow", "reason": "Tests safe"},
+                },
+                # Turn 1 records (active turn starts at step 10)
+                {
+                    "stepIdx": 12,
+                    "toolCall": {"name": "run_command", "args": {"CommandLine": "ruff check ."}},
+                    "hook_output": {"decision": "allow", "reason": "Linter safe"},
+                },
+                {
+                    "stepIdx": 14,
+                    "toolCall": {
+                        "name": "run_command",
+                        "args": {"CommandLine": "git push --force origin main"},
+                    },
+                    "hook_output": {"decision": "deny", "reason": "Destructive wipe"},
+                },
+            ]
+            for r in records:
+                f.write(json.dumps(r) + "\n")
+            log_path = f.name
+
+        try:
+            # Active turn starts at step 10
+            # 1. Exact match in active turn -> Cache hit (allow)
+            hit_allow = check_intra_turn_cache(
+                tool_name="run_command",
+                tool_args={"CommandLine": "ruff check ."},
+                log_path=log_path,
+                last_user_step_idx=10,
+            )
+            self.assertIsNotNone(hit_allow)
+            self.assertEqual(hit_allow[0], "allow")
+            self.assertIn("Intra-turn cache hit", hit_allow[1])
+
+            # 2. Denied command in active turn -> Cache hit (deny)
+            hit_deny = check_intra_turn_cache(
+                tool_name="run_command",
+                tool_args={"CommandLine": "git push --force origin main"},
+                log_path=log_path,
+                last_user_step_idx=10,
+            )
+            self.assertIsNotNone(hit_deny)
+            self.assertEqual(hit_deny[0], "deny")
+
+            # 3. Command evaluated in previous turn (step 5 < 10) -> Expired / Cache Miss
+            miss_old_turn = check_intra_turn_cache(
+                tool_name="run_command",
+                tool_args={"CommandLine": "pytest -v"},
+                log_path=log_path,
+                last_user_step_idx=10,
+            )
+            self.assertIsNone(miss_old_turn)
+
+            # 4. Unseen command -> Cache Miss
+            miss_unseen = check_intra_turn_cache(
+                tool_name="run_command",
+                tool_args={"CommandLine": "npm test"},
+                log_path=log_path,
+                last_user_step_idx=10,
+            )
+            self.assertIsNone(miss_unseen)
+        finally:
+            if os.path.exists(log_path):
+                os.remove(log_path)
 
 
 if __name__ == "__main__":
