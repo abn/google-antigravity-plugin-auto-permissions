@@ -37,6 +37,7 @@ Prompt the user to choose the target scope and customization category:
 
 2. **Customization Category:**
    * **LLM Provider & Model:** Configure Google Gemini, Local GPU Inference (Lemonade / vLLM / Ollama), or Anthropic Claude.
+   * **Workspace Writes Trust:** Toggle 0.1ms fast-path for non-sensitive repository code edits (opt-out control).
    * **Static ACL Rule:** Add fast-path `allow`, `ask`, or `deny` rule for `command(...)`, `write_file(...)`, `read_file(...)`, `read_url(...)`, or `mcp(...)`.
    * **Custom Semantic Guideline:** Add project-specific security rules (e.g. database migration protection, safe internal domains).
    * **Allowed Skill Paths:** Whitelist extra skill directory paths for sub-millisecond fast-path reads.

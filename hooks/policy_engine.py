@@ -325,6 +325,32 @@ SENSITIVE_FILENAMES = (
     "service-account.json",
 )
 
+DEFAULT_TRUST_WORKSPACE_WRITES = True
+
+# Directory names and file patterns that must NEVER be fast-path written
+SENSITIVE_WRITE_PATTERNS = (
+    ".ssh",
+    ".aws",
+    ".gnupg",
+    ".kube",
+    ".config/gcloud",
+    ".git",
+    ".github",
+    ".gitlab",
+    ".credentials",
+    ".agents",
+    ".npmrc",
+    ".pypirc",
+)
+
+SENSITIVE_WRITE_EXTENSIONS = (
+    ".pem",
+    ".key",
+    ".pfx",
+    ".p12",
+    ".token",
+)
+
 
 def is_sensitive_path(path: str) -> bool:
     """Checks if a path targets sensitive system or credential files."""
@@ -341,6 +367,39 @@ def is_sensitive_path(path: str) -> bool:
                 return True
         basename = os.path.basename(target)
         if basename in SENSITIVE_FILENAMES:
+            return True
+    return False
+
+
+def is_sensitive_write_path(path: str) -> bool:
+    """
+    Checks if a write target path touches sensitive credentials, git metadata,
+    CI/CD workflows, or security plugin policy files.
+    """
+    if not path:
+        return True
+    if is_sensitive_path(path):
+        return True
+    norm = os.path.abspath(os.path.expanduser(path))
+    real = os.path.realpath(norm)
+    for target in (norm, real):
+        _, ext = os.path.splitext(target)
+        if ext.lower() in SENSITIVE_WRITE_EXTENSIONS:
+            return True
+        parts = target.split(os.sep)
+        for part in parts:
+            if part in SENSITIVE_WRITE_PATTERNS or part.startswith(".env"):
+                return True
+            if part.startswith("id_"):
+                return True
+        basename = os.path.basename(target)
+        if basename.startswith(".env") or basename in (
+            "plugin.json",
+            "hooks.json",
+            "Dockerfile",
+            "docker-compose.yml",
+            "docker-compose.yaml",
+        ):
             return True
     return False
 
@@ -385,6 +444,7 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
         "govern_subagents": None,
         "govern_schedule": None,
         "govern_images": None,
+        "trust_workspace_writes": None,
         "provider": None,
         "model": None,
         "endpoint_url": None,
@@ -409,7 +469,12 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
                     val = data.get(k, [])
                     if isinstance(val, list):
                         policy[k] = [str(x) for x in val]
-                for bool_k in ("govern_subagents", "govern_schedule", "govern_images"):
+                for bool_k in (
+                    "govern_subagents",
+                    "govern_schedule",
+                    "govern_images",
+                    "trust_workspace_writes",
+                ):
                     if bool_k in data and isinstance(data[bool_k], bool):
                         policy[bool_k] = data[bool_k]
                 for str_k in (
@@ -769,6 +834,102 @@ def is_safe_read_only_command(
                 return False
 
     return True
+
+
+def resolve_trust_workspace_writes(
+    session_dir: str | None = None,
+    workspace_paths: list[str] | None = None,
+) -> bool:
+    """
+    Resolves whether workspace file writes qualify for sub-millisecond fast-path.
+    Precedence: Session -> Local Project -> Project -> Global -> Env Var -> Default (True).
+    """
+    scope_files = []
+    if session_dir and os.path.isdir(session_dir):
+        session_file = resolve_session_override_path(session_dir)
+        if session_file:
+            scope_files.append(session_file)
+    if workspace_paths:
+        for ws in workspace_paths:
+            scope_files.append(os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH))
+            scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
+    scope_files.append(GLOBAL_CONFIG_PATH)
+
+    for f_path in scope_files:
+        if not os.path.isfile(f_path):
+            continue
+        pol = load_policy_file(f_path)
+        if "trust_workspace_writes" in pol:
+            val = pol["trust_workspace_writes"]
+            if isinstance(val, bool):
+                return val
+            if isinstance(val, str):
+                return val.strip().lower() in ("true", "1", "yes", "on")
+
+    env_val = os.environ.get("AUTO_PERMISSIONS_TRUST_WORKSPACE_WRITES")
+    if env_val is not None:
+        return env_val.strip().lower() in ("true", "1", "yes", "on")
+
+    return DEFAULT_TRUST_WORKSPACE_WRITES
+
+
+def evaluate_workspace_write_fast_path(
+    tool_name: str,
+    tool_args: dict[str, Any],
+    workspace_paths: list[str] | None = None,
+    session_dir: str | None = None,
+) -> tuple[str, str, str] | None:
+    """
+    Evaluates whether a file write action (replace_file_content, write_to_file,
+    multi_replace_file_content) qualifies for sub-millisecond workspace write fast-path.
+    Guarantees that sensitive targets (credentials, git, CI, policies) bypass fast-path.
+    """
+    if tool_name not in ("replace_file_content", "write_to_file", "multi_replace_file_content"):
+        return None
+
+    if not resolve_trust_workspace_writes(session_dir=session_dir, workspace_paths=workspace_paths):
+        return None
+
+    target_file = (
+        tool_args.get("TargetFile")
+        or tool_args.get("target_file")
+        or tool_args.get("AbsolutePath")
+        or tool_args.get("path")
+    )
+    if not target_file:
+        return None
+
+    norm_target = os.path.abspath(os.path.expanduser(str(target_file)))
+    if is_sensitive_write_path(norm_target):
+        return None
+
+    if not is_path_in_workspaces(norm_target, workspace_paths):
+        return None
+
+    rel_name = os.path.basename(norm_target)
+    return (
+        "allow",
+        f"Safe workspace file write (trust_workspace_writes fast-path: {rel_name})",
+        "workspace_write_fast_path",
+    )
+
+
+def update_trust_workspace_writes_setting(
+    enabled: bool,
+    scope: str,
+    workspace_dir: str | None = None,
+    session_dir: str | None = None,
+) -> str:
+    """
+    Persists the trust_workspace_writes boolean lever to the specified configuration scope.
+    """
+    target_path = resolve_scope_file_path(
+        scope, workspace_dir=workspace_dir, session_dir=session_dir
+    )
+    policy = load_policy_file(target_path)
+    policy["trust_workspace_writes"] = enabled
+    save_policy_file(target_path, policy)
+    return target_path
 
 
 def check_same_turn_file_grant(

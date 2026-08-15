@@ -21,6 +21,7 @@ from policy_engine import (  # noqa: E402
     check_intra_turn_cache,
     check_same_turn_file_grant,
     evaluate_static_policies,
+    evaluate_workspace_write_fast_path,
     is_safe_read_only_command,
     is_ungoverned_surface,
     load_custom_guidelines,
@@ -303,10 +304,59 @@ def main():
             log_thread.join(timeout=0.2)
         return
 
-    # 6. Parse user prompt history from transcript.jsonl
+    # 6. FAST-PATH: Safe Workspace File Writes (trust_workspace_writes)
+    write_fast_path = evaluate_workspace_write_fast_path(
+        tool_name=tool_name,
+        tool_args=tool_args,
+        workspace_paths=workspace_paths,
+        session_dir=session_dir,
+    )
+    if write_fast_path:
+        write_decision, write_reason, write_scope = write_fast_path
+        hook_output = {
+            "decision": write_decision,
+            "reason": write_reason,
+        }
+        classification = {
+            "decision": write_decision,
+            "reason": write_reason,
+            "risk_category": "workspace_write_fast_path",
+            "confidence": 1.0,
+        }
+        context_summary = {
+            "active_prompt": "(Safe workspace write fast-path)",
+            "prior_prompts_count": 0,
+            "workspace_roots": workspace_paths,
+            "policy_scope": "workspace_write_fast_path",
+        }
+        target_f = (
+            tool_args.get("TargetFile")
+            or tool_args.get("target_file")
+            or tool_args.get("AbsolutePath")
+            or tool_args.get("path")
+        )
+        log_thread = log_audit_event_async(
+            artifact_dir=artifact_dir,
+            transcript_path=transcript_path,
+            conversation_id=conversation_id,
+            step_idx=step_idx,
+            tool_call=tool_call,
+            context=context_summary,
+            raw_prompt=f"<workspace_write_fast_path tool='{tool_name}' file='{target_f}'/>",
+            classification=classification,
+            hook_output=hook_output,
+            latency_ms=0.1,
+        )
+        print(json.dumps(hook_output))
+        sys.stdout.flush()
+        if log_thread and log_thread.is_alive():
+            log_thread.join(timeout=0.2)
+        return
+
+    # 7. Parse user prompt history from transcript.jsonl
     prior_prompts, active_prompt = read_user_prompts_from_transcript(transcript_path, max_history=4)
 
-    # 7. Load custom semantic guidelines from policy configurations
+    # 8. Load custom semantic guidelines from policy configurations
     custom_guidelines = load_custom_guidelines(
         workspace_paths=workspace_paths,
         session_dir=session_dir,

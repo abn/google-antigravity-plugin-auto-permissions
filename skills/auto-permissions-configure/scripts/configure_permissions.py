@@ -31,8 +31,10 @@ from hooks.policy_engine import (  # noqa: E402
     resolve_classifier_config,
     resolve_governed_surfaces,
     resolve_scope_file_path,
+    resolve_trust_workspace_writes,
     update_classifier_settings_in_scope,
     update_governed_surfaces_in_scope,
+    update_trust_workspace_writes_setting,
 )
 
 
@@ -103,10 +105,15 @@ def get_effective_configuration(
         session_dir=session_dir,
         workspace_paths=[ws],
     )
+    trust_writes = resolve_trust_workspace_writes(
+        session_dir=session_dir,
+        workspace_paths=[ws],
+    )
 
     return {
         "effective_classifier": classifier_config,
         "effective_governed_surfaces": governed_surfaces,
+        "effective_trust_workspace_writes": trust_writes,
         "scopes": policies_by_scope,
     }
 
@@ -115,6 +122,7 @@ def format_markdown_summary(config_info: dict[str, Any]) -> str:
     """Formats configuration status into a clean Markdown table."""
     eff = config_info["effective_classifier"]
     gov = config_info.get("effective_governed_surfaces", {})
+    trust_writes = config_info.get("effective_trust_workspace_writes", True)
     scopes = config_info["scopes"]
 
     lines = ["### ⚙️ Auto-Permissions Effective Configuration\n"]
@@ -126,6 +134,12 @@ def format_markdown_summary(config_info: dict[str, Any]) -> str:
     lines.append(f"| **Endpoint URI** | `{endpoint_display}` |")
     key_display = "Set (hidden)" if eff.get("api_key") else "None (Using environment fallback)"
     lines.append(f"| **API Key Status** | {key_display} |")
+    write_trust_display = (
+        "⚡ **Enabled (0.1ms fast-path, sensitive paths guarded)** *(Default)*"
+        if trust_writes
+        else "🔒 **Disabled** (Full LLM classification required on first file write)"
+    )
+    lines.append(f"| **Workspace Writes Trust** | {write_trust_display} |")
     lines.append("")
 
     lines.append("#### 🛡️ Governed Tool Surfaces\n")
@@ -291,6 +305,20 @@ def main():
         action="store_true",
         default=None,
         help="Disable security gate governance for images (fast-path allow).",
+    )
+    parser.add_argument(
+        "--trust-workspace-writes",
+        dest="trust_workspace_writes",
+        action="store_true",
+        default=None,
+        help="Enable 0.1ms fast-path for non-sensitive workspace writes (default: True).",
+    )
+    parser.add_argument(
+        "--no-trust-workspace-writes",
+        dest="trust_workspace_writes",
+        action="store_false",
+        default=None,
+        help="Disable workspace writes fast-path (force LLM classifier on first write).",
     )
     parser.add_argument(
         "--probe",
@@ -507,6 +535,19 @@ def main():
             session_dir=session_dir,
         )
         actions_performed.append(f"Updated governed surfaces in {scope} ({target_file})")
+
+    # 8. Update trust_workspace_writes setting
+    if args.trust_workspace_writes is not None:
+        target_file = update_trust_workspace_writes_setting(
+            enabled=args.trust_workspace_writes,
+            scope=scope,
+            workspace_dir=workspace_dir,
+            session_dir=session_dir,
+        )
+        status_word = "enabled" if args.trust_workspace_writes else "disabled"
+        actions_performed.append(
+            f"{status_word.capitalize()} trust_workspace_writes in {scope} ({target_file})"
+        )
 
     config_info = get_effective_configuration(
         workspace_dir=workspace_dir,

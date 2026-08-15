@@ -376,6 +376,12 @@ class TestGateE2E(unittest.TestCase):
                     + "\n"
                 )
 
+            # Disable trust_workspace_writes to isolate and test same_turn_file_grant path
+            cfg_dir = os.path.join(tmpdir, ".agents")
+            os.makedirs(cfg_dir, exist_ok=True)
+            with open(os.path.join(cfg_dir, "auto-permissions.json"), "w", encoding="utf-8") as f:
+                json.dump({"trust_workspace_writes": False}, f)
+
             # 1. First edit chunk (Step 6 >= 5): Calls classifier
             input_payload1 = {
                 "toolCall": {
@@ -420,6 +426,75 @@ class TestGateE2E(unittest.TestCase):
                 res2 = json.loads(mock_stdout2.getvalue().strip())
                 self.assertEqual(res2["decision"], "allow")
                 self.assertIn("File grant", res2["reason"])
+                self.assertEqual(mock_classify.call_count, 1)
+
+    @patch("hooks.auto_approve_gate.classify_tool_call")
+    def test_gate_e2e_workspace_write_fast_path(self, mock_classify):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            main_file = os.path.join(tmpdir, "src", "app.py")
+            os.makedirs(os.path.dirname(main_file), exist_ok=True)
+            with open(main_file, "w") as f:
+                f.write("def app(): pass")
+
+            input_payload = {
+                "toolCall": {
+                    "name": "replace_file_content",
+                    "args": {"TargetFile": main_file, "TargetContent": "pass"},
+                },
+                "stepIdx": 1,
+                "conversationId": "test-e2e-fast-write",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+            }
+            stdin_data = json.dumps(input_payload)
+            with (
+                patch("sys.stdin", io.StringIO(stdin_data)),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout,
+            ):
+                gate.main()
+                res = json.loads(mock_stdout.getvalue().strip())
+                self.assertEqual(res["decision"], "allow")
+                self.assertIn("Safe workspace file write", res["reason"])
+                # Fast path should NOT call classifier
+                self.assertEqual(mock_classify.call_count, 0)
+
+    @patch("hooks.auto_approve_gate.classify_tool_call")
+    def test_gate_e2e_workspace_write_sensitive_path_escalation(self, mock_classify):
+        mock_classify.return_value = (
+            "<raw_prompt>",
+            {
+                "decision": "ask",
+                "reason": "Modifying environment file requires developer confirmation",
+                "risk_category": "sensitive_file_modification",
+            },
+            None,
+            40.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env_file = os.path.join(tmpdir, ".env")
+            with open(env_file, "w") as f:
+                f.write("API_KEY=123")
+
+            input_payload = {
+                "toolCall": {
+                    "name": "replace_file_content",
+                    "args": {"TargetFile": env_file, "TargetContent": "123"},
+                },
+                "stepIdx": 1,
+                "conversationId": "test-e2e-sensitive-write",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+            }
+            stdin_data = json.dumps(input_payload)
+            with (
+                patch("sys.stdin", io.StringIO(stdin_data)),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout,
+            ):
+                gate.main()
+                res = json.loads(mock_stdout.getvalue().strip())
+                self.assertEqual(res["decision"], "ask")
+                # Sensitive path MUST call classifier
                 self.assertEqual(mock_classify.call_count, 1)
 
 
