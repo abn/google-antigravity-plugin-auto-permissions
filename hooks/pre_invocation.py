@@ -68,8 +68,10 @@ def main():
 
         ephemeral_text = (
             "The security gate evaluated tool actions during this active turn. "
-            "At the conclusion of your final response, append ONLY the exact collapsible "
-            "Markdown summary below (do not include headers, titles, or preamble text):\n\n"
+            "Append ONLY the exact collapsible Markdown summary below at the very end of your "
+            "final response to the user. If you are outputting an intermediate progress update "
+            "(such as waiting for a background task or subagent), do NOT include this summary. "
+            "Do not include headers, titles, or preamble text:\n\n"
             f"{md_summary}\n"
         )
 
