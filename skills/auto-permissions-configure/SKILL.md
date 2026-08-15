@@ -33,7 +33,7 @@ Prompt the user to choose the target scope and customization category:
    * 🟢 **Project (Tracked):** `.agents/auto-permissions.json` (committed and shared with team).
    * 🔒 **Project (Local):** `.agents/auto-permissions.local.json` (gitignored, machine-specific secrets/endpoints).
    * 🌐 **Global:** `~/.gemini/config/auto-permissions.json` (applies to all user workspaces).
-   * ⏱️ **Session:** Active chat session only (`session_overrides.json`).
+   * ⏱️ **Session:** Active chat session only (`<session_dir>/auto-permissions/session_overrides.json`).
 
 2. **Customization Category:**
    * **LLM Provider & Model:** Configure Google Gemini, Local GPU Inference (Lemonade / vLLM / Ollama), or Anthropic Claude.

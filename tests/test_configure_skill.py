@@ -53,7 +53,7 @@ class TestConfigureSkill(unittest.TestCase):
                 session_dir=session_dir,
             )
 
-            session_file = os.path.join(session_dir, SESSION_OVERRIDES_FILENAME)
+            session_file = os.path.join(session_dir, "auto-permissions", SESSION_OVERRIDES_FILENAME)
             session_policy = load_policy_file(session_file)
             self.assertIn("Treat *.corp as safe", session_policy["custom_guidelines"])
 

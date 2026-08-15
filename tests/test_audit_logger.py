@@ -29,11 +29,19 @@ class TestAuditLogger(unittest.TestCase):
     def test_resolve_session_log_path_with_artifact_dir(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = resolve_session_log_path(artifact_dir=tmpdir)
-            self.assertEqual(path, os.path.join(tmpdir, "audit.jsonl"))
+            self.assertEqual(path, os.path.join(tmpdir, "auto-permissions", "audit.jsonl"))
+
+    def test_resolve_session_log_path_legacy_fallback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            legacy_file = os.path.join(tmpdir, "audit.jsonl")
+            with open(legacy_file, "w", encoding="utf-8") as f:
+                f.write('{"legacy": true}\n')
+            path = resolve_session_log_path(artifact_dir=tmpdir)
+            self.assertEqual(path, legacy_file)
 
     def test_write_and_rotate_audit_log(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            log_path = os.path.join(tmpdir, "audit.jsonl")
+            log_path = os.path.join(tmpdir, "auto-permissions", "audit.jsonl")
 
             # Write records with a very small max_bytes to force rotation
             small_max_bytes = 200
@@ -63,7 +71,7 @@ class TestAuditLogger(unittest.TestCase):
             )
             thread.join(timeout=1.0)
 
-            log_path = os.path.join(tmpdir, "audit.jsonl")
+            log_path = os.path.join(tmpdir, "auto-permissions", "audit.jsonl")
             self.assertTrue(os.path.exists(log_path))
             with open(log_path, encoding="utf-8") as f:
                 lines = f.readlines()

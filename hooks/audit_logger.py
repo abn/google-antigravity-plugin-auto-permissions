@@ -13,6 +13,7 @@ from typing import Any
 
 DEFAULT_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 DEFAULT_BACKUP_COUNT = 3
+DEFAULT_LOG_SUBDIR = "auto-permissions"
 DEFAULT_LOG_NAME = "audit.jsonl"
 
 
@@ -21,22 +22,33 @@ def resolve_session_log_path(
     transcript_path: str | None = None,
     conversation_id: str | None = None,
 ) -> str:
-    """Resolves the active conversation's audit log file path."""
+    """
+    Resolves the active conversation's audit log file path in the auto-permissions/ subdirectory.
+    Falls back to legacy root file if already present.
+    """
+    session_root = None
     if artifact_dir and os.path.isabs(artifact_dir):
-        return os.path.join(artifact_dir, DEFAULT_LOG_NAME)
-
-    if transcript_path and os.path.isfile(transcript_path):
+        session_root = artifact_dir
+    elif transcript_path and os.path.isfile(transcript_path):
         session_root = os.path.dirname(
             os.path.dirname(os.path.dirname(os.path.abspath(transcript_path)))
         )
-        return os.path.join(session_root, DEFAULT_LOG_NAME)
+    elif conversation_id:
+        session_root = os.path.expanduser(f"~/.gemini/antigravity/brain/{conversation_id}")
 
-    if conversation_id:
-        fallback = os.path.expanduser(f"~/.gemini/antigravity/brain/{conversation_id}")
-        return os.path.join(fallback, DEFAULT_LOG_NAME)
+    if session_root:
+        scoped = os.path.join(session_root, DEFAULT_LOG_SUBDIR, DEFAULT_LOG_NAME)
+        legacy = os.path.join(session_root, DEFAULT_LOG_NAME)
+        if os.path.isfile(legacy) and not os.path.isfile(scoped):
+            return legacy
+        return scoped
 
     # Local fallback for standalone testing
-    return os.path.abspath(DEFAULT_LOG_NAME)
+    scoped_local = os.path.abspath(os.path.join(DEFAULT_LOG_SUBDIR, DEFAULT_LOG_NAME))
+    legacy_local = os.path.abspath(DEFAULT_LOG_NAME)
+    if os.path.isfile(legacy_local) and not os.path.isfile(scoped_local):
+        return legacy_local
+    return scoped_local
 
 
 def rotate_log_file_if_needed(

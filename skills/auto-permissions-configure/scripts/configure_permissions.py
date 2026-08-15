@@ -22,7 +22,6 @@ from hooks.policy_engine import (  # noqa: E402
     GLOBAL_CONFIG_PATH,
     PROJECT_CONFIG_REL_PATH,
     PROJECT_LOCAL_CONFIG_REL_PATH,
-    SESSION_OVERRIDES_FILENAME,
     add_guideline_to_scope,
     add_rule_to_scope,
     add_skill_path_to_scope,
@@ -74,7 +73,7 @@ def get_effective_configuration(
     ws = workspace_dir or os.getcwd()
     scopes = {
         "session": (
-            os.path.join(session_dir, SESSION_OVERRIDES_FILENAME)
+            resolve_scope_file_path("session", session_dir=session_dir)
             if session_dir and os.path.isdir(session_dir)
             else None
         ),

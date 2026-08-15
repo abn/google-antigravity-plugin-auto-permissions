@@ -9,10 +9,10 @@ description: >-
 Use this skill when the user asks to inspect permission audit logs, check auto-approval stats, diagnose why a particular tool call was approved, blocked, or escalated, or troubleshoot security gate behavior.
 
 ## Crucial Operational Rule: Session Bounded Inspection
-* The agent must **ONLY** attempt to inspect the active session's audit log: `<session_dir>/audit.jsonl` (or `<artifactDirectoryPath>/audit.jsonl`).
+* The agent must **ONLY** attempt to inspect the active session's audit log: `<session_dir>/auto-permissions/audit.jsonl` (or legacy `<session_dir>/audit.jsonl`).
 * **NEVER** search frantically across `/tmp`, other workspaces, or parent directories if the file is absent.
-* If `<session_dir>/audit.jsonl` does not exist or contains 0 records, immediately report to the user:
-  > *"No audit records found for this session (`<session_dir>/audit.jsonl`). The security gate has not evaluated any tool actions in this session yet."*
+* If `<session_dir>/auto-permissions/audit.jsonl` does not exist or contains 0 records, immediately report to the user:
+  > *"No audit records found for this session (`<session_dir>/auto-permissions/audit.jsonl`). The security gate has not evaluated any tool actions in this session yet."*
 
 ---
 
