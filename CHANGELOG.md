@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.5.0...auto-permissions-v0.5.1) (2026-08-15)
+
+
+### Bug Fixes
+
+* **pre-invocation:** streamline turn summary injection to omit redundant headers ([#24](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/24)) ([bf87c4d](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/bf87c4d176e9723af7fab5490d7f13567236c46f))
+
 ## [0.5.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.4.0...auto-permissions-v0.5.0) (2026-08-15)
 
 
