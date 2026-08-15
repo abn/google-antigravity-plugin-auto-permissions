@@ -29,10 +29,12 @@ from hooks.policy_engine import (
     normalize_command_string,
     parse_resource_rule,
     resolve_classifier_config,
+    resolve_classifier_timeout,
     resolve_configured_model,
     resolve_governed_surfaces,
     resolve_show_turn_summary,
     resolve_trust_workspace_writes,
+    update_classifier_timeout_setting,
     update_governed_surfaces_in_scope,
     update_show_turn_summary_setting,
     update_trust_workspace_writes_setting,
@@ -237,6 +239,33 @@ class TestPolicyEngine(unittest.TestCase):
             self.assertEqual(cfg["model"], "gemma-2-9b-it")
             self.assertEqual(cfg["endpoint_url"], "http://localhost:8000/v1/chat/completions")
             self.assertEqual(cfg["api_key"], "custom-inline-key")
+            self.assertEqual(cfg["timeout_secs"], 6.0)
+
+    def test_resolve_classifier_timeout_hierarchy_and_update(self):
+        with tempfile.TemporaryDirectory() as session_dir, tempfile.TemporaryDirectory() as ws_dir:
+            # 1. Default timeout should be 6.0s
+            self.assertEqual(
+                resolve_classifier_timeout(session_dir=session_dir, workspace_paths=[ws_dir]),
+                6.0,
+            )
+
+            # 2. Update project scope timeout to 8.5s
+            update_classifier_timeout_setting(8.5, scope="project", workspace_dir=ws_dir)
+            self.assertEqual(
+                resolve_classifier_timeout(session_dir=session_dir, workspace_paths=[ws_dir]),
+                8.5,
+            )
+
+            # 3. Session scope override takes precedence (e.g. 12.0s)
+            update_classifier_timeout_setting(12.0, scope="session", session_dir=session_dir)
+            self.assertEqual(
+                resolve_classifier_timeout(session_dir=session_dir, workspace_paths=[ws_dir]),
+                12.0,
+            )
+
+            # 4. resolve_classifier_config includes timeout_secs
+            cfg = resolve_classifier_config(session_dir=session_dir, workspace_paths=[ws_dir])
+            self.assertEqual(cfg["timeout_secs"], 12.0)
 
     def test_add_rule_and_evaluate_hierarchy(self):
         with tempfile.TemporaryDirectory() as session_dir, tempfile.TemporaryDirectory() as ws_dir:

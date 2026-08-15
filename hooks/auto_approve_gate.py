@@ -400,6 +400,7 @@ def main():
         model=classifier_cfg["model"],
         endpoint_url=classifier_cfg["endpoint_url"],
         api_key=classifier_cfg["api_key"],
+        timeout_secs=classifier_cfg.get("timeout_secs", 6.0),
     )
 
     # 4. Map classification verdict to Antigravity PreToolUse decision

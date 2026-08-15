@@ -105,6 +105,25 @@ class TestConfigureSkill(unittest.TestCase):
                 local_policy["endpoint_url"], "http://localhost:8000/v1/chat/completions"
             )
 
+    def test_configure_timeout_setting(self):
+        with tempfile.TemporaryDirectory() as ws:
+            update_classifier_settings_in_scope(
+                settings={"timeout": 8.0},
+                scope="project",
+                workspace_dir=ws,
+            )
+
+            proj_file = os.path.join(ws, PROJECT_CONFIG_REL_PATH)
+            proj_policy = load_policy_file(proj_file)
+            self.assertEqual(proj_policy["timeout"], 8.0)
+
+            config_info = get_effective_configuration(workspace_dir=ws)
+            self.assertEqual(config_info["effective_classifier"]["timeout_secs"], 8.0)
+
+            md = format_markdown_summary(config_info)
+            self.assertIn("Classifier Timeout", md)
+            self.assertIn("8.0s", md)
+
     def test_get_effective_configuration_and_summary(self):
         with tempfile.TemporaryDirectory() as ws:
             config_info = get_effective_configuration(workspace_dir=ws)

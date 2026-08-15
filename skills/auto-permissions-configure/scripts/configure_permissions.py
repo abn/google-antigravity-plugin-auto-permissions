@@ -142,6 +142,8 @@ def format_markdown_summary(config_info: dict[str, Any]) -> str:
     lines.append(f"| **Endpoint URI** | `{endpoint_display}` |")
     key_display = "Set (hidden)" if eff.get("api_key") else "None (Using environment fallback)"
     lines.append(f"| **API Key Status** | {key_display} |")
+    timeout_secs = eff.get("timeout_secs", 6.0)
+    lines.append(f"| **Classifier Timeout** | `{timeout_secs:.1f}s` *(Default: 6.0s)* |")
     write_trust_display = (
         "⚡ **Enabled (0.1ms fast-path, sensitive paths guarded)** *(Default)*"
         if trust_writes
@@ -349,6 +351,12 @@ def main():
         help="Disable (opt-out of) turn-scoped security gate summary disclosure.",
     )
     parser.add_argument(
+        "--timeout",
+        "-t",
+        type=float,
+        help="Set classifier timeout in seconds across scopes (default: 6.0s).",
+    )
+    parser.add_argument(
         "--probe",
         action="store_true",
         default=True,
@@ -451,6 +459,8 @@ def main():
         classifier_settings["api_key"] = args.api_key.strip()
     if args.api_key_env:
         classifier_settings["api_key_env"] = args.api_key_env.strip()
+    if args.timeout is not None:
+        classifier_settings["timeout"] = float(args.timeout)
 
     if classifier_settings:
         # Pre-flight health probe if enabled
