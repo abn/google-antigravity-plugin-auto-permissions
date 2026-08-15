@@ -25,7 +25,8 @@ This workspace is protected by the **Auto-Permissions Classifier Plugin**, which
    - All tool classification decisions, raw prompts, latency, and verdicts are recorded in `<session_dir>/auto-permissions/audit.jsonl`.
 
 5. **End-of-Round Security Gate Summary Table:**
-   - At the conclusion of any round where state-changing or gated tool calls (`run_command`, `write_to_file`, `replace_file_content`, `read_url_content`, etc.) were evaluated, append a clean, collapsible Markdown summary table at the bottom of the final response to the user:
+   - At the conclusion of any round where state-changing or gated tool calls (`run_command`, `write_to_file`, `replace_file_content`, `read_url_content`, etc.) were evaluated, append a clean, collapsible Markdown summary table at the bottom of the final response to the user.
+   - Do NOT append this summary to intermediate status messages or progress updates while waiting for background tasks or subagents:
 
 ```markdown
 <details>
