@@ -12,13 +12,14 @@ The plugin intercepts sensitive tool operations (commands, file writes, web requ
    - Evaluates tool operations independently of the agent's internal chain-of-thought (CoT) and previous tool outputs to eliminate indirect prompt injection (IPI) attack surfaces.
 2. **Token-Efficient Multi-Turn History:**
    - Extracts prior user prompts from `transcript.jsonl` to resolve referential commands (e.g. *"Proceed"*, *"Run it again"*, *"Delete that migration file"*) while maintaining a minimal token footprint.
-3. **Hierarchical Fast-Path Static ACL Engine:**
-   - Evaluates static permission rules (`command(...)`, `write_file(...)`, `read_url(...)`) across **Session**, **Project** (`.agents/auto-permissions.json`), and **Global** scopes with strict `Deny > Ask > Allow` priority.
-   - Matching static rules execute with **sub-millisecond latency (0ms)** with zero API cost.
+3. **Sub-Millisecond Fast-Path Cascade (~0.1ms):**
+   - Evaluates static permission rules (`command(...)`, `write_file(...)`, `read_url(...)`, `mcp(...)`) across **Session**, **Project (Local)**, **Project (Tracked)**, and **Global** scopes with strict `Deny > Ask > Allow` priority.
+   - Automatically auto-approves safe workspace file edits (`trust_workspace_writes`), same-turn file mutations, safe read-only shell commands, and session artifact operations in **0.1ms** with zero API cost.
 4. **Denial Remediation & Policy Rule Generator (`auto-permissions-fix`):**
    - Automatically translates denials in `audit.jsonl` into candidate Antigravity ACL rules and writes them to Session, Project, or Global scopes.
-5. **End-of-Round Collapsible Security Gate Summary:**
-   - Appends a non-intrusive, collapsible Markdown summary table at the end of each round showing evaluated actions, verdicts (`🟢 ALLOW`, `🔴 DENY`, `🟡 ASK`), and evaluation modes (`Static ACL` vs `Gemini`).
+5. **Turn-Scoped Collapsible Security Gate Summary (with Opt-Out):**
+   - Appends a clean, collapsible Markdown summary table at the bottom of the final response detailing evaluated actions, verdicts (`🟢 ALLOW`, `🔴 DENY`, `🟡 ASK`), and evaluation modes (`Static ACL`, `Gemini`, `Workspace Write`, `Session Artifact`).
+   - Supports opt-out via `"show_turn_summary": false` / `--no-show-turn-summary` / `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY=0`.
 6. **Four-Tier Decision Taxonomy:**
    - **`allow`**: Safe, intent-aligned workspace operations execute seamlessly without human friction.
    - **`soft_deny`**: Unrequested or scope-divergent actions are blocked, triggering the agent's *Deny-and-Continue* self-correction loop.
@@ -227,6 +228,8 @@ You can configure project-level policies in `.agents/auto-permissions.json` (tra
 | `custom_guidelines` | `array[string]` | `[]` | Semantic domain guidelines injected into the classifier prompt. |
 | `allowed_skill_paths` | `array[string]` | `[]` | Extra directory roots permitted for safe `0.1ms` skill file reads. |
 | `trust_workspace_writes` | `boolean` | `true` | When `true` (default), enables `0.1ms` fast-path for non-sensitive workspace writes. |
+| `show_turn_summary` | `boolean` | `true` | When `true` (default), appends turn-scoped collapsible security gate summary table to final response. |
+| `disclose_turn_summary` | `boolean` | `true` | Alias for `show_turn_summary`. |
 | `govern_subagents` | `boolean` | `false` | When `true`, intercepts `invoke_subagent` and evaluates via classifier. |
 | `govern_schedule` | `boolean` | `false` | When `true`, intercepts `schedule` (cron/timers) and evaluates via classifier. |
 | `govern_images` | `boolean` | `false` | When `true`, intercepts `generate_image` and evaluates via classifier. |
@@ -244,6 +247,8 @@ You can configure project-level policies in `.agents/auto-permissions.json` (tra
 | `AUTO_PERMISSIONS_MODEL` | - | Override active model identifier globally (or `GEMINI_MODEL`, `OPENAI_MODEL`, `ANTHROPIC_MODEL`). |
 | `AUTO_PERMISSIONS_ENDPOINT_URL` | - | Override custom REST endpoint globally (or `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`). |
 | `AUTO_PERMISSIONS_TRUST_WORKSPACE_WRITES` | `1` | Override workspace write fast-path (`1`/`0` or `true`/`false`). |
+| `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY` | `1` | Override turn-scoped security gate disclosure table (`1`/`0` or `true`/`false`). |
+| `AUTO_PERMISSIONS_DISCLOSE_TURN_SUMMARY` | `1` | Alias for `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY`. |
 | `AUTO_PERMISSIONS_TIMEOUT` | `4.0` | HTTP classifier timeout in seconds. Increase for large local LLMs (e.g. `60.0`). |
 | `AUTO_PERMISSIONS_GOVERN_SUBAGENTS` | `0` | Set `1` to enable classifier evaluation for `invoke_subagent`. |
 | `AUTO_PERMISSIONS_GOVERN_SCHEDULE` | `0` | Set `1` to enable classifier evaluation for `schedule`. |
@@ -301,6 +306,7 @@ auto-permissions/
     ├── test_pre_invocation.py
     ├── test_fix_permissions.py
     ├── test_permission_skill.py
+    ├── test_package_plugin.py
     └── test_gate_e2e.py
 ```
 
