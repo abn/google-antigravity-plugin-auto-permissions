@@ -121,11 +121,35 @@ def inspect_audit_log(
             print()
 
 
+def find_default_audit_log(provided_path: str | None = None) -> str:
+    """
+    Resolves default audit log path, checking provided path,
+    auto-permissions/ subdir, or legacy root.
+    """
+    if provided_path and os.path.exists(provided_path):
+        return provided_path
+    if os.path.isfile("./auto-permissions/audit.jsonl"):
+        return os.path.abspath("./auto-permissions/audit.jsonl")
+    if os.path.isfile("./audit.jsonl"):
+        return os.path.abspath("./audit.jsonl")
+    brain_dir = os.path.expanduser("~/.gemini/antigravity/brain")
+    if os.path.isdir(brain_dir):
+        candidates = []
+        for root, _dirs, files in os.walk(brain_dir):
+            if "audit.jsonl" in files:
+                fpath = os.path.join(root, "audit.jsonl")
+                candidates.append((os.path.getmtime(fpath), fpath))
+        if candidates:
+            candidates.sort(reverse=True)
+            return candidates[0][1]
+    return provided_path or "./auto-permissions/audit.jsonl"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Inspect and summarize auto-permissions audit records."
     )
-    parser.add_argument("audit_log", nargs="?", default="./audit.jsonl", help="Path to audit.jsonl")
+    parser.add_argument("audit_log", nargs="?", default=None, help="Path to audit.jsonl")
     parser.add_argument("--limit", "-n", type=int, default=10, help="Number of traces to show.")
     parser.add_argument(
         "--markdown", "-m", action="store_true", help="Output as collapsible Markdown table."
@@ -138,8 +162,9 @@ def main():
     )
 
     args = parser.parse_args()
+    log_path = find_default_audit_log(args.audit_log)
     inspect_audit_log(
-        args.audit_log,
+        log_path,
         limit=args.limit,
         as_markdown=args.markdown,
         diagnose=args.diagnose,

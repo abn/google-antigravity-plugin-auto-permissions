@@ -120,10 +120,13 @@ def load_denied_audit_records(audit_path: str) -> list[dict[str, Any]]:
 def find_default_audit_log() -> str | None:
     """Finds the active session's audit log file if available."""
     # Check current directory
+    if os.path.isfile("./auto-permissions/audit.jsonl"):
+        return os.path.abspath("./auto-permissions/audit.jsonl")
     if os.path.isfile("./audit.jsonl"):
         return os.path.abspath("./audit.jsonl")
 
-    # Search ~/.gemini/antigravity/brain/*/audit.jsonl for most recent
+    # Search ~/.gemini/antigravity/brain/*/audit.jsonl
+    # or */auto-permissions/audit.jsonl for most recent
     brain_dir = os.path.expanduser("~/.gemini/antigravity/brain")
     if os.path.isdir(brain_dir):
         candidates = []

@@ -44,7 +44,7 @@ class TestGateE2E(unittest.TestCase):
                 self.assertEqual(res["reason"], "Authorized test command")
 
             # Check audit log written
-            audit_log_path = os.path.join(tmpdir, "audit.jsonl")
+            audit_log_path = os.path.join(tmpdir, "auto-permissions", "audit.jsonl")
             self.assertTrue(os.path.exists(audit_log_path))
             with open(audit_log_path, encoding="utf-8") as f:
                 audit_records = [json.loads(line) for line in f if line.strip()]

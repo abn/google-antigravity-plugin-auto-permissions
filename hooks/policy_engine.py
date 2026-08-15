@@ -14,7 +14,24 @@ from typing import Any
 GLOBAL_CONFIG_PATH = os.path.expanduser("~/.gemini/config/auto-permissions.json")
 PROJECT_CONFIG_REL_PATH = os.path.join(".agents", "auto-permissions.json")
 PROJECT_LOCAL_CONFIG_REL_PATH = os.path.join(".agents", "auto-permissions.local.json")
+SESSION_PLUGIN_SUBDIR = "auto-permissions"
 SESSION_OVERRIDES_FILENAME = "session_overrides.json"
+
+
+def resolve_session_override_path(session_dir: str | None) -> str | None:
+    """
+    Resolves the session override path, checking auto-permissions/ subdir first,
+    falling back to legacy root.
+    """
+    if not session_dir:
+        return None
+    scoped = os.path.join(session_dir, SESSION_PLUGIN_SUBDIR, SESSION_OVERRIDES_FILENAME)
+    legacy = os.path.join(session_dir, SESSION_OVERRIDES_FILENAME)
+    if os.path.isfile(scoped):
+        return scoped
+    if os.path.isfile(legacy):
+        return legacy
+    return scoped
 
 
 def parse_resource_rule(rule_str: str) -> tuple[str, str] | None:
@@ -433,7 +450,9 @@ def resolve_governed_surfaces(
     """
     scope_files = []
     if session_dir and os.path.isdir(session_dir):
-        scope_files.append(os.path.join(session_dir, SESSION_OVERRIDES_FILENAME))
+        session_file = resolve_session_override_path(session_dir)
+        if session_file:
+            scope_files.append(session_file)
     if workspace_paths:
         for ws in workspace_paths:
             scope_files.append(os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH))
@@ -541,7 +560,9 @@ def load_allowed_skill_paths(
             scope_files.append(os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH))
             scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
     if session_dir and os.path.isdir(session_dir):
-        scope_files.append(os.path.join(session_dir, SESSION_OVERRIDES_FILENAME))
+        session_file = resolve_session_override_path(session_dir)
+        if session_file:
+            scope_files.append(session_file)
 
     for f_path in scope_files:
         if not os.path.isfile(f_path):
@@ -895,7 +916,9 @@ def resolve_classifier_config(
     scope_files = []
     # 1. Session scope
     if session_dir and os.path.isdir(session_dir):
-        scope_files.append(os.path.join(session_dir, SESSION_OVERRIDES_FILENAME))
+        session_file = resolve_session_override_path(session_dir)
+        if session_file:
+            scope_files.append(session_file)
 
     # 2. Local Project scope (untracked)
     if workspace_paths:
@@ -1040,7 +1063,9 @@ def load_custom_guidelines(
             scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
     # 3. Session
     if session_dir and os.path.isdir(session_dir):
-        scope_files.append(os.path.join(session_dir, SESSION_OVERRIDES_FILENAME))
+        session_file = resolve_session_override_path(session_dir)
+        if session_file:
+            scope_files.append(session_file)
 
     for file_path in scope_files:
         if not os.path.isfile(file_path):
@@ -1074,7 +1099,7 @@ def resolve_scope_file_path(
         if not session_dir:
             msg = "Session directory is required for session-scope configuration."
             raise ValueError(msg)
-        return os.path.join(session_dir, SESSION_OVERRIDES_FILENAME)
+        return resolve_session_override_path(session_dir)
     if scope in ("project_local", "local"):
         ws = workspace_dir or os.getcwd()
         return os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH)
@@ -1259,7 +1284,9 @@ def evaluate_static_policies(
 
     # 1. Session scope (highest specificity)
     if session_dir and os.path.isdir(session_dir):
-        scope_files.append(("session", os.path.join(session_dir, SESSION_OVERRIDES_FILENAME)))
+        session_file = resolve_session_override_path(session_dir)
+        if session_file:
+            scope_files.append(("session", session_file))
 
     # 2. Local Project scope (untracked local overrides)
     if workspace_paths:

@@ -47,6 +47,6 @@ python3 skills/auto-permissions-fix/scripts/fix_permissions.py --rule "mcp(nowle
 
 | Scope | Location | Target Lifecycle |
 | :--- | :--- | :--- |
-| **`session`** | `<session_dir>/session_overrides.json` | Active conversation only (disposed with session). |
+| **`session`** | `<session_dir>/auto-permissions/session_overrides.json` | Active conversation only (disposed with session). |
 | **`project`** | `<workspace>/.agents/auto-permissions.json` | Persistent for the workspace/git repo. |
 | **`global`** | `~/.gemini/config/auto-permissions.json` | Applies across all projects on the system. |

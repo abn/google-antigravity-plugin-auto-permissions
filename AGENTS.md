@@ -21,7 +21,7 @@ When working in this repository, all AI agents and subagents must strictly adher
    - Never fail open or emit `allow` upon encountering errors.
 
 4. **Non-Blocking Audit Logging:**
-   - All audit writes must be non-blocking and rotatable (`max_bytes=5MB`, `backup_count=3`), appending atomic JSON Lines records to `<session_dir>/audit.jsonl`.
+   - All audit writes must be non-blocking and rotatable (`max_bytes=5MB`, `backup_count=3`), appending atomic JSON Lines records to `<session_dir>/auto-permissions/audit.jsonl`.
 
 5. **PR-First & Release Please Invariant:**
    - All code, rule, skill, and documentation modifications must be submitted via Pull Requests targeting `main`. **Never push directly to `main`.**
