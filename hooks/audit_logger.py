@@ -271,9 +271,9 @@ def generate_markdown_summary(
         tool = r.get("toolCall", {}).get("name", "unknown")
         args = r.get("toolCall", {}).get("args", {})
         raw_cmd = args.get("CommandLine") or args.get("TargetFile") or json.dumps(args)
-        cmd_snippet = raw_cmd.replace("`", "").strip()
-        if len(cmd_snippet) > 45:
-            cmd_snippet = cmd_snippet[:42] + "..."
+        # Collapse all newlines, carriage returns, tabs, and backticks into single-line snippet
+        cleaned_cmd = " ".join(raw_cmd.replace("`", "").split()).strip()
+        cmd_snippet = cleaned_cmd[:42] + "..." if len(cleaned_cmd) > 45 else cleaned_cmd
 
         dec = r.get("hook_output", {}).get("decision", "unknown").lower()
         if dec == "allow":
