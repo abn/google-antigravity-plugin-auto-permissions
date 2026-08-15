@@ -31,9 +31,11 @@ from hooks.policy_engine import (  # noqa: E402
     resolve_classifier_config,
     resolve_governed_surfaces,
     resolve_scope_file_path,
+    resolve_show_turn_summary,
     resolve_trust_workspace_writes,
     update_classifier_settings_in_scope,
     update_governed_surfaces_in_scope,
+    update_show_turn_summary_setting,
     update_trust_workspace_writes_setting,
 )
 
@@ -109,11 +111,16 @@ def get_effective_configuration(
         session_dir=session_dir,
         workspace_paths=[ws],
     )
+    show_summary = resolve_show_turn_summary(
+        session_dir=session_dir,
+        workspace_paths=[ws],
+    )
 
     return {
         "effective_classifier": classifier_config,
         "effective_governed_surfaces": governed_surfaces,
         "effective_trust_workspace_writes": trust_writes,
+        "effective_show_turn_summary": show_summary,
         "scopes": policies_by_scope,
     }
 
@@ -123,6 +130,7 @@ def format_markdown_summary(config_info: dict[str, Any]) -> str:
     eff = config_info["effective_classifier"]
     gov = config_info.get("effective_governed_surfaces", {})
     trust_writes = config_info.get("effective_trust_workspace_writes", True)
+    show_summary = config_info.get("effective_show_turn_summary", True)
     scopes = config_info["scopes"]
 
     lines = ["### ⚙️ Auto-Permissions Effective Configuration\n"]
@@ -140,6 +148,12 @@ def format_markdown_summary(config_info: dict[str, Any]) -> str:
         else "🔒 **Disabled** (Full LLM classification required on first file write)"
     )
     lines.append(f"| **Workspace Writes Trust** | {write_trust_display} |")
+    summary_display = (
+        "👁️ **Enabled** (Turn-scoped `<details>` summary on final response) *(Default)*"
+        if show_summary
+        else "🔇 **Disabled (Opt-Out)**"
+    )
+    lines.append(f"| **Security Gate Summary** | {summary_display} |")
     lines.append("")
 
     lines.append("#### 🛡️ Governed Tool Surfaces\n")
@@ -319,6 +333,20 @@ def main():
         action="store_false",
         default=None,
         help="Disable workspace writes fast-path (force LLM classifier on first write).",
+    )
+    parser.add_argument(
+        "--show-turn-summary",
+        dest="show_turn_summary",
+        action="store_true",
+        default=None,
+        help="Enable turn-scoped security gate summary disclosure in final responses.",
+    )
+    parser.add_argument(
+        "--no-show-turn-summary",
+        dest="show_turn_summary",
+        action="store_false",
+        default=None,
+        help="Disable (opt-out of) turn-scoped security gate summary disclosure.",
     )
     parser.add_argument(
         "--probe",
@@ -547,6 +575,19 @@ def main():
         status_word = "enabled" if args.trust_workspace_writes else "disabled"
         actions_performed.append(
             f"{status_word.capitalize()} trust_workspace_writes in {scope} ({target_file})"
+        )
+
+    # 9. Update show_turn_summary setting
+    if args.show_turn_summary is not None:
+        target_file = update_show_turn_summary_setting(
+            enabled=args.show_turn_summary,
+            scope=scope,
+            workspace_dir=workspace_dir,
+            session_dir=session_dir,
+        )
+        status_word = "enabled" if args.show_turn_summary else "disabled"
+        actions_performed.append(
+            f"{status_word.capitalize()} show_turn_summary in {scope} ({target_file})"
         )
 
     config_info = get_effective_configuration(

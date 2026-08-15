@@ -180,6 +180,29 @@ class TestConfigureSkill(unittest.TestCase):
             config_info2 = get_effective_configuration(workspace_dir=ws)
             self.assertTrue(config_info2["effective_trust_workspace_writes"])
 
+    def test_configure_show_turn_summary(self):
+        with tempfile.TemporaryDirectory() as ws:
+            # Test disabling show_turn_summary
+            configure_permissions.update_show_turn_summary_setting(
+                enabled=False,
+                scope="project",
+                workspace_dir=ws,
+            )
+            config_info = get_effective_configuration(workspace_dir=ws)
+            self.assertFalse(config_info["effective_show_turn_summary"])
+
+            md = format_markdown_summary(config_info)
+            self.assertIn("Disabled (Opt-Out)", md)
+
+            # Test re-enabling show_turn_summary
+            configure_permissions.update_show_turn_summary_setting(
+                enabled=True,
+                scope="project",
+                workspace_dir=ws,
+            )
+            config_info2 = get_effective_configuration(workspace_dir=ws)
+            self.assertTrue(config_info2["effective_show_turn_summary"])
+
 
 if __name__ == "__main__":
     unittest.main()

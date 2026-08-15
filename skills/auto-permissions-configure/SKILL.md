@@ -164,6 +164,19 @@ python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
   --no-govern-schedule
 ```
 
+### 7. Toggle Security Gate Summary Disclosure (Opt-Out)
+```bash
+# Disable turn-scoped security gate summary disclosure in final responses
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --scope project \
+  --no-show-turn-summary
+
+# Re-enable turn-scoped security gate summary disclosure (default)
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --scope project \
+  --show-turn-summary
+```
+
 ---
 
 ## Step 3: Validate with `auto-permissions-test`

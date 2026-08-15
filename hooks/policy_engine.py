@@ -445,6 +445,8 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
         "govern_schedule": None,
         "govern_images": None,
         "trust_workspace_writes": None,
+        "show_turn_summary": None,
+        "disclose_turn_summary": None,
         "provider": None,
         "model": None,
         "endpoint_url": None,
@@ -474,9 +476,16 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
                     "govern_schedule",
                     "govern_images",
                     "trust_workspace_writes",
+                    "show_turn_summary",
+                    "disclose_turn_summary",
                 ):
                     if bool_k in data and isinstance(data[bool_k], bool):
                         policy[bool_k] = data[bool_k]
+                if (
+                    policy.get("show_turn_summary") is None
+                    and policy.get("disclose_turn_summary") is not None
+                ):
+                    policy["show_turn_summary"] = policy["disclose_turn_summary"]
                 for str_k in (
                     "provider",
                     "protocol",
@@ -1007,6 +1016,67 @@ def update_trust_workspace_writes_setting(
     )
     policy = load_policy_file(target_path)
     policy["trust_workspace_writes"] = enabled
+    save_policy_file(target_path, policy)
+    return target_path
+
+
+DEFAULT_SHOW_TURN_SUMMARY = True
+
+
+def resolve_show_turn_summary(
+    session_dir: str | None = None,
+    workspace_paths: list[str] | None = None,
+) -> bool:
+    """
+    Resolves whether the turn-scoped PreInvocation Security Gate disclosure summary is enabled.
+    Precedence: Session -> Local Project -> Project -> Global -> Env Var -> Default (True).
+    """
+    scope_files = []
+    if session_dir and os.path.isdir(session_dir):
+        session_file = resolve_session_override_path(session_dir)
+        if session_file:
+            scope_files.append(session_file)
+    if workspace_paths:
+        for ws in workspace_paths:
+            scope_files.append(os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH))
+            scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
+    scope_files.append(GLOBAL_CONFIG_PATH)
+
+    for f_path in scope_files:
+        if not os.path.isfile(f_path):
+            continue
+        pol = load_policy_file(f_path)
+        for k in ("show_turn_summary", "disclose_turn_summary"):
+            if k in pol and pol[k] is not None:
+                val = pol[k]
+                if isinstance(val, bool):
+                    return val
+                if isinstance(val, str):
+                    return val.strip().lower() in ("true", "1", "yes", "on")
+
+    env_val = os.environ.get("AUTO_PERMISSIONS_SHOW_TURN_SUMMARY") or os.environ.get(
+        "AUTO_PERMISSIONS_DISCLOSE_TURN_SUMMARY"
+    )
+    if env_val is not None:
+        return env_val.strip().lower() in ("true", "1", "yes", "on")
+
+    return DEFAULT_SHOW_TURN_SUMMARY
+
+
+def update_show_turn_summary_setting(
+    enabled: bool,
+    scope: str,
+    workspace_dir: str | None = None,
+    session_dir: str | None = None,
+) -> str:
+    """
+    Persists the show_turn_summary boolean setting to the specified configuration scope.
+    """
+    target_path = resolve_scope_file_path(
+        scope, workspace_dir=workspace_dir, session_dir=session_dir
+    )
+    policy = load_policy_file(target_path)
+    policy["show_turn_summary"] = enabled
     save_policy_file(target_path, policy)
     return target_path
 

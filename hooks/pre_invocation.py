@@ -19,7 +19,9 @@ from audit_logger import (  # noqa: E402
     generate_markdown_summary,
     load_audit_records,
     resolve_session_log_path,
+    resolve_session_root_dir,
 )
+from policy_engine import resolve_show_turn_summary  # noqa: E402
 from transcript_parser import get_last_user_step_index  # noqa: E402
 
 
@@ -38,11 +40,33 @@ def main():
         return
 
     try:
-        conversation_id = payload.get("conversationId", "")
-        transcript_path = payload.get("transcriptPath", "")
-        artifact_dir = payload.get("artifactDirectoryPath", "")
+        conversation_id = payload.get("conversationId") or payload.get("conversation_id", "")
+        transcript_path = (
+            payload.get("transcriptPath")
+            or payload.get("transcript_path")
+            or payload.get("logPath")
+            or payload.get("log_path")
+            or ""
+        )
+        artifact_dir = (
+            payload.get("artifactDirectoryPath")
+            or payload.get("artifact_dir")
+            or payload.get("artifactDir")
+            or ""
+        )
+        workspace_paths = payload.get("workspacePaths") or payload.get("workspace_paths", [])
 
         log_path = resolve_session_log_path(artifact_dir, transcript_path, conversation_id)
+        session_dir = resolve_session_root_dir(
+            artifact_dir, transcript_path, conversation_id, log_path
+        ) or os.path.dirname(os.path.abspath(log_path))
+
+        # Check if turn summary disclosure is enabled (opt-out hierarchy)
+        if not resolve_show_turn_summary(session_dir=session_dir, workspace_paths=workspace_paths):
+            print(json.dumps({"injectSteps": []}))
+            sys.stdout.flush()
+            return
+
         records = load_audit_records(log_path)
 
         if not records:

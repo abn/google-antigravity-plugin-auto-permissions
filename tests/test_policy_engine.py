@@ -31,8 +31,10 @@ from hooks.policy_engine import (
     resolve_classifier_config,
     resolve_configured_model,
     resolve_governed_surfaces,
+    resolve_show_turn_summary,
     resolve_trust_workspace_writes,
     update_governed_surfaces_in_scope,
+    update_show_turn_summary_setting,
     update_trust_workspace_writes_setting,
 )
 
@@ -578,6 +580,36 @@ class TestPolicyEngine(unittest.TestCase):
             self.assertIsNotNone(res)
             self.assertEqual(res[0], "allow")
             self.assertEqual(res[2], "session_artifact")
+
+    def test_resolve_show_turn_summary_and_update(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ws_dir = os.path.join(tmpdir, "ws")
+            os.makedirs(os.path.join(ws_dir, ".agents"), exist_ok=True)
+            session_dir = os.path.join(tmpdir, "session")
+            os.makedirs(os.path.join(session_dir, "auto-permissions"), exist_ok=True)
+
+            # 1. Default should be True
+            self.assertTrue(
+                resolve_show_turn_summary(session_dir=session_dir, workspace_paths=[ws_dir])
+            )
+
+            # 2. Update in project scope to False
+            update_show_turn_summary_setting(False, scope="project", workspace_dir=ws_dir)
+            self.assertFalse(
+                resolve_show_turn_summary(session_dir=session_dir, workspace_paths=[ws_dir])
+            )
+
+            # 3. Session override overrides project scope to True
+            update_show_turn_summary_setting(True, scope="session", session_dir=session_dir)
+            self.assertTrue(
+                resolve_show_turn_summary(session_dir=session_dir, workspace_paths=[ws_dir])
+            )
+
+            # 4. Session override to False
+            update_show_turn_summary_setting(False, scope="session", session_dir=session_dir)
+            self.assertFalse(
+                resolve_show_turn_summary(session_dir=session_dir, workspace_paths=[ws_dir])
+            )
 
     def test_check_intra_turn_cache(self):
         with tempfile.NamedTemporaryFile("w+", suffix=".jsonl", delete=False) as f:

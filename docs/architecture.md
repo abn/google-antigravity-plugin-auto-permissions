@@ -346,6 +346,11 @@ Grounded in empirical findings from Anthropic's Claude Code Auto-Mode benchmarks
   Any write targeting these paths **immediately bypasses the fast-path** and escalates to the LLM Security Classifier.
 * **Opt-Out Configuration:** Teams operating in zero-trust or compliance-restricted environments can disable the fast-path by setting `"trust_workspace_writes": false` (or `--no-trust-workspace-writes`) at Session, Project, or Global scope.
 
+### 8.9 Security Gate Summary Disclosure & Opt-Out (`show_turn_summary`)
+* **Transparency & Auditability Invariant:** To maintain developer situational awareness, the `PreInvocation` hook injects a transient instruction into the conversation before the model generates its final response, prompting the model to append a collapsible `<details>` summary table detailing all tool actions, classification latencies, and verdicts evaluated during that turn.
+* **Final-Response Enforcement:** The summary is restricted strictly to final conversational conclusions, omitting disclosures from intermediate progress pings or background task execution notifications.
+* **Opt-Out Configuration:** Users and teams can opt out of the turn summary disclosure by setting `"show_turn_summary": false` (or `--no-show-turn-summary` / `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY=0`) across Session, Local Project, Project, or Global scopes.
+
 ---
 
 ## 9. Two-Tier Security Architecture: Plugin Gate vs. Platform Container Sandbox
