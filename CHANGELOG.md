@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.3.0...auto-permissions-v0.4.0) (2026-08-15)
+
+
+### Features
+
+* **gate:** add intra-turn exact decision caching ([#16](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/16)) ([02da56e](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/02da56e35a6c965bd152a8b3a085a8841b622f08))
+* **gate:** add same-turn file grants and safe read command fast-path ([#18](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/18)) ([f187366](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/f1873661be93d6152b35c9a7834b9055e15a67d7))
+
 ## [0.3.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.2.0...auto-permissions-v0.3.0) (2026-08-15)
 
 
