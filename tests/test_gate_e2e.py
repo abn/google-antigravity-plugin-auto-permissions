@@ -328,6 +328,100 @@ class TestGateE2E(unittest.TestCase):
                 # mock_classify call count must still be 1 (zero new network calls!)
                 self.assertEqual(mock_classify.call_count, 1)
 
+    @patch("hooks.auto_approve_gate.classify_tool_call")
+    def test_gate_e2e_safe_read_command(self, mock_classify):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_payload = {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "wc -l README.md"}},
+                "stepIdx": 2,
+                "conversationId": "test-e2e-saferead",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+            }
+
+            stdin_data = json.dumps(input_payload)
+            with (
+                patch("sys.stdin", io.StringIO(stdin_data)),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout,
+            ):
+                gate.main()
+                res = json.loads(mock_stdout.getvalue().strip())
+                self.assertEqual(res["decision"], "allow")
+                self.assertIn("Read-only utility", res["reason"])
+                # Fast-path must not invoke remote classifier
+                mock_classify.assert_not_called()
+
+    @patch("hooks.auto_approve_gate.classify_tool_call")
+    def test_gate_e2e_same_turn_file_grant(self, mock_classify):
+        mock_classify.return_value = (
+            "<raw_prompt>",
+            {
+                "decision": "allow",
+                "reason": "Initial edit authorized",
+                "risk_category": "safe_routine",
+            },
+            None,
+            30.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target_file = os.path.join(tmpdir, "main.py")
+            with open(target_file, "w") as f:
+                f.write("def main(): pass")
+
+            transcript_path = os.path.join(tmpdir, "transcript.jsonl")
+            with open(transcript_path, "w", encoding="utf-8") as f:
+                f.write(
+                    json.dumps({"type": "USER_INPUT", "step_index": 5, "content": "Update main.py"})
+                    + "\n"
+                )
+
+            # 1. First edit chunk (Step 6 >= 5): Calls classifier
+            input_payload1 = {
+                "toolCall": {
+                    "name": "replace_file_content",
+                    "args": {"TargetFile": target_file, "TargetContent": "pass"},
+                },
+                "stepIdx": 6,
+                "conversationId": "test-e2e-filegrant",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+                "transcriptPath": transcript_path,
+            }
+            stdin_data1 = json.dumps(input_payload1)
+            with (
+                patch("sys.stdin", io.StringIO(stdin_data1)),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout1,
+            ):
+                gate.main()
+                res1 = json.loads(mock_stdout1.getvalue().strip())
+                self.assertEqual(res1["decision"], "allow")
+                self.assertEqual(mock_classify.call_count, 1)
+
+            # 2. Second edit chunk to same file with DIFFERENT args (Step 7 >= 5):
+            # Must hit same_turn_file_grant and NOT call classifier again
+            input_payload2 = {
+                "toolCall": {
+                    "name": "replace_file_content",
+                    "args": {"TargetFile": target_file, "TargetContent": "def main():"},
+                },
+                "stepIdx": 7,
+                "conversationId": "test-e2e-filegrant",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+                "transcriptPath": transcript_path,
+            }
+            stdin_data2 = json.dumps(input_payload2)
+            with (
+                patch("sys.stdin", io.StringIO(stdin_data2)),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout2,
+            ):
+                gate.main()
+                res2 = json.loads(mock_stdout2.getvalue().strip())
+                self.assertEqual(res2["decision"], "allow")
+                self.assertIn("File grant", res2["reason"])
+                self.assertEqual(mock_classify.call_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -19,7 +19,9 @@ from audit_logger import log_audit_event_async, resolve_session_log_path  # noqa
 from classifier import classify_tool_call  # noqa: E402
 from policy_engine import (  # noqa: E402
     check_intra_turn_cache,
+    check_same_turn_file_grant,
     evaluate_static_policies,
+    is_safe_read_only_command,
     is_ungoverned_surface,
     load_custom_guidelines,
     resolve_classifier_config,
@@ -171,7 +173,48 @@ def main():
             log_thread.join(timeout=0.2)
         return
 
-    # 3. FAST-PATH: Check Intra-Turn Decision Cache
+    # 3. FAST-PATH: Safe Read-Only CLI Command Fast-Path
+    if tool_name == "run_command":
+        cmd_str = tool_args.get("CommandLine", "")
+        if is_safe_read_only_command(cmd_str, workspace_paths=workspace_paths):
+            safe_read_reason = (
+                f"Read-only utility '{cmd_str.split()[0]}' is safe (inspection pipeline)."
+            )
+            hook_output = {
+                "decision": "allow",
+                "reason": safe_read_reason,
+            }
+            classification = {
+                "decision": "allow",
+                "reason": safe_read_reason,
+                "risk_category": "safe_read_command",
+                "confidence": 1.0,
+            }
+            context_summary = {
+                "active_prompt": "(Safe read-only command fast-path)",
+                "prior_prompts_count": 0,
+                "workspace_roots": workspace_paths,
+                "policy_scope": "safe_read_command",
+            }
+            log_thread = log_audit_event_async(
+                artifact_dir=artifact_dir,
+                transcript_path=transcript_path,
+                conversation_id=conversation_id,
+                step_idx=step_idx,
+                tool_call=tool_call,
+                context=context_summary,
+                raw_prompt=f"<safe_read_command command='{cmd_str}'/>",
+                classification=classification,
+                hook_output=hook_output,
+                latency_ms=0.1,
+            )
+            print(json.dumps(hook_output))
+            sys.stdout.flush()
+            if log_thread and log_thread.is_alive():
+                log_thread.join(timeout=0.2)
+            return
+
+    # 4. FAST-PATH: Check Intra-Turn Decision Cache
     last_user_step_idx = get_last_user_step_index(transcript_path)
     cached_verdict = check_intra_turn_cache(
         tool_name=tool_name,
@@ -215,10 +258,55 @@ def main():
             log_thread.join(timeout=0.2)
         return
 
-    # 4. Parse user prompt history from transcript.jsonl
+    # 5. FAST-PATH: Same-Turn File Mutation Grant
+    file_grant = check_same_turn_file_grant(
+        tool_name=tool_name,
+        tool_args=tool_args,
+        log_path=log_path,
+        last_user_step_idx=last_user_step_idx,
+        workspace_paths=workspace_paths,
+    )
+    if file_grant:
+        grant_decision, grant_reason = file_grant
+        hook_output = {
+            "decision": grant_decision,
+            "reason": grant_reason,
+        }
+        classification = {
+            "decision": grant_decision,
+            "reason": grant_reason,
+            "risk_category": "same_turn_file_grant",
+            "confidence": 1.0,
+        }
+        context_summary = {
+            "active_prompt": "(Same-turn target file grant)",
+            "prior_prompts_count": 0,
+            "workspace_roots": workspace_paths,
+            "policy_scope": "same_turn_file_grant",
+        }
+        target_f = tool_args.get("TargetFile")
+        log_thread = log_audit_event_async(
+            artifact_dir=artifact_dir,
+            transcript_path=transcript_path,
+            conversation_id=conversation_id,
+            step_idx=step_idx,
+            tool_call=tool_call,
+            context=context_summary,
+            raw_prompt=f"<same_turn_file_grant tool='{tool_name}' file='{target_f}'/>",
+            classification=classification,
+            hook_output=hook_output,
+            latency_ms=0.1,
+        )
+        print(json.dumps(hook_output))
+        sys.stdout.flush()
+        if log_thread and log_thread.is_alive():
+            log_thread.join(timeout=0.2)
+        return
+
+    # 6. Parse user prompt history from transcript.jsonl
     prior_prompts, active_prompt = read_user_prompts_from_transcript(transcript_path, max_history=4)
 
-    # 5. Load custom semantic guidelines from policy configurations
+    # 7. Load custom semantic guidelines from policy configurations
     custom_guidelines = load_custom_guidelines(
         workspace_paths=workspace_paths,
         session_dir=session_dir,

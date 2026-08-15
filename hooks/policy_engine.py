@@ -646,6 +646,180 @@ def is_safe_session_artifact_read(
     return is_norm_in and is_real_in
 
 
+SAFE_READ_BINARIES = {
+    "which",
+    "whereis",
+    "wc",
+    "head",
+    "tail",
+    "file",
+    "uname",
+    "du",
+    "cat",
+    "pwd",
+    "date",
+    "echo",
+    "true",
+    "false",
+    "hostname",
+    "arch",
+}
+
+SAFE_PIPE_FILTERS = {
+    "grep",
+    "rg",
+    "head",
+    "tail",
+    "wc",
+    "sort",
+    "uniq",
+    "awk",
+    "cut",
+    "tr",
+    "column",
+    "sed",
+    "fold",
+    "fmt",
+}
+
+
+def normalize_command_string(command_line: str) -> str:
+    """
+    Normalizes a command line string by collapsing redundant whitespace
+    and trimming surrounding whitespace for consistent matching and caching.
+    """
+    if not command_line:
+        return ""
+    return " ".join(command_line.strip().split())
+
+
+def is_safe_read_only_command(
+    command_line: str,
+    workspace_paths: list[str] | None = None,
+) -> bool:
+    """
+    Evaluates whether a command is a safe, non-destructive read-only shell pipeline
+    (e.g. `which uv`, `wc -l README.md`, `uname -m`, `head -n 20 file.txt | grep foo`).
+    Guarantees no file writes, redirections, command substitutions, or credential leaks.
+    """
+    if not command_line or not command_line.strip():
+        return False
+
+    raw_cmd = command_line.strip()
+
+    # Reject any shell write redirections or substitutions
+    if any(tok in raw_cmd for tok in (">", ">>", "&>", "| tee", "$(", "`")):
+        return False
+
+    # Check for chained commands (&&, ||, ;, \n)
+    segments = [s.strip() for s in re.split(r"&&|\|\||;|\n", raw_cmd) if s.strip()]
+    if not segments:
+        return False
+
+    for segment in segments:
+        # Check pipelines within segment
+        pipe_parts = [p.strip() for p in segment.split("|") if p.strip()]
+        if not pipe_parts:
+            return False
+
+        # First command in pipeline must be a whitelisted read binary
+        first_cmd_tokens = pipe_parts[0].split()
+        if not first_cmd_tokens:
+            return False
+        base_binary = os.path.basename(first_cmd_tokens[0]).lower()
+
+        if base_binary not in SAFE_READ_BINARIES:
+            return False
+
+        # Downstream pipe stages must be safe filters
+        for filter_part in pipe_parts[1:]:
+            filter_tokens = filter_part.split()
+            if not filter_tokens:
+                return False
+            filter_binary = os.path.basename(filter_tokens[0]).lower()
+            if filter_binary not in SAFE_PIPE_FILTERS and filter_binary not in SAFE_READ_BINARIES:
+                return False
+
+        # Verify any referenced file paths do not target sensitive paths
+        for token in pipe_parts[0].split()[1:]:
+            if token.startswith("-"):
+                continue
+            if is_sensitive_path(token):
+                return False
+
+    return True
+
+
+def check_same_turn_file_grant(
+    tool_name: str,
+    tool_args: dict[str, Any],
+    log_path: str | None,
+    last_user_step_idx: int | None,
+    workspace_paths: list[str] | None = None,
+) -> tuple[str, str] | None:
+    """
+    Checks if a target file within workspace roots was already authorized for mutation
+    by the classifier in the current active user turn (stepIdx >= last_user_step_idx).
+    Reuses the write grant for multi-chunk edits to the same file in ~0.1ms.
+    """
+    if tool_name not in ("replace_file_content", "multi_replace_file_content", "write_to_file"):
+        return None
+    if last_user_step_idx is None or not log_path or not os.path.isfile(log_path):
+        return None
+
+    target_file = tool_args.get("TargetFile")
+    if not target_file:
+        return None
+
+    # Must be inside workspace roots and not sensitive
+    if not is_path_in_workspaces(target_file, workspace_paths):
+        return None
+    if is_sensitive_path(target_file):
+        return None
+
+    norm_target = os.path.realpath(os.path.abspath(os.path.expanduser(target_file)))
+
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                with contextlib.suppress(json.JSONDecodeError):
+                    record = json.loads(line)
+                    step_idx = record.get("stepIdx", 0)
+                    if step_idx < last_user_step_idx:
+                        continue
+
+                    # Check if file was authorized for edits earlier in this turn
+                    tool_call = record.get("toolCall", {})
+                    t_name = tool_call.get("name", "")
+                    if t_name not in (
+                        "replace_file_content",
+                        "multi_replace_file_content",
+                        "write_to_file",
+                    ):
+                        continue
+
+                    r_target = tool_call.get("args", {}).get("TargetFile")
+                    if not r_target:
+                        continue
+
+                    norm_r_target = os.path.realpath(os.path.abspath(os.path.expanduser(r_target)))
+                    if norm_target == norm_r_target:
+                        hook_output = record.get("hook_output", {})
+                        if hook_output.get("decision") == "allow":
+                            filename = os.path.basename(target_file)
+                            return (
+                                "allow",
+                                f"File '{filename}' edit authorized in active turn (File grant)",
+                            )
+    except Exception:
+        return None
+
+    return None
+
+
 def check_intra_turn_cache(
     tool_name: str,
     tool_args: dict[str, Any],
@@ -663,6 +837,12 @@ def check_intra_turn_cache(
     if last_user_step_idx is None or not log_path or not os.path.isfile(log_path):
         return None
 
+    norm_args = dict(tool_args)
+    if tool_name == "run_command" and "CommandLine" in norm_args:
+        norm_cmd = normalize_command_string(norm_args["CommandLine"])
+    else:
+        norm_cmd = None
+
     try:
         with open(log_path, encoding="utf-8", errors="replace") as f:
             for line in f:
@@ -678,7 +858,17 @@ def check_intra_turn_cache(
                     tool_call = record.get("toolCall", {})
                     if tool_call.get("name") != tool_name:
                         continue
-                    if tool_call.get("args") != tool_args:
+
+                    r_args = tool_call.get("args", {})
+                    if tool_name == "run_command" and norm_cmd is not None:
+                        r_cmd = normalize_command_string(r_args.get("CommandLine", ""))
+                        if norm_cmd != r_cmd:
+                            continue
+                        if norm_args.get("Cwd") != r_args.get("Cwd"):
+                            continue
+                        if norm_args.get("BypassSandbox") != r_args.get("BypassSandbox"):
+                            continue
+                    elif tool_args != r_args:
                         continue
 
                     hook_output = record.get("hook_output", {})
