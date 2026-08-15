@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.6.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.5.1...auto-permissions-v0.6.0) (2026-08-15)
+
+
+### Features
+
+* **classifier:** optimize prompt density, KV prefix cache invariance, and parser resilience ([#32](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/32)) ([296a122](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/296a1224e287a42594bddca0f750d06f9e67d51b))
+* **config:** add opt-out configuration option for turn-scoped security gate summary ([#30](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/30)) ([dbf8e80](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/dbf8e80576292c02443b33628edcd9d53a43e5c5))
+* **policy:** add sub-millisecond fast-path for safe session artifact writes ([#26](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/26)) ([d919262](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/d919262e2c29ec1656cfe103375bd238c6682b08))
+
+
+### Bug Fixes
+
+* **gate:** resolve session root directory for accurate artifact path matching ([#28](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/28)) ([a3061d7](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/a3061d7c0ce2d88b56ca0d16ea400d8329a1c801))
+* **pre-invocation:** restrict turn summary disclosure to final conversational responses ([#29](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/29)) ([59e68b7](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/59e68b745437bf1e2774a01a615a04c85dfffe4f))
+
+
+### Documentation
+
+* update documentation and project manifests to reflect current status quo ([#31](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/31)) ([c27ac64](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/c27ac6449db0c18ec5d9d2edf76174614ae9ed35))
+
 ## [0.5.1](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.5.0...auto-permissions-v0.5.1) (2026-08-15)
 
 

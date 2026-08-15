@@ -1,6 +1,6 @@
 {
   "name": "auto-permissions",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Autonomous security authorization moderator and auto-permission classifier for Google Antigravity tools",
   "author": {
     "name": "Arun Babu Neelicattu",
