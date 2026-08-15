@@ -51,6 +51,34 @@ def resolve_session_log_path(
     return scoped_local
 
 
+def resolve_session_root_dir(
+    artifact_dir: str | None = None,
+    transcript_path: str | None = None,
+    conversation_id: str | None = None,
+    log_path: str | None = None,
+) -> str | None:
+    """
+    Resolves the canonical root directory of the active session
+    (<session_dir> or ~/.gemini/antigravity/brain/<conversation_id>/).
+    Unwraps any .system_generated/logs or auto-permissions/ subdirectories.
+    """
+    if artifact_dir and os.path.isabs(artifact_dir):
+        return os.path.abspath(artifact_dir)
+    if transcript_path and os.path.isabs(transcript_path):
+        # <session_root>/.system_generated/logs/transcript.jsonl
+        norm = os.path.abspath(transcript_path)
+        return os.path.dirname(os.path.dirname(os.path.dirname(norm)))
+    if conversation_id:
+        return os.path.abspath(os.path.expanduser(f"~/.gemini/antigravity/brain/{conversation_id}"))
+    if log_path and os.path.isabs(log_path):
+        norm = os.path.abspath(log_path)
+        d = os.path.dirname(norm)
+        if os.path.basename(d) == "auto-permissions":
+            return os.path.dirname(d)
+        return d
+    return None
+
+
 def rotate_log_file_if_needed(
     log_path: str,
     max_bytes: int = DEFAULT_MAX_BYTES,

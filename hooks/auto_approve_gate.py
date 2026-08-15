@@ -15,7 +15,11 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
-from audit_logger import log_audit_event_async, resolve_session_log_path  # noqa: E402
+from audit_logger import (  # noqa: E402
+    log_audit_event_async,
+    resolve_session_log_path,
+    resolve_session_root_dir,
+)
 from classifier import classify_tool_call  # noqa: E402
 from policy_engine import (  # noqa: E402
     check_intra_turn_cache,
@@ -61,10 +65,21 @@ def main():
     tool_action = payload.get("toolAction") or tool_call.get("toolAction")
     tool_summary = payload.get("toolSummary") or tool_call.get("toolSummary")
     step_idx = payload.get("stepIdx", 0)
-    conversation_id = payload.get("conversationId", "")
-    workspace_paths = payload.get("workspacePaths", [])
-    transcript_path = payload.get("transcriptPath", "")
-    artifact_dir = payload.get("artifactDirectoryPath", "")
+    conversation_id = payload.get("conversationId") or payload.get("conversation_id", "")
+    workspace_paths = payload.get("workspacePaths") or payload.get("workspace_paths", [])
+    transcript_path = (
+        payload.get("transcriptPath")
+        or payload.get("transcript_path")
+        or payload.get("logPath")
+        or payload.get("log_path")
+        or ""
+    )
+    artifact_dir = (
+        payload.get("artifactDirectoryPath")
+        or payload.get("artifact_dir")
+        or payload.get("artifactDir")
+        or ""
+    )
 
     # Extract optional explicit goal object or string
     raw_goal = (
@@ -87,7 +102,9 @@ def main():
 
     # Resolve session directory for overrides and audit logging
     log_path = resolve_session_log_path(artifact_dir, transcript_path, conversation_id)
-    session_dir = os.path.dirname(os.path.abspath(log_path))
+    session_dir = resolve_session_root_dir(
+        artifact_dir, transcript_path, conversation_id, log_path
+    ) or os.path.dirname(os.path.abspath(log_path))
 
     # 1. FAST-PATH: Evaluate Static Policies (Session -> Project -> Global)
     static_verdict = evaluate_static_policies(
