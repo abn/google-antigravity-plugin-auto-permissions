@@ -15,6 +15,7 @@ from hooks.policy_engine import (
     is_path_in_workspaces,
     is_safe_read_only_command,
     is_safe_session_artifact_read,
+    is_safe_session_artifact_write,
     is_sensitive_write_path,
     is_ungoverned_surface,
     load_custom_guidelines,
@@ -506,6 +507,72 @@ class TestPolicyEngine(unittest.TestCase):
             res = evaluate_static_policies(
                 "view_file",
                 {"AbsolutePath": audit_log},
+                session_dir=session_dir,
+            )
+            self.assertIsNotNone(res)
+            self.assertEqual(res[0], "allow")
+            self.assertEqual(res[2], "session_artifact")
+
+    def test_is_safe_session_artifact_write(self):
+        with tempfile.TemporaryDirectory() as session_tmp:
+            session_dir = os.path.abspath(session_tmp)
+            artifact_md = os.path.join(session_dir, "plan.md")
+            artifact_json = os.path.join(session_dir, "notes.json")
+            executable_sh = os.path.join(session_dir, "script.sh")
+            env_file = os.path.join(session_dir, ".env")
+
+            # 1. Valid artifact writes (.md, .json)
+            self.assertTrue(
+                is_safe_session_artifact_write(
+                    "write_to_file", {"TargetFile": artifact_md}, session_dir=session_dir
+                )
+            )
+            self.assertTrue(
+                is_safe_session_artifact_write(
+                    "replace_file_content", {"TargetFile": artifact_json}, session_dir=session_dir
+                )
+            )
+            self.assertTrue(
+                is_safe_session_artifact_write(
+                    "multi_replace_file_content",
+                    {"TargetFile": artifact_md},
+                    session_dir=session_dir,
+                )
+            )
+
+            # 2. Reject executable / non-artifact extensions (.sh)
+            self.assertFalse(
+                is_safe_session_artifact_write(
+                    "write_to_file", {"TargetFile": executable_sh}, session_dir=session_dir
+                )
+            )
+
+            # 3. Reject sensitive perimeter writes (.env)
+            self.assertFalse(
+                is_safe_session_artifact_write(
+                    "write_to_file", {"TargetFile": env_file}, session_dir=session_dir
+                )
+            )
+
+            # 4. Reject files outside session_dir
+            outside_md = "/tmp/other_dir/plan.md"
+            self.assertFalse(
+                is_safe_session_artifact_write(
+                    "write_to_file", {"TargetFile": outside_md}, session_dir=session_dir
+                )
+            )
+
+            # 5. Reject non-write tools
+            self.assertFalse(
+                is_safe_session_artifact_write(
+                    "view_file", {"AbsolutePath": artifact_md}, session_dir=session_dir
+                )
+            )
+
+            # 6. evaluate_static_policies fast-path returns ("allow", ..., "session_artifact")
+            res = evaluate_static_policies(
+                "write_to_file",
+                {"TargetFile": artifact_md},
                 session_dir=session_dir,
             )
             self.assertIsNotNone(res)
