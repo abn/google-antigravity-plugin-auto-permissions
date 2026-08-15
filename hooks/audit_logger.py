@@ -291,6 +291,10 @@ def generate_markdown_summary(
             mode_str = f"Static ACL ({latency:.1f}ms)"
         elif "intra_turn_cache" in risk_cat:
             mode_str = f"Turn Cache ({latency:.1f}ms)"
+        elif "same_turn_file_grant" in risk_cat:
+            mode_str = f"File Grant ({latency:.1f}ms)"
+        elif "safe_read_command" in risk_cat:
+            mode_str = f"Safe Read ({latency:.1f}ms)"
         elif "ungoverned_surface" in risk_cat:
             mode_str = f"Opt-in Surface ({latency:.1f}ms)"
         else:

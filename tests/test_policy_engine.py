@@ -9,8 +9,10 @@ from hooks.policy_engine import (
     PROJECT_LOCAL_CONFIG_REL_PATH,
     add_rule_to_scope,
     check_intra_turn_cache,
+    check_same_turn_file_grant,
     evaluate_static_policies,
     is_path_in_workspaces,
+    is_safe_read_only_command,
     is_safe_session_artifact_read,
     is_ungoverned_surface,
     load_custom_guidelines,
@@ -21,6 +23,7 @@ from hooks.policy_engine import (
     match_subagent,
     match_tool_against_rule,
     match_url,
+    normalize_command_string,
     parse_resource_rule,
     resolve_classifier_config,
     resolve_configured_model,
@@ -576,6 +579,97 @@ class TestPolicyEngine(unittest.TestCase):
         finally:
             if os.path.exists(log_path):
                 os.remove(log_path)
+
+    def test_normalize_command_string(self):
+        self.assertEqual(normalize_command_string(""), "")
+        self.assertEqual(normalize_command_string("   pytest    -v   "), "pytest -v")
+        self.assertEqual(normalize_command_string("git\tstatus\n-s"), "git status -s")
+
+    def test_is_safe_read_only_command(self):
+        # Safe read pipelines
+        self.assertTrue(is_safe_read_only_command("which uv"))
+        self.assertTrue(is_safe_read_only_command("wc -l README.md"))
+        self.assertTrue(is_safe_read_only_command("head -n 20 file.txt | grep foo"))
+        self.assertTrue(is_safe_read_only_command("uname -m"))
+        self.assertTrue(is_safe_read_only_command("file src/main.py"))
+        self.assertTrue(is_safe_read_only_command("du -sh ."))
+
+        # Dangerous or mutating commands (must be rejected)
+        self.assertFalse(is_safe_read_only_command("rm -rf /"))
+        self.assertFalse(is_safe_read_only_command("head -n 10 file.txt > output.txt"))
+        self.assertFalse(is_safe_read_only_command("cat file.txt >> log.txt"))
+        self.assertFalse(is_safe_read_only_command("echo $(cat ~/.ssh/id_rsa)"))
+        self.assertFalse(is_safe_read_only_command("head -n 10 file.txt | rm -rf"))
+        self.assertFalse(is_safe_read_only_command("cat /etc/shadow"))
+
+    def test_check_same_turn_file_grant(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target_file = os.path.join(tmpdir, "auth.py")
+            other_file = os.path.join(tmpdir, "other.py")
+            with open(target_file, "w") as f:
+                f.write("content")
+            with open(other_file, "w") as f:
+                f.write("other")
+
+            log_path = os.path.join(tmpdir, "audit.jsonl")
+            with open(log_path, "w", encoding="utf-8") as f:
+                f.write(
+                    json.dumps(
+                        {
+                            "stepIdx": 12,
+                            "toolCall": {
+                                "name": "replace_file_content",
+                                "args": {"TargetFile": target_file},
+                            },
+                            "hook_output": {"decision": "allow", "reason": "Edit authorized"},
+                        }
+                    )
+                    + "\n"
+                )
+
+            # Active turn starts at step 10
+            # 1. Subsequent edit to same authorized workspace file in active turn -> Grant
+            grant = check_same_turn_file_grant(
+                tool_name="replace_file_content",
+                tool_args={"TargetFile": target_file},
+                log_path=log_path,
+                last_user_step_idx=10,
+                workspace_paths=[tmpdir],
+            )
+            self.assertIsNotNone(grant)
+            self.assertEqual(grant[0], "allow")
+            self.assertIn("File grant", grant[1])
+
+            # 2. Multi-replace edit to same authorized workspace file in active turn -> Grant
+            multi_grant = check_same_turn_file_grant(
+                tool_name="multi_replace_file_content",
+                tool_args={"TargetFile": target_file},
+                log_path=log_path,
+                last_user_step_idx=10,
+                workspace_paths=[tmpdir],
+            )
+            self.assertIsNotNone(multi_grant)
+            self.assertEqual(multi_grant[0], "allow")
+
+            # 3. Unapproved file in same turn -> No grant (falls through to classifier)
+            miss_file = check_same_turn_file_grant(
+                tool_name="replace_file_content",
+                tool_args={"TargetFile": other_file},
+                log_path=log_path,
+                last_user_step_idx=10,
+                workspace_paths=[tmpdir],
+            )
+            self.assertIsNone(miss_file)
+
+            # 4. Same file but evaluated in prior turn (stepIdx 12 < active turn 15) -> Expired
+            miss_turn = check_same_turn_file_grant(
+                tool_name="replace_file_content",
+                tool_args={"TargetFile": target_file},
+                log_path=log_path,
+                last_user_step_idx=15,
+                workspace_paths=[tmpdir],
+            )
+            self.assertIsNone(miss_turn)
 
 
 if __name__ == "__main__":
