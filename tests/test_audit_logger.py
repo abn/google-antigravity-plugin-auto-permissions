@@ -170,6 +170,28 @@ class TestAuditLogger(unittest.TestCase):
         self.assertIn("Static ACL (0.2ms)", md)
         self.assertIn("Gemini (320ms)", md)
 
+    def test_generate_markdown_summary_multiline_sanitization(self):
+        multiline_cmd = "python3 -c '\nimport json\nimport os\nprint(\"ok\")\n'"
+        records = [
+            {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": multiline_cmd}},
+                "hook_output": {"decision": "allow", "reason": "Safe multiline"},
+                "classification": {
+                    "decision": "allow",
+                    "risk_category": "safe_routine",
+                    "latency_ms": 150.0,
+                },
+            }
+        ]
+
+        md = generate_markdown_summary(records, limit=1)
+        self.assertIsNotNone(md)
+        # Verify no raw newline splits inside the table row
+        table_lines = [line for line in md.split("\n") if line.startswith("| `run_command`")]
+        self.assertEqual(len(table_lines), 1)
+        # Verify all newlines were collapsed into spaces
+        self.assertIn("python3 -c ' import json import os print(\"...", table_lines[0])
+
 
 if __name__ == "__main__":
     unittest.main()
