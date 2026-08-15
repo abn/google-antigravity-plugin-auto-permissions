@@ -109,13 +109,12 @@ def read_user_prompts_from_transcript(
         prior_prompts = [f"[Turn {i}]: {p}" for i, p in enumerate(all_priors)]
         return prior_prompts, active_prompt
 
-    # Conversation exceeds max_history: preserve Turn 0 Session Goal + rolling recent turns
-    # Turn 0 anchor remains [Turn 0]: ...
-    # Recent turns preserve their exact original turn index (e.g. [Turn 6], [Turn 7], ...)
+    # Conversation exceeds max_history: preserve Turn 0 Anchor + rolling recent turns.
+    # Enforce immutable '[Turn 0]:' prefix to preserve byte-exact KV cache invariance across turns.
     start_recent_idx = total_priors - max_history
     session_anchor = all_priors[0]
 
-    prior_prompts = [f"[Turn 0 / Anchor]: {session_anchor}"]
+    prior_prompts = [f"[Turn 0]: {session_anchor}"]
     for idx in range(start_recent_idx, total_priors):
         if idx == 0:
             continue

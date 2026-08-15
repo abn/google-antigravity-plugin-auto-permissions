@@ -3,7 +3,7 @@ import json
 import unittest
 from unittest.mock import MagicMock, patch
 
-from hooks.classifier import classify_tool_call, format_classifier_payload
+from hooks.classifier import _clean_json_text, classify_tool_call, format_classifier_payload
 
 
 class TestClassifier(unittest.TestCase):
@@ -283,6 +283,40 @@ class TestClassifier(unittest.TestCase):
         self.assertIn("Connection refused", str(err))
         self.assertEqual(decision["decision"], "ask")
         self.assertEqual(decision["risk_category"], "classifier_error_fallback")
+
+    def test_clean_json_text_variants(self):
+        # 1. Plain JSON
+        self.assertEqual(
+            _clean_json_text('{"decision": "allow"}'),
+            '{"decision": "allow"}',
+        )
+
+        # 2. Markdown fence with json tag
+        fenced = '```json\n{"decision": "allow", "reason": "ok"}\n```'
+        self.assertEqual(
+            _clean_json_text(fenced),
+            '{"decision": "allow", "reason": "ok"}',
+        )
+
+        # 3. Conversational preamble + markdown fence + trailing commentary
+        conversational = (
+            "Here is the classification result:\n"
+            "```json\n"
+            '{"decision": "soft_deny", "reason": "out of scope"}\n'
+            "```\n"
+            "Let me know if you need anything else."
+        )
+        self.assertEqual(
+            _clean_json_text(conversational),
+            '{"decision": "soft_deny", "reason": "out of scope"}',
+        )
+
+        # 4. Unfenced JSON embedded in text
+        unfenced = 'Security verdict: {"decision": "ask", "reason": "check"} was determined.'
+        self.assertEqual(
+            _clean_json_text(unfenced),
+            '{"decision": "ask", "reason": "check"}',
+        )
 
 
 if __name__ == "__main__":
