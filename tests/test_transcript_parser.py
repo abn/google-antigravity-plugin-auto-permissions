@@ -111,7 +111,7 @@ class TestTranscriptParser(unittest.TestCase):
             self.assertEqual(
                 prior,
                 [
-                    "[Turn 0 / Anchor]: Turn 0: Push changes as you go to origin",
+                    "[Turn 0]: Turn 0: Push changes as you go to origin",
                     "[Turn 3]: Turn 3: Update colors",
                     "[Turn 4]: Turn 4: Fix responsive layout",
                     "[Turn 5]: Turn 5: Update tests",
