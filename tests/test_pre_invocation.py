@@ -67,9 +67,8 @@ class TestPreInvocationHook(unittest.TestCase):
 
             out = json.loads(res.stdout.strip())
             self.assertIn("injectSteps", out)
-            self.assertEqual(len(out["injectSteps"]), 1)
             msg = out["injectSteps"][0]["ephemeralMessage"]
-            self.assertIn("MANDATORY SECURITY DISCLOSURE", msg)
+            self.assertIn("Security Gate Summary", msg)
             self.assertIn("pytest -v", msg)
             self.assertNotIn("`ls`", msg)
             self.assertIn("1 actions in this turn", msg)

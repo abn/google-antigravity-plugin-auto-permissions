@@ -67,10 +67,9 @@ def main():
             return
 
         ephemeral_text = (
-            "### 🛡️ MANDATORY SECURITY DISCLOSURE\n"
-            "The security gate evaluated the following tool actions during this active turn. "
-            "At the conclusion of your final response, append the exact collapsible "
-            "Markdown summary below:\n\n"
+            "The security gate evaluated tool actions during this active turn. "
+            "At the conclusion of your final response, append ONLY the exact collapsible "
+            "Markdown summary below (do not include headers, titles, or preamble text):\n\n"
             f"{md_summary}\n"
         )
 
