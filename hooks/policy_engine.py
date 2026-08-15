@@ -732,6 +732,73 @@ def is_safe_session_artifact_read(
     return is_norm_in and is_real_in
 
 
+SAFE_ARTIFACT_WRITE_EXTENSIONS = {
+    ".md",
+    ".txt",
+    ".json",
+    ".jsonl",
+    ".csv",
+    ".tsv",
+    ".yaml",
+    ".yml",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".svg",
+    ".pdf",
+    ".html",
+    ".htm",
+    ".diff",
+    ".patch",
+}
+
+
+def is_safe_session_artifact_write(
+    tool_name: str,
+    tool_args: dict[str, Any],
+    session_dir: str | None = None,
+) -> bool:
+    """
+    Verifies if a file mutation tool call (write_to_file, replace_file_content,
+    multi_replace_file_content) is safely authoring or editing an artifact document, plan,
+    notes, or scratch file strictly within the active session's own directory
+    (<session_dir>/... or ~/.gemini/antigravity/brain/<session_id>/...).
+    Guarantees no writing of binary executables, shell scripts, or host-level credential files.
+    """
+    if tool_name not in ("write_to_file", "replace_file_content", "multi_replace_file_content"):
+        return False
+    if not session_dir or not os.path.isabs(session_dir):
+        return False
+
+    target_path = str(tool_args.get("TargetFile", "")).strip()
+    if not target_path:
+        return False
+
+    norm_target = os.path.abspath(os.path.expanduser(target_path))
+    real_target = os.path.realpath(norm_target)
+
+    # Hard defense: reject if real target touches sensitive system/credential targets
+    if (
+        is_sensitive_path(norm_target)
+        or is_sensitive_path(real_target)
+        or is_sensitive_write_path(norm_target)
+    ):
+        return False
+
+    # Check file extension against safe artifact extensions
+    _, ext = os.path.splitext(norm_target)
+    if ext.lower() not in SAFE_ARTIFACT_WRITE_EXTENSIONS:
+        return False
+
+    norm_session = os.path.abspath(session_dir)
+    real_session = os.path.realpath(norm_session)
+
+    # Validate target is strictly within the active session directory
+    is_norm_in = norm_target == norm_session or norm_target.startswith(norm_session + os.sep)
+    is_real_in = real_target == real_session or real_target.startswith(real_session + os.sep)
+    return is_norm_in and is_real_in
+
+
 SAFE_READ_BINARIES = {
     "which",
     "whereis",
@@ -902,6 +969,18 @@ def evaluate_workspace_write_fast_path(
     norm_target = os.path.abspath(os.path.expanduser(str(target_file)))
     if is_sensitive_write_path(norm_target):
         return None
+
+    if is_safe_session_artifact_write(
+        tool_name=tool_name,
+        tool_args=tool_args,
+        session_dir=session_dir,
+    ):
+        rel_name = os.path.basename(norm_target)
+        return (
+            "allow",
+            f"Safe session artifact write (session_artifact fast-path: {rel_name})",
+            "session_artifact",
+        )
 
     if not is_path_in_workspaces(norm_target, workspace_paths):
         return None
@@ -1521,6 +1600,19 @@ def evaluate_static_policies(
         return (
             "allow",
             f"Auto-approved active session artifact read for {tool_name}",
+            "session_artifact",
+        )
+
+    # 5.1 Built-in fast-path for active session artifact writes (plans, notes, drafts)
+    if is_safe_session_artifact_write(
+        tool_name=tool_name,
+        tool_args=tool_args,
+        session_dir=session_dir,
+    ):
+        rel_name = os.path.basename(str(tool_args.get("TargetFile", "")))
+        return (
+            "allow",
+            f"Auto-approved active session artifact write ({rel_name})",
             "session_artifact",
         )
 
