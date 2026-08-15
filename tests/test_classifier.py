@@ -201,6 +201,89 @@ class TestClassifier(unittest.TestCase):
         self.assertEqual(decision["decision"], "allow")
         self.assertEqual(decision["reason"], "Claude verified safe workspace operation")
 
+    @patch("urllib.request.urlopen")
+    def test_classify_tool_call_http_401_error_extraction(self, mock_urlopen):
+        import io
+        import urllib.error
+
+        error_body = json.dumps({"error": {"message": "Invalid API key provided"}}).encode("utf-8")
+        fp = io.BytesIO(error_body)
+        mock_urlopen.side_effect = urllib.error.HTTPError(
+            url="https://api.openai.com/v1/chat/completions",
+            code=401,
+            msg="Unauthorized",
+            hdrs={},
+            fp=fp,
+        )
+
+        raw_payload, decision, err, latency = classify_tool_call(
+            workspace_paths=["/tmp"],
+            prior_prompts=[],
+            active_prompt="Run tests",
+            tool_name="run_command",
+            tool_args={"CommandLine": "pytest"},
+            provider="openai",
+            model="gpt-4o-mini",
+            api_key="invalid-key",
+        )
+
+        self.assertIn("HTTP 401 Unauthorized", str(err))
+        self.assertIn("Invalid API key provided", str(err))
+        self.assertEqual(decision["decision"], "ask")
+        self.assertEqual(decision["risk_category"], "classifier_error_fallback")
+        self.assertIn("Invalid API key provided", decision["reason"])
+
+    @patch("urllib.request.urlopen")
+    def test_classify_tool_call_http_404_error_extraction(self, mock_urlopen):
+        import io
+        import urllib.error
+
+        error_body = json.dumps({"error": "Model 'gemma-99b' not found"}).encode("utf-8")
+        fp = io.BytesIO(error_body)
+        mock_urlopen.side_effect = urllib.error.HTTPError(
+            url="http://localhost:13305/v1/chat/completions",
+            code=404,
+            msg="Not Found",
+            hdrs={},
+            fp=fp,
+        )
+
+        raw_payload, decision, err, latency = classify_tool_call(
+            workspace_paths=["/tmp"],
+            prior_prompts=[],
+            active_prompt="Run tests",
+            tool_name="run_command",
+            tool_args={"CommandLine": "pytest"},
+            provider="openai",
+            model="gemma-99b",
+            endpoint_url="http://localhost:13305/v1/chat/completions",
+        )
+
+        self.assertIn("HTTP 404 Not Found", str(err))
+        self.assertIn("Model 'gemma-99b' not found", str(err))
+        self.assertEqual(decision["decision"], "ask")
+        self.assertEqual(decision["risk_category"], "classifier_error_fallback")
+
+    @patch("urllib.request.urlopen")
+    def test_classify_tool_call_connection_refused(self, mock_urlopen):
+        import urllib.error
+
+        mock_urlopen.side_effect = urllib.error.URLError(reason="[Errno 111] Connection refused")
+
+        raw_payload, decision, err, latency = classify_tool_call(
+            workspace_paths=["/tmp"],
+            prior_prompts=[],
+            active_prompt="Run tests",
+            tool_name="run_command",
+            tool_args={"CommandLine": "pytest"},
+            provider="openai",
+            endpoint_url="http://localhost:13305/v1/chat/completions",
+        )
+
+        self.assertIn("Connection refused", str(err))
+        self.assertEqual(decision["decision"], "ask")
+        self.assertEqual(decision["risk_category"], "classifier_error_fallback")
+
 
 if __name__ == "__main__":
     unittest.main()

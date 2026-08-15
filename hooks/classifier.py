@@ -341,6 +341,39 @@ def _call_anthropic_api(
         return _parse_decision_text(raw_text)
 
 
+def _format_request_error(exc: Exception) -> str:
+    """Extracts granular, sanitized HTTP error code and response payload snippet."""
+    if isinstance(exc, urllib.error.HTTPError):
+        body_snippet = ""
+        with contextlib.suppress(Exception):
+            raw_body = exc.read(512).decode("utf-8", errors="replace").strip()
+            if raw_body:
+                with contextlib.suppress(Exception):
+                    err_json = json.loads(raw_body)
+                    if isinstance(err_json, dict):
+                        if "error" in err_json:
+                            err_val = err_json["error"]
+                            if isinstance(err_val, dict) and "message" in err_val:
+                                body_snippet = str(err_val["message"])
+                            elif isinstance(err_val, str):
+                                body_snippet = err_val
+                        elif "message" in err_json:
+                            body_snippet = str(err_json["message"])
+                if not body_snippet:
+                    body_snippet = raw_body[:180].replace("\n", " ").strip()
+
+        if body_snippet:
+            return f"HTTP {exc.code} {exc.reason}: {body_snippet}"
+        return f"HTTP {exc.code} {exc.reason}"
+
+    if isinstance(exc, urllib.error.URLError):
+        reason = str(exc.reason)
+        return f"Network/Connection error: {reason}"
+    if isinstance(exc, TimeoutError):
+        return "Request timed out (>4.0s)"
+    return str(exc)
+
+
 def classify_tool_call(
     workspace_paths: list[str],
     prior_prompts: list[str],
@@ -412,15 +445,19 @@ def classify_tool_call(
                 timeout_secs=timeout_secs,
             )
 
+        classification["provider"] = norm_provider
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
         return raw_prompt, classification, None, elapsed_ms
 
     except Exception as exc:
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+        err_msg = _format_request_error(exc)
         fallback = {
             "decision": "ask",
-            "reason": f"Classifier fallback on error ({norm_provider}): {exc}",
-            "risk_category": "classifier_error",
+            "reason": f"Classifier fallback on error ({norm_provider}): {err_msg}",
+            "risk_category": "classifier_error_fallback",
             "confidence": 0.0,
+            "provider": norm_provider,
+            "error": err_msg,
         }
-        return raw_prompt, fallback, str(exc), elapsed_ms
+        return raw_prompt, fallback, err_msg, elapsed_ms

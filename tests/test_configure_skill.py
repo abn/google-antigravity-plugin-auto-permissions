@@ -115,6 +115,48 @@ class TestConfigureSkill(unittest.TestCase):
             self.assertIn("Auto-Permissions Effective Configuration", md)
             self.assertIn("Policy Scopes & Rules", md)
 
+    def test_probe_classifier_provider(self):
+        from unittest.mock import patch
+
+        probe_fn = configure_permissions.probe_classifier_provider
+
+        # Test success path
+        with patch("hooks.classifier.classify_tool_call") as mock_classify:
+            mock_classify.return_value = (
+                "<payload>",
+                {"decision": "allow", "reason": "Safe", "risk_category": "safe_routine"},
+                None,
+                15.2,
+            )
+            is_healthy, msg, latency = probe_fn(
+                provider="openai",
+                model="gemma-4-it",
+                endpoint_url="http://localhost:13305/v1/chat/completions",
+            )
+            self.assertTrue(is_healthy)
+            self.assertIn("Connected to openai (gemma-4-it)", msg)
+            self.assertEqual(latency, 15.2)
+
+        # Test failure path
+        with patch("hooks.classifier.classify_tool_call") as mock_classify:
+            mock_classify.return_value = (
+                "<payload>",
+                {
+                    "decision": "ask",
+                    "reason": "Classifier fallback on error (openai): HTTP 401 Unauthorized",
+                    "risk_category": "classifier_error_fallback",
+                },
+                "HTTP 401 Unauthorized: Invalid key",
+                8.4,
+            )
+            is_healthy, msg, latency = probe_fn(
+                provider="openai",
+                model="gemma-4-it",
+                endpoint_url="http://localhost:13305/v1/chat/completions",
+            )
+            self.assertFalse(is_healthy)
+            self.assertIn("HTTP 401 Unauthorized", msg)
+
 
 if __name__ == "__main__":
     unittest.main()
