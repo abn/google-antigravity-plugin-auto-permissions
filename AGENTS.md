@@ -104,6 +104,7 @@ auto-permissions/
 │   ├── test_pre_invocation.py               # Unit tests for PreInvocation hook
 │   ├── test_fix_permissions.py              # Unit tests for policy remediation rule derivation
 │   ├── test_permission_skill.py             # Unit tests for test_permission simulation CLI
+│   ├── test_package_plugin.py               # Unit tests for release packaging & manifest validation
 │   └── test_gate_e2e.py                     # End-to-end hook simulation tests
 ├── README.md                                # General project documentation
 └── AGENTS.md                                # This file
