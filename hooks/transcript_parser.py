@@ -9,6 +9,33 @@ import json
 import os
 
 
+def sanitize_user_prompt(text: str) -> str:
+    """
+    Extracts strictly the core user request, stripping volatile metadata,
+    timestamps, and settings change envelopes for byte-stable prompt caching.
+    """
+    if not text:
+        return ""
+
+    # Extract content within <USER_REQUEST> if present
+    if "<USER_REQUEST>" in text and "</USER_REQUEST>" in text:
+        start = text.find("<USER_REQUEST>") + len("<USER_REQUEST>")
+        end = text.find("</USER_REQUEST>", start)
+        if end != -1:
+            text = text[start:end].strip()
+
+    # Strip any remaining XML envelope wrappers
+    for tag in ("ADDITIONAL_METADATA", "USER_SETTINGS_CHANGE", "SKILL"):
+        open_tag = f"<{tag}>"
+        close_tag = f"</{tag}>"
+        while open_tag in text and close_tag in text:
+            start = text.find(open_tag)
+            end = text.find(close_tag, start) + len(close_tag)
+            text = (text[:start] + text[end:]).strip()
+
+    return text.strip()
+
+
 def extract_user_content(step_obj: dict) -> str | None:
     """Extracts raw text from a transcript step JSON object if it is a user input."""
     step_type = step_obj.get("type", "")
@@ -16,10 +43,9 @@ def extract_user_content(step_obj: dict) -> str | None:
 
     if step_type in ("USER_INPUT", "USER_MESSAGE") or source in ("USER_EXPLICIT", "USER"):
         content = step_obj.get("content", "")
+        raw_text = ""
         if isinstance(content, str):
-            text = content.strip()
-            if text:
-                return text
+            raw_text = content.strip()
         elif isinstance(content, list):
             texts = []
             for part in content:
@@ -27,13 +53,13 @@ def extract_user_content(step_obj: dict) -> str | None:
                     texts.append(part)
                 elif isinstance(part, dict) and "text" in part:
                     texts.append(part["text"])
-            combined = "\n".join(texts).strip()
-            if combined:
-                return combined
+            raw_text = "\n".join(texts).strip()
         elif isinstance(content, dict) and "text" in content:
-            text = str(content["text"]).strip()
-            if text:
-                return text
+            raw_text = str(content["text"]).strip()
+
+        if raw_text:
+            cleaned = sanitize_user_prompt(raw_text)
+            return cleaned or raw_text
     return None
 
 
@@ -42,11 +68,12 @@ def read_user_prompts_from_transcript(
 ) -> tuple[list[str], str | None]:
     """
     Parses transcript.jsonl to extract prior user prompts and the active user prompt.
-    Preserves initial Turn 0 (Session Goal / Anchor) if conversation exceeds max_history turns.
+    Labels prior turns with absolute chronological turn numbers ([Turn 0], [Turn 1], ...)
+    to guarantee byte-stable prefix caching across turns.
 
     Returns:
         Tuple of (prior_prompts, active_prompt):
-        - prior_prompts: List of previous user prompts (Turn 0 anchor + rolling recent turns)
+        - prior_prompts: List of labeled previous user prompts (Turn 0 anchor + rolling turns)
         - active_prompt: Most recent user prompt, or None if not found
     """
     if not transcript_path or not os.path.isfile(transcript_path):
@@ -76,17 +103,23 @@ def read_user_prompts_from_transcript(
     if not all_priors:
         return [], active_prompt
 
-    if len(all_priors) <= max_history:
-        return all_priors, active_prompt
+    total_priors = len(all_priors)
+    if total_priors <= max_history:
+        # Absolute chronological labeling: [Turn 0], [Turn 1], ...
+        prior_prompts = [f"[Turn {i}]: {p}" for i, p in enumerate(all_priors)]
+        return prior_prompts, active_prompt
 
     # Conversation exceeds max_history: preserve Turn 0 Session Goal + rolling recent turns
+    # Turn 0 anchor remains [Turn 0]: ...
+    # Recent turns preserve their exact original turn index (e.g. [Turn 6], [Turn 7], ...)
+    start_recent_idx = total_priors - max_history
     session_anchor = all_priors[0]
-    rolling_recent = all_priors[-max_history:]
 
-    if session_anchor not in rolling_recent:
-        prior_prompts = [f"[Session Goal / Turn 0]: {session_anchor}"] + rolling_recent
-    else:
-        prior_prompts = rolling_recent
+    prior_prompts = [f"[Turn 0 / Anchor]: {session_anchor}"]
+    for idx in range(start_recent_idx, total_priors):
+        if idx == 0:
+            continue
+        prior_prompts.append(f"[Turn {idx}]: {all_priors[idx]}")
 
     return prior_prompts, active_prompt
 
