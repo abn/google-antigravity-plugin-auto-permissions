@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.4.0...auto-permissions-v0.5.0) (2026-08-15)
+
+
+### Features
+
+* **classifier:** add pre-flight health probes, granular http error extraction, and prominent fallback disclosure ([#21](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/21)) ([fac4034](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/fac4034cfc6ce060e2779f37c0fda9eaadc454c1))
+* **policy:** add opt-out trust_workspace_writes fast-path with sensitive perimeter defense ([#23](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/23)) ([549f7c9](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/549f7c9185b9a373887b248ed83462200e23e84b))
+
+
+### Documentation
+
+* **skill:** enforce sequential branching and api-key prompt in configure wizard ([#19](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/19)) ([8c589ca](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/8c589ca8ffcd7d44c395d6d19ff8b0b0303c7c61))
+
 ## [0.4.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.3.0...auto-permissions-v0.4.0) (2026-08-15)
 
 
