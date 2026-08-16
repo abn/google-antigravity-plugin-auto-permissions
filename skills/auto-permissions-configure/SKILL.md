@@ -51,11 +51,17 @@ Prompt the user to choose the target scope and customization category:
 
 #### Branch B: If LLM Provider & Model was chosen:
 1. **Turn 2 (Provider Selection):** Ask *only* for the provider protocol:
-   - `Google Gemini` (Official Google REST API)
+   - `Inbuilt Antigravity (Zero-Key Persistent Worker)` [Recommended] (Uses active Antigravity session & Language Server daemon on 127.0.0.1:4020)
+   - `Google Cloud Code OAuth` (Direct Cloud Code Assist REST API using Google OAuth token)
+   - `Google Gemini` (Official Google AI Studio REST API with API key)
    - `Local / OpenAI-compatible` (Lemonade, vLLM, Ollama)
    - `Anthropic Claude` (Anthropic Messages API)
 
 2. **Turn 3 (Provider-Specific Configuration):**
+   * **If Inbuilt Antigravity:**
+     - Zero configuration required! Sets `--provider antigravity`.
+   * **If Google Cloud Code OAuth:**
+     - Prompt for optional project ID (default: current workspace project). Sets `--provider cloudcode`.
    * **If Google Gemini:**
      - Prompt for Gemini model (`gemini-2.5-flash` [Recommended], `gemini-2.5-pro`, `gemini-2.0-flash`).
      - Prompt for API key environment variable (default: `GEMINI_API_KEY`).

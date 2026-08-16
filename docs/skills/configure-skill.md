@@ -50,6 +50,10 @@ python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
 python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
   --scope project --allow "command(cargo check*)"
 
+# Configure zero-key inbuilt Antigravity session
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --scope project --provider antigravity
+
 # Configure model endpoint
 python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
   --scope project_local --provider anthropic --model claude-3-5-haiku-20241022
