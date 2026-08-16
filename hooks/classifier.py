@@ -9,6 +9,8 @@ import contextlib
 import json
 import os
 import re
+import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -189,6 +191,72 @@ def _parse_decision_text(raw_text: str) -> dict[str, Any]:
     }
 
 
+def _probe_sidecar_health(port: int = 4020, timeout_secs: float = 0.2) -> bool:
+    """Checks if the local sidecar worker is responsive on its /health endpoint."""
+    url = f"http://127.0.0.1:{port}/health"
+    try:
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=timeout_secs) as resp:
+            if resp.status == 200:
+                data = json.loads(resp.read().decode("utf-8"))
+                return data.get("status") == "ok"
+    except Exception:
+        return False
+    return False
+
+
+def _resolve_sidecar_worker_script() -> str | None:
+    """Resolves absolute path to sidecars/worker.py across relative and plugin paths."""
+    candidates = [
+        os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "sidecars",
+            "worker.py",
+        ),
+        os.path.expanduser("~/.gemini/config/plugins/auto-permissions/sidecars/worker.py"),
+        os.path.expanduser("~/.config/antigravity/sidecars/worker.py"),
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def _ensure_sidecar_running(port: int = 4020, max_wait_secs: float = 1.0) -> bool:
+    """
+    Ensures the persistent sidecar worker daemon is running on 127.0.0.1:port,
+    auto-spawning it in the background if offline.
+    """
+    if _probe_sidecar_health(port=port, timeout_secs=0.15):
+        return True
+
+    worker_script = _resolve_sidecar_worker_script()
+    if not worker_script:
+        return False
+
+    try:
+        env = os.environ.copy()
+        env["AUTO_PERMISSIONS_SIDECAR_PORT"] = str(port)
+        subprocess.Popen(
+            [sys.executable, worker_script],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            env=env,
+        )
+    except Exception:
+        return False
+
+    # Poll /health until ready or timeout
+    start_poll = time.perf_counter()
+    while (time.perf_counter() - start_poll) < max_wait_secs:
+        time.sleep(0.05)
+        if _probe_sidecar_health(port=port, timeout_secs=0.15):
+            return True
+
+    return False
+
+
 def _call_antigravity_sidecar_api(
     raw_prompt: str,
     timeout_secs: float = DEFAULT_TIMEOUT_SECS,
@@ -198,8 +266,11 @@ def _call_antigravity_sidecar_api(
     Queries the local persistent auto-permissions sidecar worker.
     Connects to 127.0.0.1:4020 (or AUTO_PERMISSIONS_SIDECAR_PORT) to leverage
     Antigravity's active Language Server session without an explicit API key.
+    Auto-spawns the worker daemon in the background if offline.
     """
     effective_port = port or int(os.environ.get("AUTO_PERMISSIONS_SIDECAR_PORT", "4020"))
+    _ensure_sidecar_running(port=effective_port, max_wait_secs=1.0)
+
     url = f"http://127.0.0.1:{effective_port}/classify"
     data = json.dumps({"raw_prompt": raw_prompt, "timeout_secs": timeout_secs}).encode("utf-8")
     headers = {"Content-Type": "application/json"}
