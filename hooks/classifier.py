@@ -272,7 +272,14 @@ def _call_antigravity_sidecar_api(
     _ensure_sidecar_running(port=effective_port, max_wait_secs=1.0)
 
     url = f"http://127.0.0.1:{effective_port}/classify"
-    data = json.dumps({"raw_prompt": raw_prompt, "timeout_secs": timeout_secs}).encode("utf-8")
+    payload = {
+        "raw_prompt": raw_prompt,
+        "timeout_secs": timeout_secs,
+        "ls_address": os.environ.get("ANTIGRAVITY_LS_ADDRESS"),
+        "csrf_token": os.environ.get("ANTIGRAVITY_CSRF_TOKEN"),
+        "project_id": os.environ.get("ANTIGRAVITY_PROJECT_ID"),
+    }
+    data = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     with urllib.request.urlopen(req, timeout=timeout_secs) as resp:

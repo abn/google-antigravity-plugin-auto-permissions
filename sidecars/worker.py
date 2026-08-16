@@ -86,8 +86,26 @@ class ClassifierWorkerState:
             self.trajectory_id = traj_id
             return self.trajectory_id
 
-    def classify_payload(self, raw_prompt: str, timeout: float = 5.0) -> dict[str, Any]:
+    def classify_payload(
+        self,
+        raw_prompt: str,
+        timeout: float = 5.0,
+        ls_address: str | None = None,
+        csrf_token: str | None = None,
+        project_id: str | None = None,
+    ) -> dict[str, Any]:
         """Submits classification request to the persistent worker trajectory."""
+        with self.lock:
+            if ls_address and ls_address != self.ls_address:
+                self.ls_address = ls_address
+                self.trajectory_id = None
+            if csrf_token and csrf_token != self.csrf_token:
+                self.csrf_token = csrf_token
+                self.trajectory_id = None
+            if project_id and project_id != self.project_id:
+                self.project_id = project_id
+                self.trajectory_id = None
+
         traj_id = self.get_or_create_trajectory()
         res = self.call_ls_rpc(
             "HandleCascadeUserInteraction",
@@ -155,8 +173,17 @@ class ClassifierHTTPHandler(BaseHTTPRequestHandler):
                 req_data = json.loads(body)
                 raw_prompt = req_data.get("raw_prompt", "")
                 timeout = float(req_data.get("timeout_secs", 5.0))
+                ls_address = req_data.get("ls_address")
+                csrf_token = req_data.get("csrf_token")
+                project_id = req_data.get("project_id")
 
-                classification = WORKER_STATE.classify_payload(raw_prompt, timeout=timeout)
+                classification = WORKER_STATE.classify_payload(
+                    raw_prompt,
+                    timeout=timeout,
+                    ls_address=ls_address,
+                    csrf_token=csrf_token,
+                    project_id=project_id,
+                )
                 self._send_json(200, classification)
             except Exception as e:
                 self._send_json(
