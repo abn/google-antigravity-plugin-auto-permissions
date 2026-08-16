@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import re
 import tempfile
 import unittest
 
@@ -221,6 +222,39 @@ class TestAuditLogger(unittest.TestCase):
         self.assertIsNotNone(md)
         self.assertIn("⚠️ Fallback (HTTP 401 / 142ms)", md)
         self.assertIn("⚠️ Fallback (Offline / 12ms)", md)
+
+    def test_generate_markdown_summary_escapes_pipes_in_target(self):
+        records = [
+            {
+                "toolCall": {
+                    "name": "run_command",
+                    "args": {
+                        "CommandLine": 'lspci -nn -k | grep -E -A 3 "Processing|accel|NPU" '
+                        "; ls -la /sys/bus/pci/drivers/amdxdna/"
+                    },
+                },
+                "hook_output": {"decision": "allow", "reason": "safe diagnostics"},
+                "classification": {
+                    "decision": "allow",
+                    "risk_category": "safe_routine",
+                    "latency_ms": 100.0,
+                },
+            }
+        ]
+
+        md = generate_markdown_summary(records, limit=1)
+        # Escaped pipes are present so the Target cell cannot split the table.
+        self.assertIn("\\|", md)
+        # Every table row must still render as exactly 4 columns (split only on
+        # unescaped pipes).
+        for line in md.splitlines():
+            if line.startswith("| `"):
+                cells = [c for c in re.split(r"(?<!\\)\|", line) if c.strip()]
+                self.assertEqual(
+                    len(cells),
+                    4,
+                    f"row has wrong column count (pipe escaping broken): {line!r}",
+                )
 
 
 if __name__ == "__main__":

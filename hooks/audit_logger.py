@@ -314,6 +314,8 @@ def generate_markdown_summary(
         # Collapse all newlines, carriage returns, tabs, and backticks into single-line snippet
         cleaned_cmd = " ".join(raw_cmd.replace("`", "").split()).strip()
         cmd_snippet = cleaned_cmd[:42] + "..." if len(cleaned_cmd) > 45 else cleaned_cmd
+        # Escape pipe so the Target cell cannot split the Markdown table columns.
+        cmd_snippet = cmd_snippet.replace("|", "\\|")
 
         dec = r.get("hook_output", {}).get("decision", "unknown").lower()
         if dec == "allow":
