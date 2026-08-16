@@ -68,9 +68,9 @@ export GEMINI_API_KEY="your-api-key"
 
 ---
 
-## Architecture & Design Specification
+## Architecture & Knowledge Base (OKF 0.2)
 
-For complete details on the security principles, decoupled classifier blinding mechanics, threat modeling, state machine taxonomy, and latency benchmarks, see the **[Architecture & Technical Design Specification](docs/architecture.md)**.
+For complete technical specifications, security models, empirical benchmarks, and operational guides, explore the **[Open Knowledge Format (OKF 0.2) Documentation Wiki](docs/index.md)** or the monolithic **[Architecture Specification](docs/architecture.md)**.
 
 ---
 
@@ -424,7 +424,14 @@ auto-permissions/
 │       └── scripts/
 │           └── test_permission.py          # Classifier simulation CLI
 ├── docs/
-│   └── architecture.md                      # Comprehensive technical architecture
+│   ├── index.md                             # OKF 0.2 Wiki root catalog & concept graph
+│   ├── logs.md                              # Knowledge evolution & provenance log
+│   ├── architecture.md                      # Comprehensive technical architecture
+│   ├── architecture/                        # Modular architecture specifications
+│   ├── guides/                              # Developer & operational guides
+│   ├── skills/                              # Agent skills reference & workflows
+│   ├── benchmarks/                          # Empirical benchmarks & latency analysis
+│   └── reference/                           # Policy schemas, bundle catalog & rule syntax
 └── tests/
     ├── test_bundles.py                      # Unit tests for permission bundles & resolution
     ├── test_configure_skill.py              # Unit tests for configure CLI

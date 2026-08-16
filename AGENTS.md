@@ -92,9 +92,15 @@ auto-permissions/
 │   └── auto-permissions-test/
 │       ├── SKILL.md                         # Policy & classifier simulation procedure
 │       └── scripts/
-│           └── test_permission.py          # Classifier simulation CLI
 ├── docs/
-│   └── architecture.md                      # Comprehensive design specification
+│   ├── index.md                             # OKF 0.2 Wiki root catalog & concept graph
+│   ├── logs.md                              # Knowledge evolution & provenance log
+│   ├── architecture.md                      # Comprehensive design specification
+│   ├── architecture/                        # Deep design specifications (Security, KV-Cache, Sandboxing)
+│   ├── guides/                              # Developer & operational guides
+│   ├── skills/                              # Agent skills reference & workflows
+│   ├── benchmarks/                          # Empirical latency & token economics validation
+│   └── reference/                           # JSON schemas, bundle catalog, and rule syntax
 ├── tests/
 │   ├── test_configure_skill.py              # Unit tests for policy configuration skill
 │   ├── test_transcript_parser.py            # Unit tests for transcript parser
