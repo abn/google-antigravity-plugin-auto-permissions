@@ -550,6 +550,76 @@ class TestAntigravityLanguageServer(unittest.TestCase):
         mock_sidecar.assert_called_once()
         self.assertEqual(parsed["decision"], "ask")
 
+    def test_antigravity_dispatcher_falls_back_to_sidecar_on_origin_rejection(self):
+        import io
+        import urllib.error
+
+        origin_err = urllib.error.HTTPError(
+            url="https://127.0.0.1:39974/exa.language_server_pb.LanguageServerService/GetModelResponse",
+            code=400,
+            msg="Bad Request",
+            hdrs={},
+            fp=io.BytesIO(b"Direct IP access is not allowed"),
+        )
+        with (
+            patch.dict(os.environ, {"ANTIGRAVITY_LS_ADDRESS": "127.0.0.1:39974"}),
+            patch("hooks.classifier._antigravity_ls_direct", side_effect=origin_err) as mock_direct,
+            patch(
+                "hooks.classifier._call_antigravity_sidecar",
+                return_value={"decision": "ask"},
+            ) as mock_sidecar,
+        ):
+            parsed = _call_antigravity_ls_api("prompt")
+        mock_direct.assert_called_once()
+        mock_sidecar.assert_called_once()
+        self.assertEqual(parsed["decision"], "ask")
+
+    def test_antigravity_dispatcher_does_not_fallback_on_other_errors(self):
+        with (
+            patch.dict(os.environ, {"ANTIGRAVITY_LS_ADDRESS": "127.0.0.1:39974"}),
+            patch("hooks.classifier._antigravity_ls_direct", side_effect=RuntimeError("boom")),
+            patch("hooks.classifier._call_antigravity_sidecar") as mock_sidecar,
+            self.assertRaises(RuntimeError),
+        ):
+            _call_antigravity_ls_api("prompt")
+        mock_sidecar.assert_not_called()
+
+    def test_antigravity_dispatcher_falls_back_to_sidecar_on_connection_refused(self):
+        import urllib.error
+
+        refused = urllib.error.URLError(ConnectionRefusedError(111, "Connection refused"))
+        with (
+            patch.dict(os.environ, {"ANTIGRAVITY_LS_ADDRESS": "127.0.0.1:39974"}),
+            patch("hooks.classifier._antigravity_ls_direct", side_effect=refused),
+            patch(
+                "hooks.classifier._call_antigravity_sidecar",
+                return_value={"decision": "allow"},
+            ) as mock_sidecar,
+        ):
+            parsed = _call_antigravity_ls_api("prompt")
+        mock_sidecar.assert_called_once()
+        self.assertEqual(parsed["decision"], "allow")
+
+    def test_antigravity_dispatcher_does_not_fallback_on_real_http_404(self):
+        import io
+        import urllib.error
+
+        not_found = urllib.error.HTTPError(
+            url="https://127.0.0.1:39974/exa.language_server_pb.LanguageServerService/GetModelResponse",
+            code=404,
+            msg="Not Found",
+            hdrs={},
+            fp=io.BytesIO(b'{"error": {"message": "unknown model"}}'),
+        )
+        with (
+            patch.dict(os.environ, {"ANTIGRAVITY_LS_ADDRESS": "127.0.0.1:39974"}),
+            patch("hooks.classifier._antigravity_ls_direct", side_effect=not_found),
+            patch("hooks.classifier._call_antigravity_sidecar") as mock_sidecar,
+            self.assertRaises(urllib.error.HTTPError),
+        ):
+            _call_antigravity_ls_api("prompt")
+        mock_sidecar.assert_not_called()
+
     def test_call_antigravity_sidecar_posts_to_classify(self):
         server = _LocalSidecarServer()
         try:

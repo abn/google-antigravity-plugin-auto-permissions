@@ -10,6 +10,8 @@ Use this skill when the user asks to measure or validate the accuracy of a class
 
 The benchmark runs a fixed set of labeled `(prompt, tool, arguments)` cases — covering safe routines, workspace writes/reads, external actions, destructive operations, and credential exfiltration — and reports whether each verdict lands in the accepted set plus an overall accuracy score.
 
+**Run the script directly** (`benchmark_accuracy.py ...`). It handles Language Server connectivity itself via the plugin sidecar; do NOT hand-probe the Language Server from the sandbox — direct loopback requests are rejected by the LS origin check (`Direct IP access is not allowed`) even when `ANTIGRAVITY_LS_ADDRESS` is present. The script classifies through `classify_tool_call`, which falls back to the sidecar automatically.
+
 ---
 
 ## Usage Recipes

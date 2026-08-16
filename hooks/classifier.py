@@ -409,6 +409,27 @@ def _call_antigravity_sidecar(
         return json.loads(resp.read().decode("utf-8"))
 
 
+def _ls_direct_unusable(exc: Exception) -> bool:
+    """True when the direct Language Server path is unusable from this context.
+
+    Sandboxed tool executions cannot reach the LS loopback at all (URLError,
+    e.g. Errno 111 Connection refused) or are rejected by the LS origin check
+    (HTTP 400 "Direct IP access is not allowed"). In both cases the bundled
+    plugin sidecar — a sanctioned Antigravity process that reaches the LS —
+    must be used instead. Genuine API errors (401/404/5xx) are NOT treated as
+    unreachable; they indicate real model/config problems.
+    """
+    if isinstance(exc, urllib.error.HTTPError):
+        # Only the origin-check 400 means "use the sidecar"; other HTTP statuses
+        # are real API/model errors that must surface, not fall back.
+        if exc.code == 400:
+            with contextlib.suppress(Exception):
+                body = exc.read(256).decode("utf-8", errors="replace")
+                return "Direct IP access" in body or "origin" in body.lower()
+        return False
+    return bool(isinstance(exc, urllib.error.URLError))
+
+
 def _call_antigravity_ls_api(
     raw_prompt: str,
     model: str | None = None,
@@ -418,15 +439,22 @@ def _call_antigravity_ls_api(
 
     Prefers a direct single-turn GetModelResponse against the Language Server
     when the injected environment (ANTIGRAVITY_LS_ADDRESS) is available — the
-    sidecar/tool-execution contexts. PreToolUse hooks lack that environment, so
-    the bundled plugin sidecar is used instead (which has it injected).
+    host sidecar/tool-execution contexts. Falls back to the bundled plugin
+    sidecar when the direct path is unreachable (sandboxed tool executions get
+    connection-refused or the LS origin check rejects the loopback) or when the
+    hook runs without the LS environment.
     """
     if os.environ.get("ANTIGRAVITY_LS_ADDRESS"):
-        return _antigravity_ls_direct(
-            raw_prompt=raw_prompt,
-            model=model,
-            timeout_secs=timeout_secs,
-        )
+        try:
+            return _antigravity_ls_direct(
+                raw_prompt=raw_prompt,
+                model=model,
+                timeout_secs=timeout_secs,
+            )
+        except Exception as exc:
+            if _ls_direct_unusable(exc):
+                return _call_antigravity_sidecar(raw_prompt=raw_prompt, timeout_secs=timeout_secs)
+            raise
     return _call_antigravity_sidecar(raw_prompt=raw_prompt, timeout_secs=timeout_secs)
 
 
