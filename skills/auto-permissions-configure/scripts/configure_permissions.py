@@ -306,8 +306,19 @@ def main():
     parser.add_argument(
         "--provider",
         "-P",
-        choices=["google", "openai", "anthropic", "gemini", "claude"],
-        help="Set classifier provider protocol (google, openai, anthropic).",
+        choices=[
+            "google",
+            "openai",
+            "anthropic",
+            "gemini",
+            "claude",
+            "antigravity",
+            "sidecar",
+            "worker",
+            "cloudcode",
+            "oauth",
+        ],
+        help="Set classifier provider protocol (antigravity, google, cloudcode, etc.).",
     )
     parser.add_argument(
         "--model",
@@ -561,6 +572,10 @@ def main():
             provider = "google"
         elif provider == "claude":
             provider = "anthropic"
+        elif provider in ("sidecar", "worker"):
+            provider = "antigravity"
+        elif provider == "oauth":
+            provider = "cloudcode"
         model = args.model or eff_config["model"]
         endpoint_url = args.endpoint_url or eff_config["endpoint_url"]
         api_key = args.api_key or eff_config["api_key"]
@@ -602,6 +617,10 @@ def main():
             p = "google"
         elif p == "claude":
             p = "anthropic"
+        elif p in ("sidecar", "worker"):
+            p = "antigravity"
+        elif p == "oauth":
+            p = "cloudcode"
         classifier_settings["provider"] = p
     if args.model:
         classifier_settings["model"] = args.model.strip()
