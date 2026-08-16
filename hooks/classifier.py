@@ -2,15 +2,15 @@
 """
 Security Authorization Classifier for Google Antigravity Auto-Permissions Hook.
 Evaluates proposed tool actions against user intent using Google Gemini, OpenAI-wire,
-or Anthropic Claude endpoints with zero external runtime dependencies.
+Anthropric Claude, or direct Antigravity Language Server Connect-RPC endpoints
+with zero external runtime dependencies.
 """
 
 import contextlib
 import json
 import os
 import re
-import subprocess
-import sys
+import ssl
 import time
 import urllib.error
 import urllib.request
@@ -24,6 +24,7 @@ GOOGLE_ENDPOINT_TEMPLATE = (
 )
 OPENAI_DEFAULT_ENDPOINT = "https://api.openai.com/v1/chat/completions"
 ANTHROPIC_DEFAULT_ENDPOINT = "https://api.anthropic.com/v1/messages"
+DEFAULT_ANTIGRAVITY_MODEL = "MODEL_GOOGLE_GEMINI_2_5_FLASH"
 
 SYSTEM_INSTRUCTION = (
     "You are a strict security authorization classifier for an autonomous coding agent.\n"
@@ -191,99 +192,307 @@ def _parse_decision_text(raw_text: str) -> dict[str, Any]:
     }
 
 
-def _probe_sidecar_health(port: int = 4020, timeout_secs: float = 0.2) -> bool:
-    """Checks if the local sidecar worker is responsive on its /health endpoint."""
-    url = f"http://127.0.0.1:{port}/health"
-    try:
-        req = urllib.request.Request(url, method="GET")
-        with urllib.request.urlopen(req, timeout=timeout_secs) as resp:
-            if resp.status == 200:
-                data = json.loads(resp.read().decode("utf-8"))
-                return data.get("status") == "ok"
-    except Exception:
-        return False
-    return False
+def _get_unverified_ssl_context() -> ssl.SSLContext:
+    """Creates an SSL context for loopback HTTPS connections to the Language Server."""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
 
 
-def _resolve_sidecar_worker_script() -> str | None:
-    """Resolves absolute path to sidecars/worker.py across relative and plugin paths."""
-    candidates = [
-        os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "sidecars",
-            "worker.py",
-        ),
-        os.path.expanduser("~/.gemini/config/plugins/auto-permissions/sidecars/worker.py"),
-        os.path.expanduser("~/.config/antigravity/sidecars/worker.py"),
-    ]
-    for path in candidates:
-        if os.path.isfile(path):
-            return path
-    return None
-
-
-def _ensure_sidecar_running(port: int = 4020, max_wait_secs: float = 1.0) -> bool:
+def _resolve_ls_endpoint() -> tuple[str, str | None]:
     """
-    Ensures the persistent sidecar worker daemon is running on 127.0.0.1:port,
-    auto-spawning it in the background if offline.
+    Resolves the Language Server base URL and CSRF token from Antigravity-injected
+    environment variables. Returns (base_url, csrf_token).
     """
-    if _probe_sidecar_health(port=port, timeout_secs=0.15):
-        return True
+    ls_address = os.environ.get("ANTIGRAVITY_LS_ADDRESS", "")
+    csrf_token = os.environ.get("ANTIGRAVITY_CSRF_TOKEN")
 
-    worker_script = _resolve_sidecar_worker_script()
-    if not worker_script:
-        return False
+    if not ls_address:
+        return "", None
 
-    try:
-        env = os.environ.copy()
-        env["AUTO_PERMISSIONS_SIDECAR_PORT"] = str(port)
-        subprocess.Popen(
-            [sys.executable, worker_script],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-            env=env,
-        )
-    except Exception:
-        return False
-
-    # Poll /health until ready or timeout
-    start_poll = time.perf_counter()
-    while (time.perf_counter() - start_poll) < max_wait_secs:
-        time.sleep(0.05)
-        if _probe_sidecar_health(port=port, timeout_secs=0.15):
-            return True
-
-    return False
+    clean_addr = ls_address.strip()
+    if not clean_addr.startswith("http://") and not clean_addr.startswith("https://"):
+        # The Language Server's loopback listener is HTTPS (self-signed); the
+        # injected ANTIGRAVITY_LS_ADDRESS carries only host:port. Default to
+        # HTTPS so the unverified-context handler below is actually used.
+        clean_addr = f"https://{clean_addr}"
+    clean_addr = clean_addr.replace("localhost", "127.0.0.1")
+    return clean_addr, csrf_token
 
 
-def _call_antigravity_sidecar_api(
-    raw_prompt: str,
-    timeout_secs: float = DEFAULT_TIMEOUT_SECS,
-    port: int | None = None,
+def _call_ls_rpc(
+    method: str,
+    payload: dict[str, Any],
+    timeout: float = 6.0,
 ) -> dict[str, Any]:
     """
-    Queries the local persistent auto-permissions sidecar worker.
-    Connects to 127.0.0.1:4020 (or AUTO_PERMISSIONS_SIDECAR_PORT) to leverage
-    Antigravity's active Language Server session without an explicit API key.
-    Auto-spawns the worker daemon in the background if offline.
+    Calls a Connect-RPC method on the local Language Server.
+    Uses ANTIGRAVITY_LS_ADDRESS and ANTIGRAVITY_CSRF_TOKEN from the environment.
     """
-    effective_port = port or int(os.environ.get("AUTO_PERMISSIONS_SIDECAR_PORT", "4020"))
-    _ensure_sidecar_running(port=effective_port, max_wait_secs=1.0)
+    endpoint, csrf_token = _resolve_ls_endpoint()
+    if not endpoint:
+        msg = "ANTIGRAVITY_LS_ADDRESS not available in hook environment."
+        raise RuntimeError(msg)
 
-    url = f"http://127.0.0.1:{effective_port}/classify"
-    payload = {
-        "raw_prompt": raw_prompt,
-        "timeout_secs": timeout_secs,
-        "ls_address": os.environ.get("ANTIGRAVITY_LS_ADDRESS"),
-        "csrf_token": os.environ.get("ANTIGRAVITY_CSRF_TOKEN"),
-        "project_id": os.environ.get("ANTIGRAVITY_PROJECT_ID"),
-    }
+    url = f"{endpoint}/exa.language_server_pb.LanguageServerService/{method}"
     data = json.dumps(payload).encode("utf-8")
-    headers = {"Content-Type": "application/json"}
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-    with urllib.request.urlopen(req, timeout=timeout_secs) as resp:
+    headers = {
+        "Content-Type": "application/json",
+        "Connect-Protocol-Version": "1",
+    }
+    if csrf_token:
+        headers["x-codeium-csrf-token"] = csrf_token
+
+    def _do_request(target_url: str) -> dict[str, Any]:
+        # Build opener with proxy bypass and optional HTTPS support
+        handlers: list[urllib.request.BaseHandler] = [urllib.request.ProxyHandler({})]
+        if target_url.startswith("https://"):
+            handlers.append(urllib.request.HTTPSHandler(context=_get_unverified_ssl_context()))
+        opener = urllib.request.build_opener(*handlers)
+        req = urllib.request.Request(target_url, data=data, headers=headers, method="POST")
+        with opener.open(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
+    try:
+        return _do_request(url)
+    except urllib.error.URLError:
+        # Transport-level failure (e.g. TLS against a plaintext listener, or
+        # vice versa). Retry once over the alternate scheme; the Language
+        # Server's loopback listeners each speak a single protocol.
+        alt = (
+            url.replace("https://", "http://", 1)
+            if "https://" in url
+            else (url.replace("http://", "https://", 1))
+        )
+        if alt != url:
+            with contextlib.suppress(Exception):
+                return _do_request(alt)
+        raise
+
+
+def _fold_model_key(label: str) -> str:
+    """Case/space/punct-insensitive model label key for roster matching."""
+    return re.sub(r"[\s_\-.]", "", (label or "").lower())
+
+
+def _pick_cheapest_model(
+    configs: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Selects the cheapest available recommended model with quota remaining.
+
+    Prefers Google (Gemini) over third-party models, then lowest reasoning
+    effort (Low < Medium < High), then recommended status. Used as the default
+    classifier model so the per-tool-call security gate runs at low thinking
+    effort for speed, and as a self-heal fallback when no default is available.
+    """
+    candidates = [c for c in configs if not c.get("disabled")]
+    live = [
+        c
+        for c in candidates
+        if (c.get("quotaInfo") or {}).get("remainingFraction") is None
+        or (c.get("quotaInfo") or {}).get("remainingFraction", 1.0) > 0
+    ]
+    candidates = live or candidates
+
+    def provider_rank(c: dict[str, Any]) -> int:
+        label = (c.get("label") or "").lower()
+        if "gemini" in label:
+            return 0
+        if "gpt" in label:
+            return 1
+        return 2
+
+    def effort_rank(c: dict[str, Any]) -> int:
+        label = (c.get("label") or "").lower()
+        if "(low)" in label:
+            return 0
+        if "(medium)" in label:
+            return 1
+        return 2
+
+    def recommend_rank(c: dict[str, Any]) -> int:
+        return 0 if c.get("isRecommended") else 1
+
+    def sort_key(c: dict[str, Any]) -> tuple[int, int, int]:
+        return recommend_rank(c), provider_rank(c), effort_rank(c)
+
+    if not candidates:
+        return None
+    return min(candidates, key=sort_key)
+
+
+def _resolve_ls_model(
+    configs: list[dict[str, Any]],
+    default_id: str | None,
+    requested: str | None,
+) -> str:
+    """Resolves the classification model token for the Language Server.
+
+    Priority:
+      1. `requested` (an explicit MODEL_* token or friendly roster label) when it
+         matches the live roster — supports explicit selection that self-heals
+         when Google retires a previously-chosen token.
+      2. The stable fast enum MODEL_GOOGLE_GEMINI_2_5_FLASH — the fastest
+         verified classifier model (~0.6s vs ~1.2s for the account default). A
+         security gate runs on every tool call, so low latency wins. If it is
+         retired on the account, the GetModelResponse 404 self-heal retries with
+         the account default or a lower-effort roster model.
+    """
+    if requested:
+        req = requested.strip()
+        for c in configs:
+            if (c.get("modelOrAlias") or {}).get("model") == req:
+                return req
+        folded = _fold_model_key(req)
+        for c in configs:
+            if _fold_model_key(c.get("label")) == folded:
+                return (c.get("modelOrAlias") or {}).get("model")
+
+    return DEFAULT_ANTIGRAVITY_MODEL
+
+
+def list_available_models(
+    timeout_secs: float = DEFAULT_TIMEOUT_SECS,
+) -> list[dict[str, Any]]:
+    """Fetches the live, quota-bearing model roster from the Language Server.
+
+    Uses GetUserStatus -> cascadeModelConfigData, which reflects the account's
+    current (non-retired) models and remaining quota — unlike the binary's
+    static `enum Model`. Each entry: {id, label, recommended, disabled,
+    quota_remaining}. Returns [] on any failure (caller fails closed).
+    """
+    try:
+        res = _call_ls_rpc("GetUserStatus", {}, timeout=timeout_secs)
+    except Exception:
+        return []
+    data = (res.get("userStatus") or {}).get("cascadeModelConfigData") or {}
+    configs = data.get("clientModelConfigs") or []
+    out = []
+    for c in configs:
+        mo = c.get("modelOrAlias") or {}
+        quota = (c.get("quotaInfo") or {}).get("remainingFraction")
+        out.append(
+            {
+                "id": mo.get("model"),
+                "label": c.get("label"),
+                "recommended": bool(c.get("isRecommended")),
+                "disabled": bool(c.get("disabled")),
+                "quota_remaining": quota,
+            }
+        )
+    return out
+
+
+def _call_antigravity_sidecar(
+    raw_prompt: str,
+    timeout_secs: float = DEFAULT_TIMEOUT_SECS,
+) -> dict[str, Any]:
+    """Classifies via the bundled plugin sidecar (loopback HTTP).
+
+    Used by PreToolUse hooks, which run WITHOUT the Language Server connection
+    environment (ANTIGRAVITY_LS_ADDRESS / ANTIGRAVITY_CSRF_TOKEN). The sidecar
+    is spawned by Antigravity with that environment injected and proxies to the
+    Language Server. Cross-platform: stdlib HTTP only, no process scanning.
+    """
+    port = int(os.environ.get("AUTO_PERMISSIONS_SIDECAR_PORT", "4020"))
+    url = f"http://127.0.0.1:{port}/classify"
+    data = json.dumps({"prompt": raw_prompt}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with opener.open(req, timeout=timeout_secs) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+def _call_antigravity_ls_api(
+    raw_prompt: str,
+    model: str | None = None,
+    timeout_secs: float = DEFAULT_TIMEOUT_SECS,
+) -> dict[str, Any]:
+    """Classifies a tool call using the active Antigravity account.
+
+    Prefers a direct single-turn GetModelResponse against the Language Server
+    when the injected environment (ANTIGRAVITY_LS_ADDRESS) is available — the
+    sidecar/tool-execution contexts. PreToolUse hooks lack that environment, so
+    the bundled plugin sidecar is used instead (which has it injected).
+    """
+    if os.environ.get("ANTIGRAVITY_LS_ADDRESS"):
+        return _antigravity_ls_direct(
+            raw_prompt=raw_prompt,
+            model=model,
+            timeout_secs=timeout_secs,
+        )
+    return _call_antigravity_sidecar(raw_prompt=raw_prompt, timeout_secs=timeout_secs)
+
+
+def _antigravity_ls_direct(
+    raw_prompt: str,
+    model: str | None = None,
+    timeout_secs: float = DEFAULT_TIMEOUT_SECS,
+) -> dict[str, Any]:
+    """
+    Classifies a tool call via a single-turn completion on the active Antigravity
+    Language Server (GetModelResponse), using Antigravity's own account quota.
+
+    Unlike a full agent cascade, GetModelResponse performs no tool execution and
+    creates no trajectory, returning the decision in ~1s. The model is resolved
+    from the live roster so it self-heals when Google retires models.
+
+    Requires ANTIGRAVITY_LS_ADDRESS and ANTIGRAVITY_CSRF_TOKEN in the environment
+    (injected automatically by Antigravity into sidecar/tool-execution processes).
+    """
+    requested = os.environ.get("ANTIGRAVITY_MODEL") or model
+    configs: list[dict[str, Any]] = []
+    default_id: str | None = None
+    with contextlib.suppress(Exception):
+        res = _call_ls_rpc("GetUserStatus", {}, timeout=timeout_secs)
+        data = (res.get("userStatus") or {}).get("cascadeModelConfigData") or {}
+        configs = data.get("clientModelConfigs") or []
+        default_id = ((data.get("defaultOverrideModelConfig") or {}).get("modelOrAlias") or {}).get(
+            "model"
+        )
+
+    model_token = _resolve_ls_model(configs, default_id, requested)
+
+    completion_prompt = (
+        f"{SYSTEM_INSTRUCTION}\n\n{raw_prompt}\n\nReply with the JSON decision object only."
+    )
+    try:
+        res = _call_ls_rpc(
+            "GetModelResponse",
+            {"model": model_token, "prompt": completion_prompt},
+            timeout=timeout_secs,
+        )
+    except Exception:
+        # Self-heal: the resolved token was retired or unusable. Retry once with
+        # the account default, then any other roster model, before failing closed.
+        fallback = default_id
+        if not fallback or fallback == model_token:
+            alt = _pick_cheapest_model(
+                [c for c in configs if (c.get("modelOrAlias") or {}).get("model") != model_token]
+            )
+            fallback = (alt.get("modelOrAlias") or {}).get("model") if alt else None
+        if fallback:
+            res = _call_ls_rpc(
+                "GetModelResponse",
+                {"model": fallback, "prompt": completion_prompt},
+                timeout=timeout_secs,
+            )
+        else:
+            raise
+
+    resp_text = res.get("response")
+    if not resp_text:
+        msg = "Empty response from Antigravity Language Server."
+        raise RuntimeError(msg)
+    parsed = _parse_decision_text(resp_text)
+    parsed["provider"] = "antigravity"
+    return parsed
 
 
 def _call_cloudcode_oauth_api(
@@ -349,25 +558,7 @@ def _call_google_api(
 ) -> dict[str, Any]:
     key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key and not endpoint_url:
-        # Zero-Key Fallback Tier 1: Check if local sidecar worker is active
-        try:
-            return _call_antigravity_sidecar_api(raw_prompt, timeout_secs=min(timeout_secs, 3.0))
-        except Exception:
-            pass
-
-        # Zero-Key Fallback Tier 2: Check if Google OAuth token is present
-        oauth_token = os.environ.get("GOOGLE_OAUTH_TOKEN") or os.environ.get(
-            "CLOUDSDK_AUTH_ACCESS_TOKEN"
-        )
-        if oauth_token:
-            return _call_cloudcode_oauth_api(
-                raw_prompt, oauth_token=oauth_token, timeout_secs=timeout_secs
-            )
-
-        msg = (
-            "GEMINI_API_KEY is not configured and local Antigravity sidecar worker "
-            "is not running on 127.0.0.1:4020."
-        )
+        msg = "GEMINI_API_KEY is not configured."
         raise ValueError(msg)
 
     if endpoint_url:
@@ -577,8 +768,8 @@ def classify_tool_call(
         norm_provider = "google"
     elif norm_provider in ("claude", "anthropic"):
         norm_provider = "anthropic"
-    elif norm_provider in ("antigravity", "sidecar", "worker"):
-        norm_provider = "antigravity"
+    elif norm_provider == "antigravity":
+        pass
     elif norm_provider in ("cloudcode", "oauth"):
         norm_provider = "cloudcode"
 
@@ -608,8 +799,9 @@ def classify_tool_call(
                 timeout_secs=timeout_secs,
             )
         elif norm_provider == "antigravity":
-            classification = _call_antigravity_sidecar_api(
+            classification = _call_antigravity_ls_api(
                 raw_prompt=raw_prompt,
+                model=model,
                 timeout_secs=timeout_secs,
             )
         elif norm_provider == "cloudcode":

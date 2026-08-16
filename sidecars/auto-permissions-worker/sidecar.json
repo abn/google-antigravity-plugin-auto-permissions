@@ -1,0 +1,9 @@
+{
+  "description": "Thin zero-key security classifier worker: bridges the PreToolUse hook to the Antigravity Language Server via single-turn GetModelResponse",
+  "command": "python3",
+  "args": ["worker.py"],
+  "restart_policy": "always",
+  "env": {
+    "AUTO_PERMISSIONS_SIDECAR_PORT": "4020"
+  }
+}

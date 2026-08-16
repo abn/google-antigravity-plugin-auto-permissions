@@ -71,11 +71,15 @@ auto-permissions/
 │   ├── auto_approve_gate.py                 # Main PreToolUse entrypoint
 │   ├── pre_invocation.py                    # PreInvocation dynamic summary injector
 │   ├── policy_engine.py                     # Fast-path static policy evaluation & scoping
-│   ├── classifier.py                        # Gemini REST API security classifier
+│   ├── classifier.py                        # Multi-provider security classifier (Connect-RPC, REST)
 │   ├── transcript_parser.py                 # Backwards parser for user prompt history
 │   └── audit_logger.py                      # Async rotatable JSONL audit logger
 ├── rules/
 │   └── auto_permissions.md                  # Workspace rules for the agent
+├── sidecars/
+│   └── auto-permissions-worker/             # Plugin-sidecar bridge for the zero-key hook path
+│       ├── sidecar.json                     # Antigravity sidecar manifest (port 4020)
+│       └── worker.py                        # Thin HTTP proxy -> LS GetModelResponse
 ├── skills/
 │   ├── auto-permissions-configure/
 │   │   ├── SKILL.md                         # Interactive policy & provider configuration

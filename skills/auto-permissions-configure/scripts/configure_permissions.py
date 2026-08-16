@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import sys
+import urllib.request
 from typing import Any
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -69,6 +70,66 @@ def probe_classifier_provider(
         err_msg = error or classification.get("reason", "Unknown connection error")
         return False, err_msg, latency
     return True, f"Connected to {provider} ({model})", latency
+
+
+def normalize_provider_alias(provider: str | None) -> str:
+    """Maps provider aliases to their canonical classifier names."""
+    p = (provider or "").lower()
+    if p == "gemini":
+        return "google"
+    if p == "claude":
+        return "anthropic"
+    if p == "oauth":
+        return "cloudcode"
+    return p
+
+
+def _models_endpoint_from_chat(endpoint_url: str | None) -> str | None:
+    """Derives a local/OpenAI-compatible `/v1/models` URL from a chat endpoint."""
+    if not endpoint_url:
+        return None
+    if "/chat/completions" in endpoint_url:
+        return endpoint_url.replace("/chat/completions", "/models")
+    return endpoint_url.rstrip("/") + "/models"
+
+
+def _fetch_openai_models(endpoint_url: str | None) -> list[str]:
+    """Queries a local/OpenAI-compatible `/v1/models` endpoint.
+
+    Returns an empty list when the endpoint is unreachable or returns no
+    models. Callers gate on this: local providers may expose hundreds of
+    models (e.g. OpenRouter), so listing is optional and never exhaustive.
+    """
+    url = _models_endpoint_from_chat(endpoint_url)
+    if not url:
+        return []
+    try:
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        ids = sorted(
+            m.get("id") for m in data.get("data", []) if isinstance(m, dict) and m.get("id")
+        )
+        return [m for m in ids if isinstance(m, str)]
+    except Exception:
+        return []
+
+
+def normalize_antigravity_model(model: str) -> str:
+    """Resolves a friendly roster label to its canonical MODEL_* token.
+
+    No-ops for tokens already in MODEL_* form or when the roster is
+    unreachable / no match is found (caller falls back to the stored value).
+    """
+    model = (model or "").strip()
+    if not model or model.startswith("MODEL_"):
+        return model
+    for m in classifier_module.list_available_models():
+        mid = m.get("id") or ""
+        label = m.get("label") or ""
+        if mid == model or label == model:
+            return mid
+    return model
 
 
 def get_effective_configuration(
@@ -281,6 +342,14 @@ def main():
         help="List all available built-in, global, and project permission bundles.",
     )
     parser.add_argument(
+        "--list-models",
+        action="store_true",
+        help=(
+            "List models available to the active Antigravity account (live roster "
+            "with quota) and exit. Use with --json/--markdown for machine output."
+        ),
+    )
+    parser.add_argument(
         "--bundle-info",
         metavar="BUNDLE_NAME",
         help="Display detailed rules and description for a specific bundle.",
@@ -314,14 +383,12 @@ def main():
             "anthropic",
             "gemini",
             "claude",
-            "sidecar",
-            "worker",
             "oauth",
         ],
         metavar="PROVIDER",
         help=(
             "Set classifier provider (canonical: antigravity, google, "
-            "cloudcode, openai, anthropic; aliases: gemini, claude, sidecar, oauth)."
+            "cloudcode, openai, anthropic; aliases: gemini, claude, oauth)."
         ),
     )
     parser.add_argument(
@@ -533,6 +600,88 @@ def main():
                 print(f"| {status} | **`{b_slug}`** | `{src}` | {desc} | {r_cnt} |")
         sys.exit(0)
 
+    # Dedicated list-models mode (live Antigravity roster, or local /v1/models)
+    if args.list_models:
+        list_prov = (
+            normalize_provider_alias(args.provider)
+            if args.provider
+            else resolve_classifier_config(
+                session_dir=session_dir, workspace_paths=[workspace_dir]
+            )["provider"]
+        )
+
+        # Antigravity: the account's own live, quota-bearing roster is the only
+        # curated list worth showing. Local/OpenAI-compatible providers can
+        # expose hundreds of models (e.g. OpenRouter) and official APIs have no
+        # reliable public list, so those are not enumerated by default.
+        if list_prov == "antigravity":
+            models = classifier_module.list_available_models()
+            if args.json:
+                print(json.dumps({"provider": list_prov, "available_models": models}, indent=2))
+                sys.exit(0)
+            print("### 🧠 Available Models (antigravity)\n")
+            if not models:
+                print("⚠️  Could not fetch the live roster from the Language Server.")
+                print("   Set a model identifier directly via `--model`.")
+                sys.exit(1)
+            print("| Model ID | Label | Recommended | Quota |")
+            print("| :--- | :--- | :---: | :---: |")
+            for m in models:
+                quota = (
+                    f"{m['quota_remaining']:.0%}" if m.get("quota_remaining") is not None else "—"
+                )
+                rec = "✅" if m.get("recommended") else "—"
+                print(f"| `{m['id']}` | {m['label']} | {rec} | {quota} |")
+            if not args.markdown:
+                print(
+                    "\nSet one via: `configure_permissions.py --provider antigravity "
+                    '--model "<label-or-id>"`'
+                )
+            sys.exit(0)
+
+        # OpenAI-compatible / local: optional /v1/models enumeration when an
+        # endpoint is provided; otherwise prompt for a model name directly.
+        openai_ids = _fetch_openai_models(args.endpoint_url) if list_prov == "openai" else []
+        if args.json:
+            print(json.dumps({"provider": list_prov, "available_models": openai_ids}, indent=2))
+            sys.exit(0)
+        print(f"### 🧠 Available Models ({list_prov})\n")
+        if openai_ids:
+            print(
+                f"Queried `{_models_endpoint_from_chat(args.endpoint_url)}` — "
+                f"{len(openai_ids)} model(s).\n"
+            )
+            print("| Model ID |")
+            print("| :--- |")
+            for mid in openai_ids:
+                print(f"| `{mid}` |")
+            print(
+                "\nLocal/OpenAI-compatible endpoints can expose hundreds of models. "
+                "Prefer entering the model name directly via `--model`."
+            )
+        else:
+            if list_prov == "openai":
+                print(
+                    "Local/OpenAI-compatible providers expose many models; enter the "
+                    "model name directly rather than enumerating."
+                )
+                if args.endpoint_url:
+                    print(
+                        f"Note: could not reach `{_models_endpoint_from_chat(args.endpoint_url)}` "
+                        "to enumerate; supply an endpoint URL and pass `--list-models` again."
+                    )
+                else:
+                    print(
+                        "Tip: pass `--endpoint-url <url>` with `--list-models` to "
+                        "enumerate a local `/v1/models` endpoint."
+                    )
+            else:
+                print(
+                    "This provider's API does not expose a reliable public model list; "
+                    "enter the model identifier directly via `--model`."
+                )
+        sys.exit(0)
+
     # Dedicated bundle-info mode
     if args.bundle_info:
         b_name = args.bundle_info.strip().lower()
@@ -576,8 +725,6 @@ def main():
             provider = "google"
         elif provider == "claude":
             provider = "anthropic"
-        elif provider in ("sidecar", "worker"):
-            provider = "antigravity"
         elif provider == "oauth":
             provider = "cloudcode"
         model = args.model or eff_config["model"]
@@ -616,18 +763,14 @@ def main():
     # 1. Update classifier settings if specified
     classifier_settings = {}
     if args.provider:
-        p = args.provider.lower()
-        if p == "gemini":
-            p = "google"
-        elif p == "claude":
-            p = "anthropic"
-        elif p in ("sidecar", "worker"):
-            p = "antigravity"
-        elif p == "oauth":
-            p = "cloudcode"
+        p = normalize_provider_alias(args.provider)
         classifier_settings["provider"] = p
     if args.model:
-        classifier_settings["model"] = args.model.strip()
+        m = args.model.strip()
+        eff_provider = classifier_settings.get("provider")
+        if eff_provider == "antigravity":
+            m = normalize_antigravity_model(m)
+        classifier_settings["model"] = m
     if args.endpoint_url:
         classifier_settings["endpoint_url"] = args.endpoint_url.strip()
     if args.api_key:

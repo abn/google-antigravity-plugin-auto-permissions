@@ -221,8 +221,8 @@ def main():
     parser.add_argument(
         "--provider",
         "-P",
-        choices=["google", "openai", "anthropic", "gemini", "claude"],
-        help="Provider / protocol (google, openai, anthropic).",
+        choices=["google", "openai", "anthropic", "gemini", "claude", "antigravity", "cloudcode"],
+        help="Provider / protocol (google, openai, anthropic, antigravity, cloudcode).",
     )
     parser.add_argument(
         "--model",

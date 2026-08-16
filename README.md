@@ -2,7 +2,7 @@
 
 An autonomous security authorization and auto-permission classifier plugin for **Google Antigravity 2.0**, emulating Claude Code's Auto-Mode security moderator.
 
-The plugin intercepts sensitive tool operations (commands, file writes, web requests, task management) via Antigravity's `PreToolUse` lifecycle hook, provides strictly sanitized contextual intent to a decoupled **Gemini 2.5 Flash** classifier, automatically approves safe actions, blocks hostile or out-of-scope operations, and records asynchronous rotatable audit logs in the active session directory.
+The plugin intercepts sensitive tool operations (commands, file writes, web requests, task management) via Antigravity's `PreToolUse` lifecycle hook, provides strictly sanitized contextual intent to a decoupled security classifier (default: the Antigravity Language Server's own model, zero-key; optional Google Gemini, Cloud Code, OpenAI-compatible, or Anthropic), automatically approves safe actions, blocks hostile or out-of-scope operations, and records asynchronous rotatable audit logs in the active session directory.
 
 ---
 
@@ -312,7 +312,26 @@ python3 skills/auto-permissions-configure/scripts/configure_permissions.py --mig
 
 ### Multi-Provider & Local Inference Support
 
-`auto-permissions` supports Google Gemini, OpenAI-compatible servers (e.g. local Lemonade, vLLM, Ollama, Groq, OpenRouter), and Anthropic Claude using zero external dependencies:
+`auto-permissions` supports multiple classification providers using zero external dependencies:
+
+* **`antigravity`** (default, zero-key): A bundled plugin sidecar (spawned by Antigravity with the LS connection environment injected) classifies via a single-turn `GetModelResponse` call to the active Antigravity Language Server over the Connect-RPC loopback. PreToolUse hooks call the sidecar over loopback HTTP; contexts with the LS env (tool execution/sidecar) talk to the Language Server directly. No API key required. The model is resolved at call time from the live account roster so it self-heals when Google retires models.
+* **`cloudcode`**: Google Cloud Code Assist REST API using the active Google OAuth token.
+* **`google`**: Official Google Gemini REST API with an API key.
+* **`openai`**: OpenAI-wire compatible servers (e.g. local Lemonade, vLLM, Ollama, Groq, OpenRouter).
+* **`anthropic`**: Anthropic Messages API.
+
+List models the active Antigravity account serves (live roster with quota), or query a local OpenAI-compatible `/v1/models` endpoint, with:
+```bash
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py --list-models --provider antigravity
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py --list-models --provider openai --endpoint-url "http://localhost:8000/v1/chat/completions"
+```
+
+```json
+// Example: Zero-key Antigravity (default)
+{
+  "provider": "antigravity"
+}
+```
 
 ```json
 // Example: Local Self-Hosted LLM on GPU (Lemonade / vLLM / Ollama)
@@ -332,8 +351,8 @@ python3 skills/auto-permissions-configure/scripts/configure_permissions.py --mig
 | :--- | :--- | :--- | :--- |
 | `bundles` | `array[string]` or `object` | `[]` | Active permission bundles (`["git-inspect", ...]` or `{"enabled": [...], "disabled": [...]}`). |
 | `custom_bundles` | `object` | `{}` | Inline custom bundle definitions dictionary. |
-| `provider` | `string` | `"google"` | Classification provider/protocol (`"google"`, `"openai"`, `"anthropic"`). |
-| `model` | `string` | `"gemini-2.5-flash"` | Target LLM model name (e.g. `gemini-2.5-flash`, `gpt-4o-mini`, `claude-3-5-haiku-20241022`). |
+| `provider` | `string` | `"google"` | Classification provider/protocol (`"google"`, `"antigravity"`, `"cloudcode"`, `"openai"`, `"anthropic"`; aliases `gemini`, `claude`, `oauth`). |
+| `model` | `string` | `"gemini-2.5-flash"` | Target LLM model name (e.g. `gemini-2.5-flash`, `gpt-4o-mini`, `claude-3-5-haiku-20241022`, or an Antigravity roster token). |
 | `endpoint_url` | `string` | *Provider default* | Custom REST API endpoint URI (e.g. local vLLM/Lemonade/Ollama or reverse proxy). |
 | `api_key` | `string` | `null` | Direct API token string (recommended only in `config.local.json`). |
 | `api_key_env` | `string` | *Provider default* | Name of custom environment variable holding the API key. |
@@ -358,7 +377,7 @@ python3 skills/auto-permissions-configure/scripts/configure_permissions.py --mig
 | `OPENAI_API_KEY` | - | API key for OpenAI-compatible endpoints. |
 | `ANTHROPIC_API_KEY` | - | API key for Anthropic Claude provider. |
 | `AUTO_PERMISSIONS_API_KEY` | - | Generic provider API key override. |
-| `AUTO_PERMISSIONS_PROVIDER` | - | Override active provider globally (`google`, `openai`, `anthropic`). |
+| `AUTO_PERMISSIONS_PROVIDER` | - | Override active provider globally (`google`, `antigravity`, `cloudcode`, `openai`, `anthropic`). |
 | `AUTO_PERMISSIONS_MODEL` | - | Override active model identifier globally (or `GEMINI_MODEL`, `OPENAI_MODEL`, `ANTHROPIC_MODEL`). |
 | `AUTO_PERMISSIONS_ENDPOINT_URL` | - | Override custom REST endpoint globally (or `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`). |
 | `AUTO_PERMISSIONS_TRUST_WORKSPACE_WRITES` | `1` | Override workspace write fast-path (`1`/`0` or `true`/`false`). |
@@ -370,6 +389,7 @@ python3 skills/auto-permissions-configure/scripts/configure_permissions.py --mig
 | `AUTO_PERMISSIONS_GOVERN_IMAGES` | `0` | Set `1` to enable classifier evaluation for `generate_image`. |
 | `AUTO_PERMISSIONS_GOVERN_SURFACES` | - | Comma-separated list of surfaces to govern (e.g. `subagents,schedule,images`). |
 | `AUTO_PERMISSIONS_SESSION_DIR` | - | Override session directory path for audit logs and overrides (or `ANTIGRAVITY_ARTIFACT_DIR`). |
+| `AUTO_PERMISSIONS_SIDECAR_PORT` | `4020` | Loopback port for the bundled plugin sidecar (shared default between the hook and the sidecar). |
 
 ---
 

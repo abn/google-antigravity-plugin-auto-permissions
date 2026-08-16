@@ -176,7 +176,7 @@ class TestAuditLogger(unittest.TestCase):
         self.assertIn("🟢 **ALLOW**", md)
         self.assertIn("🔴 **DENY**", md)
         self.assertIn("Static ACL (0.2ms)", md)
-        self.assertIn("Gemini (320ms)", md)
+        self.assertIn("Antigravity (320ms)", md)
 
     def test_generate_markdown_summary_error_fallback(self):
         records = [

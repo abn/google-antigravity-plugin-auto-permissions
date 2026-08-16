@@ -33,7 +33,7 @@ flowchart LR
     subgraph Security Gate [Isolated Security Perimeter]
         UserIntent[Clean User Intent]
         ToolReq[Proposed Tool Call]
-        Classifier[Gemini 2.5 Flash Classifier]
+        Classifier[Security Classifier (Antigravity LS / Gemini)]
         Decision[Authorization Verdict]
     end
 
@@ -274,10 +274,10 @@ The `auto-permissions` gate intercepts all MCP tool invocations (`call_mcp_tool`
   - `mcp(server:*)` or `mcp(server/*)`: Matches any tool on that MCP server (e.g. `mcp(nowledge-mem:*)`).
   - `mcp(server:tool)`: Matches a specific tool (e.g. `mcp(stripe:charge_customer)`).
   - `mcp(*:delete_*)`: Wildcard pattern across all MCP servers.
-* **Classifier Evaluation:** Unmatched MCP calls are evaluated by the Gemini 2.5 Flash classifier, ensuring destructive operations or external data modifications align with active user intent.
+* **Classifier Evaluation:** Unmatched MCP calls are evaluated by the security classifier (default: the zero-key Antigravity Language Server provider; configurable to Gemini, Cloud Code, OpenAI-compatible, or Anthropic), ensuring destructive operations or external data modifications align with active user intent.
 
 ### 8.5 Multi-Provider Architecture, Custom Endpoints & Local Inference
-`auto-permissions` supports Google Gemini, OpenAI-wire compatible endpoints (e.g. self-hosted Lemonade, vLLM, Ollama, Groq, OpenRouter), and Anthropic Claude using zero external runtime dependencies.
+`auto-permissions` supports multiple classification providers using zero external runtime dependencies: the Antigravity Language Server (`antigravity`, zero-key default), Google Cloud Code Assist (`cloudcode`), Google Gemini (`google`), OpenAI-wire compatible endpoints (e.g. self-hosted Lemonade, vLLM, Ollama, Groq, OpenRouter), and Anthropic Claude.
 
 * **Configuration Schema:**
   ```json
@@ -286,6 +286,14 @@ The `auto-permissions` gate intercepts all MCP tool invocations (`call_mcp_tool`
     "model": "gemini-2.5-flash",
     "endpoint_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
     "api_key_env": "GEMINI_API_KEY"
+  }
+  ```
+
+* **Antigravity Zero-Key Provider (default):**
+  A bundled plugin sidecar (`sidecars/auto-permissions-worker/`) is spawned by Antigravity with the Language Server connection environment injected. It classifies via a single-turn `GetModelResponse` call to the Language Server over the Connect-RPC loopback (HTTPS with unverified cert, with a plain-HTTP fallback for the injected `ANTIGRAVITY_LS_ADDRESS`). PreToolUse hooks run WITHOUT the LS environment, so they call the sidecar over loopback HTTP (`POST /classify`); contexts that do carry the env (tool execution, the sidecar itself) call the Language Server directly. The model token is resolved at call time from the live `GetUserStatus` roster (explicit token -> account default -> cheapest recommended with quota -> stable fallback) so it self-heals when Google retires models; a retired-token 404 retries once with the default. A full agent cascade is avoided because it would actually execute the proposed tool; `GetModelResponse` is stateless (~1.1s) and performs no tool execution.
+  ```json
+  {
+    "provider": "antigravity"
   }
   ```
 

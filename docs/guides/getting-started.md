@@ -46,7 +46,7 @@ Antigravity automatically discovers the plugin manifest (`plugin.json`) and life
 
 `auto-permissions` operates out-of-the-box with **zero manual configuration**:
 
-- **Zero-Key Inbuilt Mode (Default):** When running inside Antigravity, the bundled background sidecar (`sidecars/worker.py`) automatically leverages your active IDE session and Language Server connection without requiring an external API key.
+- **Zero-Key Inbuilt Mode (Default):** A bundled plugin sidecar (`sidecars/auto-permissions-worker/`) is spawned by Antigravity with the Language Server connection environment injected, and classifies via the single-turn `GetModelResponse` Connect-RPC call — no external API key. PreToolUse hooks (which run without that environment) call the sidecar over loopback HTTP; in contexts where the LS environment is available (tool execution, sidecar), the classifier talks to the Language Server directly.
 - **Google Cloud Code OAuth Mode:** Automatically uses `GOOGLE_OAUTH_TOKEN` or active `gcloud` credentials when available.
 - **Direct API Key (Optional):** If you prefer using a dedicated Google AI Studio key:
   ```bash

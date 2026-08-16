@@ -35,6 +35,8 @@ tags:
 
 | Provider Option | Protocol | Recommended Models | Authentication Header |
 | :--- | :--- | :--- | :--- |
+| **`antigravity`** | Language Server Connect-RPC (single-turn `GetModelResponse`) | Live account roster (`--list-models --provider antigravity`); zero-key | Injected `x-codeium-csrf-token` |
+| **`cloudcode`** | Cloud Code Assist REST | `gemini-2.5-flash` | `Authorization: Bearer <OAuth>` |
 | **`google`** | Gemini REST API | `gemini-2.5-flash`, `gemini-2.5-pro` | `x-goog-api-key` |
 | **`openai`** | OpenAI Chat Completions API | `gemma-2-9b-it`, `qwen-2.5-coder`, `gpt-4o-mini` | `Authorization: Bearer <key>` |
 | **`anthropic`** | Anthropic Messages API | `claude-3-5-haiku`, `claude-3-7-sonnet` | `x-api-key`, `anthropic-version` |

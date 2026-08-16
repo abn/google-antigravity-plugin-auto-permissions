@@ -51,7 +51,7 @@ Prompt the user to choose the target scope and customization category:
 
 #### Branch B: If LLM Provider & Model was chosen:
 1. **Turn 2 (Provider Selection):** Ask *only* for the provider protocol:
-   - `Inbuilt Antigravity (Zero-Key Persistent Worker)` [Recommended] (Uses active Antigravity session & Language Server daemon on 127.0.0.1:4020)
+   - `Inbuilt Antigravity (Zero-Key Plugin Sidecar)` [Recommended] (Uses the active Antigravity Language Server via the bundled plugin sidecar on 127.0.0.1:4020; no API key)
    - `Google Cloud Code OAuth` (Direct Cloud Code Assist REST API using Google OAuth token)
    - `Google Gemini` (Official Google AI Studio REST API with API key)
    - `Local / OpenAI-compatible` (Lemonade, vLLM, Ollama)
@@ -59,16 +59,18 @@ Prompt the user to choose the target scope and customization category:
 
 2. **Turn 3 (Provider-Specific Configuration):**
    * **If Inbuilt Antigravity:**
-     - Zero configuration required! Sets `--provider antigravity`.
+     - List the live, quota-bearing account roster: `configure_permissions.py --list-models --provider antigravity`.
+     - Zero configuration required if using the account default: sets `--provider antigravity`.
+     - To pin a specific model, prompt the user to choose from the `--list-models` output (by label or ID), then set `--provider antigravity --model "<label-or-id>"` (labels auto-resolve to the canonical `MODEL_*` token).
    * **If Google Cloud Code OAuth:**
      - Prompt for optional project ID (default: current workspace project). Sets `--provider cloudcode`.
    * **If Google Gemini:**
      - Prompt for Gemini model (`gemini-2.5-flash` [Recommended], `gemini-2.5-pro`, `gemini-2.0-flash`).
      - Prompt for API key environment variable (default: `GEMINI_API_KEY`).
-   * **If Local (Lemonade / vLLM / Ollama):**
-     - Prompt for **Endpoint URL** (e.g. `http://localhost:13305/v1/chat/completions` for Lemonade, `http://localhost:11434/v1/chat/completions` for Ollama, `http://localhost:8000/v1/chat/completions` for vLLM).
-     - Prompt for **Model Identifier** (e.g. `Gemma-4-26B-A4B-NoThinking-qat-MTP`, `gemma4-it-e4b-FLM`, `qwen2.5-coder`).
-     - Prompt for **API Key Environment Variable** (e.g. `LEMONADE_API_KEY`, or optional/none for unauthenticated local servers).
+* **If Local (Lemonade / vLLM / Ollama / OpenRouter):**
+      - Prompt for **Endpoint URL** (e.g. `http://localhost:13305/v1/chat/completions` for Lemonade, `http://localhost:11434/v1/chat/completions` for Ollama, `http://localhost:8000/v1/chat/completions` for vLLM).
+      - Prompt for **Model Identifier** directly — do **not** enumerate (local/OpenAI-compatible endpoints can expose hundreds of models, e.g. OpenRouter). Only Antigravity exposes a curated roster. Optionally, `--list-models --provider openai --endpoint-url <url>` queries `/v1/models` for an advanced user who explicitly wants a listing.
+      - Prompt for **API Key Environment Variable** (e.g. `LEMONADE_API_KEY`, or optional/none for unauthenticated local servers).
    * **If Anthropic Claude:**
      - Prompt for Claude model (`claude-3-7-sonnet-20250219`, `claude-3-5-haiku-20241022`).
      - Prompt for **API Key Environment Variable** (e.g. `ANTHROPIC_API_KEY`).

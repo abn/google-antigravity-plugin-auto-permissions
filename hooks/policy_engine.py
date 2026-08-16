@@ -1387,8 +1387,6 @@ def check_intra_turn_circuit_breaker(
         norm_provider = "google"
     elif norm_provider == "claude":
         norm_provider = "anthropic"
-    elif norm_provider in ("sidecar", "worker"):
-        norm_provider = "antigravity"
     elif norm_provider == "oauth":
         norm_provider = "cloudcode"
 
@@ -1522,8 +1520,12 @@ def resolve_classifier_config(
             or model.startswith("o3")
         ):
             provider = "openai"
-        else:
+        elif os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
             provider = "google"
+        elif os.environ.get("ANTIGRAVITY_CSRF_TOKEN") or os.environ.get("ANTIGRAVITY_LS_ADDRESS"):
+            provider = "antigravity"
+        else:
+            provider = "antigravity"
 
     # Default models per provider
     if not model:
@@ -1531,6 +1533,8 @@ def resolve_classifier_config(
             model = "claude-3-5-haiku-20241022"
         elif provider == "openai":
             model = "gpt-4o-mini"
+        elif provider == "antigravity":
+            model = "gemini-2.5-flash"
         else:
             model = "gemini-2.5-flash"
 
