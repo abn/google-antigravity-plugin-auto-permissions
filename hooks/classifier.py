@@ -599,6 +599,59 @@ def _call_google_api(
         return _parse_decision_text(raw_text)
 
 
+def _openai_generation_config() -> dict[str, Any]:
+    """Generation overrides for the OpenAI-wire classifier path.
+
+    Defaults target a deterministic, latency-bounded security gate: temperature
+    0 for reproducible verdicts, top_p 1.0 (stable at temp 0), and a max_tokens
+    cap so thinking models cannot blow the latency budget. Every value is
+    overridable via AUTO_PERMISSIONS_TEMPERATURE / _TOP_P / _TOP_K /
+    _MAX_TOKENS / _SEED / _REASONING_EFFORT (set _MAX_TOKENS=0 for server
+    default). JSON mode is controlled by AUTO_PERMISSIONS_JSON_MODE (default
+    on; set 0 for servers that reject response_format).
+    """
+    config: dict[str, Any] = {"temperature": 0.0, "top_p": 1.0, "max_tokens": 800}
+
+    def _float_env(name: str) -> float | None:
+        raw = os.environ.get(name)
+        if raw is None:
+            return None
+        with contextlib.suppress(ValueError, TypeError):
+            return float(raw)
+        return None
+
+    def _int_env(name: str) -> int | None:
+        raw = os.environ.get(name)
+        if raw is None:
+            return None
+        with contextlib.suppress(ValueError, TypeError):
+            return int(raw)
+        return None
+
+    temp = _float_env("AUTO_PERMISSIONS_TEMPERATURE")
+    if temp is not None:
+        config["temperature"] = temp
+    top_p = _float_env("AUTO_PERMISSIONS_TOP_P")
+    if top_p is not None:
+        config["top_p"] = top_p
+    top_k = _int_env("AUTO_PERMISSIONS_TOP_K")
+    if top_k is not None:
+        config["top_k"] = top_k
+    max_tokens = _int_env("AUTO_PERMISSIONS_MAX_TOKENS")
+    if max_tokens is not None:
+        if max_tokens > 0:
+            config["max_tokens"] = max_tokens
+        else:
+            config.pop("max_tokens", None)
+    seed = _int_env("AUTO_PERMISSIONS_SEED")
+    if seed is not None:
+        config["seed"] = seed
+    reasoning = os.environ.get("AUTO_PERMISSIONS_REASONING_EFFORT")
+    if reasoning:
+        config["reasoning_effort"] = reasoning.strip().lower()
+    return config
+
+
 def _call_openai_api(
     raw_prompt: str,
     model: str,
@@ -615,15 +668,17 @@ def _call_openai_api(
     if key:
         headers["Authorization"] = f"Bearer {key}"
 
-    request_body = {
+    json_mode = os.environ.get("AUTO_PERMISSIONS_JSON_MODE", "1") != "0"
+    request_body: dict[str, Any] = {
         "model": model or "gpt-4o-mini",
         "messages": [
             {"role": "system", "content": SYSTEM_INSTRUCTION},
             {"role": "user", "content": raw_prompt},
         ],
-        "temperature": 0.0,
-        "response_format": {"type": "json_object"},
     }
+    if json_mode:
+        request_body["response_format"] = {"type": "json_object"}
+    request_body.update(_openai_generation_config())
 
     req = urllib.request.Request(
         url,

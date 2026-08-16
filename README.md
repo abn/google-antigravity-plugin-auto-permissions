@@ -390,6 +390,13 @@ python3 skills/auto-permissions-configure/scripts/configure_permissions.py --lis
 | `AUTO_PERMISSIONS_GOVERN_SURFACES` | - | Comma-separated list of surfaces to govern (e.g. `subagents,schedule,images`). |
 | `AUTO_PERMISSIONS_SESSION_DIR` | - | Override session directory path for audit logs and overrides (or `ANTIGRAVITY_ARTIFACT_DIR`). |
 | `AUTO_PERMISSIONS_SIDECAR_PORT` | `4020` | Loopback port for the bundled plugin sidecar (shared default between the hook and the sidecar). |
+| `AUTO_PERMISSIONS_TEMPERATURE` | `0.0` | OpenAI-wire sampling temperature (0 = deterministic verdicts). |
+| `AUTO_PERMISSIONS_TOP_P` | `1.0` | OpenAI-wire nucleus sampling (1.0 = stable at temp 0). |
+| `AUTO_PERMISSIONS_TOP_K` | - | OpenAI-wire top-k sampling (only sent when set; `-1`/`0` = off on llama.cpp-style backends). |
+| `AUTO_PERMISSIONS_MAX_TOKENS` | `800` | OpenAI-wire output cap bounding thinking/latency (`0` = server default). |
+| `AUTO_PERMISSIONS_SEED` | - | OpenAI-wire fixed seed for reproducible verdicts (when supported). |
+| `AUTO_PERMISSIONS_REASONING_EFFORT` | - | Reasoning effort passthrough (`low`/`medium`/`high`) for thinking-capable local models. |
+| `AUTO_PERMISSIONS_JSON_MODE` | `1` | OpenAI-wire `response_format: json_object` (set `0` for servers that reject it). |
 
 ---
 

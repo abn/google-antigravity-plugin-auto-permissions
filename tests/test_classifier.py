@@ -10,6 +10,7 @@ from hooks.classifier import (
     _call_antigravity_ls_api,
     _call_antigravity_sidecar,
     _clean_json_text,
+    _openai_generation_config,
     _resolve_ls_endpoint,
     classify_tool_call,
     format_classifier_payload,
@@ -666,6 +667,98 @@ class _LocalSidecarServer:
 
     def shutdown(self):
         self._server.shutdown()
+
+
+class TestOpenAIGenerationConfig(unittest.TestCase):
+    def test_defaults_target_deterministic_latency_bounded_gate(self):
+        with patch.dict(os.environ, {}, clear=True):
+            cfg = _openai_generation_config()
+        self.assertEqual(cfg["temperature"], 0.0)
+        self.assertEqual(cfg["top_p"], 1.0)
+        self.assertEqual(cfg["max_tokens"], 800)
+        self.assertNotIn("top_k", cfg)
+        self.assertNotIn("seed", cfg)
+        self.assertNotIn("reasoning_effort", cfg)
+
+    def test_env_overrides(self):
+        with patch.dict(
+            os.environ,
+            {
+                "AUTO_PERMISSIONS_TEMPERATURE": "0.3",
+                "AUTO_PERMISSIONS_TOP_P": "0.9",
+                "AUTO_PERMISSIONS_TOP_K": "40",
+                "AUTO_PERMISSIONS_MAX_TOKENS": "256",
+                "AUTO_PERMISSIONS_SEED": "7",
+                "AUTO_PERMISSIONS_REASONING_EFFORT": "low",
+            },
+        ):
+            cfg = _openai_generation_config()
+        self.assertEqual(cfg["temperature"], 0.3)
+        self.assertEqual(cfg["top_p"], 0.9)
+        self.assertEqual(cfg["top_k"], 40)
+        self.assertEqual(cfg["max_tokens"], 256)
+        self.assertEqual(cfg["seed"], 7)
+        self.assertEqual(cfg["reasoning_effort"], "low")
+
+    def test_max_tokens_zero_uses_server_default(self):
+        with patch.dict(os.environ, {"AUTO_PERMISSIONS_MAX_TOKENS": "0"}):
+            cfg = _openai_generation_config()
+        self.assertNotIn("max_tokens", cfg)
+
+    @patch("urllib.request.urlopen")
+    def test_request_body_carries_config_and_json_mode_toggle(self, mock_urlopen):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "decision": "allow",
+                                    "reason": "ok",
+                                    "risk_category": "safe_routine",
+                                    "confidence": 0.9,
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+        ).encode("utf-8")
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        kwargs = dict(
+            workspace_paths=["/tmp"],
+            prior_prompts=[],
+            active_prompt="Run tests",
+            tool_name="run_command",
+            tool_args={"CommandLine": "pytest"},
+            provider="openai",
+            model="gpt-4o-mini",
+            api_key="k",
+        )
+
+        with patch.dict(
+            os.environ,
+            {"AUTO_PERMISSIONS_TOP_K": "40", "AUTO_PERMISSIONS_REASONING_EFFORT": "low"},
+        ):
+            _, decision, err, _ = classify_tool_call(**kwargs)
+        self.assertIsNone(err)
+        self.assertEqual(decision["decision"], "allow")
+        req = mock_urlopen.call_args[0][0]
+        body = json.loads(req.data.decode())
+        self.assertEqual(body["temperature"], 0.0)
+        self.assertEqual(body["top_k"], 40)
+        self.assertEqual(body["reasoning_effort"], "low")
+        self.assertEqual(body["response_format"], {"type": "json_object"})
+
+        with patch.dict(os.environ, {"AUTO_PERMISSIONS_JSON_MODE": "0"}):
+            _, _, err, _ = classify_tool_call(**kwargs)
+        self.assertIsNone(err)
+        body2 = json.loads(mock_urlopen.call_args[0][0].data.decode())
+        self.assertNotIn("response_format", body2)
 
 
 if __name__ == "__main__":
