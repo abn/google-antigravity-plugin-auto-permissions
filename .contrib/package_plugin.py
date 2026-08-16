@@ -25,6 +25,7 @@ INCLUDED_FILES = [
 INCLUDED_DIRECTORIES = [
     "hooks",
     "rules",
+    "sidecars",
     "skills",
 ]
 

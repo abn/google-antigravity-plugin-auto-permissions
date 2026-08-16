@@ -283,38 +283,60 @@ def match_tool_against_rule(rule_str: str, tool_name: str, tool_args: dict[str, 
             return match_command(target_pattern, cmd)
 
     elif tool_name in ("write_to_file", "replace_file_content", "multi_replace_file_content"):
-        path = str(tool_args.get("TargetFile", ""))
+        path = str(
+            tool_args.get("TargetFile")
+            or tool_args.get("target_file")
+            or tool_args.get("AbsolutePath")
+            or tool_args.get("path")
+            or ""
+        )
         if action == "write_file":
             return match_path(target_pattern, path)
 
     elif tool_name == "view_file":
-        path = str(tool_args.get("AbsolutePath", ""))
+        path = str(
+            tool_args.get("AbsolutePath")
+            or tool_args.get("path")
+            or tool_args.get("TargetFile")
+            or tool_args.get("target_file")
+            or ""
+        )
         if action in ("read_file", "view_file"):
             return match_path(target_pattern, path)
 
     elif tool_name == "list_dir":
-        path = str(tool_args.get("DirectoryPath", ""))
+        path = str(
+            tool_args.get("DirectoryPath")
+            or tool_args.get("directory_path")
+            or tool_args.get("path")
+            or ""
+        )
         if action in ("read_file", "list_dir"):
             return match_path(target_pattern, path)
 
     elif tool_name == "grep_search":
-        path = str(tool_args.get("SearchPath", ""))
+        path = str(
+            tool_args.get("SearchPath")
+            or tool_args.get("search_path")
+            or tool_args.get("path")
+            or ""
+        )
         if action in ("read_file", "grep_search"):
             return match_path(target_pattern, path)
 
     elif tool_name == "read_url_content":
-        url = str(tool_args.get("Url", ""))
+        url = str(tool_args.get("Url") or tool_args.get("url") or "")
         if action == "read_url":
             return match_url(target_pattern, url)
 
     elif tool_name == "manage_task":
-        sub_action = str(tool_args.get("Action", ""))
+        sub_action = str(tool_args.get("Action") or tool_args.get("action") or "")
         if action == "manage_task":
             return target_pattern in ("*", sub_action)
 
     elif tool_name == "call_mcp_tool":
-        server = str(tool_args.get("ServerName", ""))
-        sub_tool = str(tool_args.get("ToolName", ""))
+        server = str(tool_args.get("ServerName") or tool_args.get("server_name") or "")
+        sub_tool = str(tool_args.get("ToolName") or tool_args.get("tool_name") or "")
         if action in ("mcp", "call_mcp_tool"):
             return match_mcp(target_pattern, server, sub_tool)
 
@@ -328,7 +350,7 @@ def match_tool_against_rule(rule_str: str, tool_name: str, tool_args: dict[str, 
             return match_mcp(target_pattern, server, sub_tool)
 
     elif tool_name in ("read_resource", "list_resources"):
-        server = str(tool_args.get("ServerName", ""))
+        server = str(tool_args.get("ServerName") or tool_args.get("server_name") or "")
         if action in ("mcp", "read_resource", "list_resources"):
             return match_mcp(target_pattern, server, tool_name)
 
@@ -1042,12 +1064,13 @@ def is_safe_read_only_command(
             if filter_binary not in SAFE_PIPE_FILTERS and filter_binary not in SAFE_READ_BINARIES:
                 return False
 
-        # Verify any referenced file paths do not target sensitive paths
-        for token in pipe_parts[0].split()[1:]:
-            if token.startswith("-"):
-                continue
-            if is_sensitive_path(token):
-                return False
+        # Verify any referenced file paths do not target sensitive paths across all pipe stages
+        for stage in pipe_parts:
+            for token in stage.split()[1:]:
+                if token.startswith("-"):
+                    continue
+                if is_sensitive_path(token):
+                    return False
 
     return True
 
@@ -1220,7 +1243,12 @@ def check_same_turn_file_grant(
     if last_user_step_idx is None or not log_path or not os.path.isfile(log_path):
         return None
 
-    target_file = tool_args.get("TargetFile")
+    target_file = (
+        tool_args.get("TargetFile")
+        or tool_args.get("target_file")
+        or tool_args.get("AbsolutePath")
+        or tool_args.get("path")
+    )
     if not target_file:
         return None
 
