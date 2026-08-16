@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.7.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.6.0...auto-permissions-v0.7.0) (2026-08-16)
+
+
+### Features
+
+* **bundles:** implement permission bundles and scoped directory layout ([#35](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/35)) ([572b776](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/572b776f70b2104847ab55109bfaf123220a5645))
+* **classifier:** make security classifier timeout configurable and extend default to 6.0s ([#33](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/33)) ([4a5f9b0](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/4a5f9b0d412642330e4f14176b674f980aa2c372))
+* govern subagent and schedule delegation surfaces by default ([#36](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/36)) ([bb95517](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/bb95517a54e8c1ef1fc22a6960da8d4c21659e24))
+* support zero-key Antigravity authentication and persistent sidecar worker ([#38](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/38)) ([e225659](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/e225659c3e3abeeeb74089efea4527dcf957c15b))
+
+
+### Bug Fixes
+
+* **core:** resolve P0/P1 security and packaging audit findings ([#41](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/41)) ([0e66e7a](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/0e66e7a20994f010b33da83e45e4deab3ec53d57))
+* **skills:** support antigravity and cloudcode choices in configure_permissions CLI ([#40](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/40)) ([d1123e4](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/d1123e4a60f7c8840a24ac1687b4149831ebb677))
+
+
+### Documentation
+
+* convert documentation into modular OKF 0.2 knowledge base wiki ([#37](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/37)) ([48ebf0f](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/48ebf0fe92cb4e2ec13177e13fcbadac908e9a86))
+* **skills:** update configure skill with zero-key antigravity and cloudcode providers ([#39](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/39)) ([dbe8e78](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/dbe8e78527ca4d54e496348b249462c65e591990))
+
 ## [0.6.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.5.1...auto-permissions-v0.6.0) (2026-08-15)
 
 
