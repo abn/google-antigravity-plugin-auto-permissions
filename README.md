@@ -177,7 +177,7 @@ Simulates how the security classifier and static policies would evaluate a hypot
 | :--- | :--- | :--- |
 | **`git-inspect`** | Git Inspection | Read-only repository inspection (`git status`, `log`, `diff`, `branch`, `show`, `tag`, `remote`, `rev-parse`, `describe`). |
 | **`gh-readonly`** | GitHub CLI | Read-only GitHub queries (`gh pr view/list/checks/diff/status`, `run list/view`, `issue list/view`, `release list/view`, `repo view`). |
-| **`python-tooling`** | Python Dev Tools | Safe Python testing, formatting, and linting (`pytest`, `python -m pytest`, `uv run pytest`, `ruff check/format`, `black`, `flake8`, `mypy`, `uv lock`). |
+| **`python-tooling`** | Python Dev Tools | Safe Python testing, formatting, and packaging (`pytest`, `python -m pytest`, `uv run pytest`, `ruff check/format`, `black`, `flake8`, `mypy`, `uv lock`, `poetry`). |
 | **`rust-tooling`** | Rust / Cargo | Standard Cargo build, test, and lint commands (`cargo test`, `check`, `clippy`, `fmt`, `doc`, `build`). |
 | **`node-tooling`** | Node.js / Web | Common JavaScript/TypeScript testing and linting (`npm/pnpm/yarn/bun test/lint`, `eslint`, `prettier`). |
 | **`container-inspect`** | Docker & Podman | Safe container status inspection (`podman/docker ps`, `logs`, `images`, `inspect`). |

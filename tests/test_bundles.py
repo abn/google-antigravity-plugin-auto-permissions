@@ -179,6 +179,9 @@ def test_resolve_active_bundles_across_scopes(tmp_path):
     assert "python-tooling" in active["active_bundles"]
     assert "command(git status*)" in active["allow"]
     assert "command(pytest*)" in active["allow"]
+    assert "command(poetry run *)" in active["allow"]
+    assert "command(poetry check*)" in active["allow"]
+    assert "command(poetry lock*)" in active["allow"]
 
     # Session override masks/disables python-tooling
     sess_file = os.path.join(sess_dir, "auto-permissions", "session_overrides.json")
@@ -189,6 +192,7 @@ def test_resolve_active_bundles_across_scopes(tmp_path):
     assert "python-tooling" not in active_sess["active_bundles"]
     assert "command(git status*)" in active_sess["allow"]
     assert "command(pytest*)" not in active_sess["allow"]
+    assert "command(poetry lock*)" not in active_sess["allow"]
 
 
 def test_evaluate_static_policies_with_bundles(tmp_path):
