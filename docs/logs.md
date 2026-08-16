@@ -62,3 +62,7 @@ This log tracks documentation additions, structural refactors, benchmark refresh
   - Published Model Context Protocol governance specification ([`reference/mcp-tool-governance.md`](reference/mcp-tool-governance.md)).
   - Published Static ACL rule syntax cheat sheet ([`reference/rule-syntax-cheat-sheet.md`](reference/rule-syntax-cheat-sheet.md)).
   - Documented `PreToolUse` and `PreInvocation` hook contracts ([`reference/lifecycle-hooks.md`](reference/lifecycle-hooks.md)).
+- **Zero-Key Authentication & Persistent Sidecar Worker:**
+  - Introduced bundled background sidecar daemon (`sidecars/worker.py`, `sidecars/sidecar.json`) bridging the security gate to the active Antigravity Language Server session with persistent KV-prefix cache warmth.
+  - Implemented multi-tier zero-key fallback cascade in `hooks/classifier.py` (`_call_antigravity_sidecar_api` -> `_call_cloudcode_oauth_api` -> fail closed).
+

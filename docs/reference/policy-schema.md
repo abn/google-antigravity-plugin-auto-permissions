@@ -82,7 +82,7 @@ Configuration files (`.agents/auto-permissions/config.json`, `config.local.json`
         "generate_image": { "type": "boolean" }
       }
     },
-    "provider": { "type": "string", "enum": ["google", "openai", "anthropic", "gemini", "claude"] },
+    "provider": { "type": "string", "enum": ["google", "antigravity", "cloudcode", "openai", "anthropic", "gemini", "claude"] },
     "model": { "type": "string" },
     "endpoint_url": { "type": "string" },
     "api_key_env_var": { "type": "string" },

@@ -189,6 +189,79 @@ def _parse_decision_text(raw_text: str) -> dict[str, Any]:
     }
 
 
+def _call_antigravity_sidecar_api(
+    raw_prompt: str,
+    timeout_secs: float = DEFAULT_TIMEOUT_SECS,
+    port: int | None = None,
+) -> dict[str, Any]:
+    """
+    Queries the local persistent auto-permissions sidecar worker.
+    Connects to 127.0.0.1:4020 (or AUTO_PERMISSIONS_SIDECAR_PORT) to leverage
+    Antigravity's active Language Server session without an explicit API key.
+    """
+    effective_port = port or int(os.environ.get("AUTO_PERMISSIONS_SIDECAR_PORT", "4020"))
+    url = f"http://127.0.0.1:{effective_port}/classify"
+    data = json.dumps({"raw_prompt": raw_prompt, "timeout_secs": timeout_secs}).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    with urllib.request.urlopen(req, timeout=timeout_secs) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _call_cloudcode_oauth_api(
+    raw_prompt: str,
+    oauth_token: str | None = None,
+    project_id: str | None = None,
+    timeout_secs: float = DEFAULT_TIMEOUT_SECS,
+) -> dict[str, Any]:
+    """
+    Queries Google Cloud Code Assist API using active Google OAuth token.
+    Leverages user's Antigravity / Cloud Code login quota with zero external API keys.
+    """
+    token = (
+        oauth_token
+        or os.environ.get("GOOGLE_OAUTH_TOKEN")
+        or os.environ.get("CLOUDSDK_AUTH_ACCESS_TOKEN")
+    )
+    if not token:
+        msg = "Missing Google OAuth token (GOOGLE_OAUTH_TOKEN / CLOUDSDK_AUTH_ACCESS_TOKEN)."
+        raise ValueError(msg)
+
+    proj = project_id or os.environ.get("ANTIGRAVITY_PROJECT_ID", "default")
+    url = f"https://cloudaicompanion.googleapis.com/v1/projects/{proj}:generateChatCompletions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+    request_body = {
+        "model": "gemini-2.5-flash",
+        "systemInstruction": {"parts": [{"text": SYSTEM_INSTRUCTION}]},
+        "contents": [{"role": "user", "parts": [{"text": raw_prompt}]}],
+        "generationConfig": {
+            "response_mime_type": "application/json",
+            "temperature": 0.0,
+        },
+    }
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(request_body).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout_secs) as resp:
+        response_json = json.loads(resp.read().decode("utf-8"))
+        candidates = response_json.get("candidates", [])
+        if not candidates:
+            msg = "No candidates returned from Cloud Code Assist API."
+            raise ValueError(msg)
+        content_parts = candidates[0].get("content", {}).get("parts", [])
+        if not content_parts:
+            msg = "Empty content parts in Cloud Code response."
+            raise ValueError(msg)
+        raw_text = content_parts[0].get("text", "{}")
+        return _parse_decision_text(raw_text)
+
+
 def _call_google_api(
     raw_prompt: str,
     model: str,
@@ -198,7 +271,25 @@ def _call_google_api(
 ) -> dict[str, Any]:
     key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key and not endpoint_url:
-        msg = "GEMINI_API_KEY / GOOGLE_API_KEY is not configured in environment or config."
+        # Zero-Key Fallback Tier 1: Check if local sidecar worker is active
+        try:
+            return _call_antigravity_sidecar_api(raw_prompt, timeout_secs=min(timeout_secs, 3.0))
+        except Exception:
+            pass
+
+        # Zero-Key Fallback Tier 2: Check if Google OAuth token is present
+        oauth_token = os.environ.get("GOOGLE_OAUTH_TOKEN") or os.environ.get(
+            "CLOUDSDK_AUTH_ACCESS_TOKEN"
+        )
+        if oauth_token:
+            return _call_cloudcode_oauth_api(
+                raw_prompt, oauth_token=oauth_token, timeout_secs=timeout_secs
+            )
+
+        msg = (
+            "GEMINI_API_KEY is not configured and local Antigravity sidecar worker "
+            "is not running on 127.0.0.1:4020."
+        )
         raise ValueError(msg)
 
     if endpoint_url:
@@ -404,10 +495,14 @@ def classify_tool_call(
     )
 
     norm_provider = (provider or DEFAULT_PROVIDER).lower()
-    if norm_provider == "gemini":
+    if norm_provider in ("gemini", "google"):
         norm_provider = "google"
-    elif norm_provider == "claude":
+    elif norm_provider in ("claude", "anthropic"):
         norm_provider = "anthropic"
+    elif norm_provider in ("antigravity", "sidecar", "worker"):
+        norm_provider = "antigravity"
+    elif norm_provider in ("cloudcode", "oauth"):
+        norm_provider = "cloudcode"
 
     env_timeout = os.environ.get("AUTO_PERMISSIONS_TIMEOUT") or os.environ.get(
         "AUTO_PERMISSIONS_TIMEOUT_SECS"
@@ -432,6 +527,17 @@ def classify_tool_call(
                 model=model,
                 endpoint_url=endpoint_url,
                 api_key=api_key,
+                timeout_secs=timeout_secs,
+            )
+        elif norm_provider == "antigravity":
+            classification = _call_antigravity_sidecar_api(
+                raw_prompt=raw_prompt,
+                timeout_secs=timeout_secs,
+            )
+        elif norm_provider == "cloudcode":
+            classification = _call_cloudcode_oauth_api(
+                raw_prompt=raw_prompt,
+                oauth_token=api_key,
                 timeout_secs=timeout_secs,
             )
         else:
