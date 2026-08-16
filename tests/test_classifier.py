@@ -295,6 +295,7 @@ class TestClassifier(unittest.TestCase):
             tool_name="run_command",
             tool_args={"CommandLine": "pytest"},
             provider="google",
+            api_key="mock-gemini-key",
             timeout_secs=6.0,
         )
 
