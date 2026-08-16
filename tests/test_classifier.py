@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import os
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -336,6 +337,103 @@ class TestClassifier(unittest.TestCase):
             _clean_json_text(unfenced),
             '{"decision": "ask", "reason": "check"}',
         )
+
+    @patch("urllib.request.urlopen")
+    def test_classify_tool_call_antigravity_sidecar_provider(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(
+            {
+                "decision": "allow",
+                "reason": "Antigravity sidecar worker verified safe operation",
+                "risk_category": "safe_routine",
+                "confidence": 0.99,
+            }
+        ).encode("utf-8")
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        raw_payload, decision, err, latency = classify_tool_call(
+            workspace_paths=["/tmp"],
+            prior_prompts=[],
+            active_prompt="Run tests",
+            tool_name="run_command",
+            tool_args={"CommandLine": "pytest"},
+            provider="antigravity",
+        )
+
+        self.assertIsNone(err)
+        self.assertEqual(decision["decision"], "allow")
+        self.assertEqual(decision["provider"], "antigravity")
+        self.assertEqual(decision["reason"], "Antigravity sidecar worker verified safe operation")
+
+    @patch("urllib.request.urlopen")
+    def test_classify_tool_call_cloudcode_oauth_provider(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": json.dumps(
+                                        {
+                                            "decision": "allow",
+                                            "reason": "Cloud Code OAuth verified safe operation",
+                                            "risk_category": "safe_routine",
+                                            "confidence": 0.95,
+                                        }
+                                    )
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        ).encode("utf-8")
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        with patch.dict(os.environ, {"GOOGLE_OAUTH_TOKEN": "ya29.mock_token"}):
+            raw_payload, decision, err, latency = classify_tool_call(
+                workspace_paths=["/tmp"],
+                prior_prompts=[],
+                active_prompt="Run tests",
+                tool_name="run_command",
+                tool_args={"CommandLine": "pytest"},
+                provider="cloudcode",
+            )
+
+            self.assertIsNone(err)
+            self.assertEqual(decision["decision"], "allow")
+            self.assertEqual(decision["provider"], "cloudcode")
+            self.assertEqual(decision["reason"], "Cloud Code OAuth verified safe operation")
+
+    @patch("hooks.classifier._call_antigravity_sidecar_api")
+    def test_zero_key_fallback_to_sidecar_when_gemini_key_missing(self, mock_sidecar):
+        mock_sidecar.return_value = {
+            "decision": "allow",
+            "reason": "Zero-key sidecar fallback verified",
+            "risk_category": "safe_routine",
+            "confidence": 0.97,
+        }
+
+        # Clear API keys from environment
+        with patch.dict(os.environ, {}, clear=True):
+            raw_payload, decision, err, latency = classify_tool_call(
+                workspace_paths=["/tmp"],
+                prior_prompts=[],
+                active_prompt="Run tests",
+                tool_name="run_command",
+                tool_args={"CommandLine": "pytest"},
+                provider="google",
+                api_key=None,
+            )
+
+            self.assertIsNone(err)
+            self.assertEqual(decision["decision"], "allow")
+            self.assertEqual(decision["reason"], "Zero-key sidecar fallback verified")
+            mock_sidecar.assert_called_once()
 
 
 if __name__ == "__main__":

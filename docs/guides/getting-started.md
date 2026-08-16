@@ -42,16 +42,17 @@ Antigravity automatically discovers the plugin manifest (`plugin.json`) and life
 
 ---
 
-## 2. API Key Configuration
+## 2. Authentication & Zero-Configuration Mode
 
-To enable the decoupled LLM security classifier for unconfigured operations, set your API key in your environment or `~/.bashrc`:
+`auto-permissions` operates out-of-the-box with **zero manual configuration**:
 
-```bash
-# Google Gemini (Default recommended provider)
-export GEMINI_API_KEY="your-gemini-api-key"
-```
-
-*(Alternatively, configure local models or OpenAI/Anthropic gateways; see [`guides/byom-local-models.md`](byom-local-models.md)).*
+- **Zero-Key Inbuilt Mode (Default):** When running inside Antigravity, the bundled background sidecar (`sidecars/worker.py`) automatically leverages your active IDE session and Language Server connection without requiring an external API key.
+- **Google Cloud Code OAuth Mode:** Automatically uses `GOOGLE_OAUTH_TOKEN` or active `gcloud` credentials when available.
+- **Direct API Key (Optional):** If you prefer using a dedicated Google AI Studio key:
+  ```bash
+  export GEMINI_API_KEY="your-gemini-api-key"
+  ```
+- **Local BYOM Inference (Optional):** Route requests to local Ollama, vLLM, or Lemonade instances; see [`guides/byom-local-models.md`](byom-local-models.md).
 
 ---
 
