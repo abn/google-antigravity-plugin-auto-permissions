@@ -3,6 +3,7 @@ import json
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from hooks.policy_engine import (
     PROJECT_CONFIG_REL_PATH,
@@ -192,11 +193,12 @@ class TestPolicyEngine(unittest.TestCase):
 
     def test_resolve_configured_model(self):
         with tempfile.TemporaryDirectory() as ws, tempfile.TemporaryDirectory() as session_dir:
-            # 1. Default fallback
-            self.assertEqual(
-                resolve_configured_model(session_dir=session_dir, workspace_paths=[ws]),
-                "gemini-2.5-flash",
-            )
+            # 1. Default fallback (Antigravity zero-key provider)
+            with patch.dict(os.environ, {}, clear=True):
+                self.assertEqual(
+                    resolve_configured_model(session_dir=session_dir, workspace_paths=[ws]),
+                    "gemini-2.5-flash",
+                )
 
             # 2. Project config override
             config_file = os.path.join(ws, PROJECT_CONFIG_REL_PATH)

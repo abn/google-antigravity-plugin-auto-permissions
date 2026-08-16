@@ -1,122 +1,57 @@
 #!/usr/bin/env python3
-"""
-Unit tests for the Auto-Permissions Sidecar Worker daemon.
-"""
-
-import json
-import threading
-import urllib.error
-import urllib.request
-from http.server import HTTPServer
+import importlib.util
+import os
+import unittest
 from unittest.mock import patch
 
-import pytest
-from sidecars.worker import WORKER_STATE, ClassifierHTTPHandler, ClassifierWorkerState
+script_path = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "../sidecars/auto-permissions-worker/worker.py",
+    )
+)
+spec = importlib.util.spec_from_file_location("auto_permissions_worker", script_path)
+worker = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(worker)
 
 
-class TestSidecarWorker:
-    @pytest.fixture
-    def mock_server(self):
-        """Starts a mock test server on an ephemeral port."""
-        server = HTTPServer(("127.0.0.1", 0), ClassifierHTTPHandler)
-        port = server.server_address[1]
-        t = threading.Thread(target=server.serve_forever, daemon=True)
-        t.start()
-        yield port
-        server.shutdown()
-        server.server_close()
-
-    def test_worker_state_initialization(self):
-        state = ClassifierWorkerState()
-        assert state.trajectory_id is None
-        assert state.project_id is not None
-
-    def test_health_endpoint(self, mock_server):
-        url = f"http://127.0.0.1:{mock_server}/health"
-        with urllib.request.urlopen(url, timeout=3.0) as resp:
-            assert resp.status == 200
-            data = json.loads(resp.read().decode("utf-8"))
-            assert data["status"] == "ok"
-            assert data["service"] == "auto-permissions-worker"
-
-    def test_classify_endpoint_success(self, mock_server):
-        url = f"http://127.0.0.1:{mock_server}/classify"
-        mock_verdict = {
-            "decision": "allow",
-            "reason": "Safe test command matching user prompt",
-            "risk_category": "safe_routine",
-            "confidence": 0.98,
-        }
-
-        with patch.object(WORKER_STATE, "classify_payload", return_value=mock_verdict):
-            req_data = json.dumps(
-                {"raw_prompt": "<test>prompt</test>", "timeout_secs": 2.0}
-            ).encode("utf-8")
-            req = urllib.request.Request(
-                url,
-                data=req_data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=3.0) as resp:
-                assert resp.status == 200
-                data = json.loads(resp.read().decode("utf-8"))
-                assert data["decision"] == "allow"
-                assert data["confidence"] == 0.98
-
-    def test_classify_endpoint_error_handling(self, mock_server):
-        url = f"http://127.0.0.1:{mock_server}/classify"
+class TestSidecarWorker(unittest.TestCase):
+    def test_classify_returns_classification(self):
         with patch.object(
-            WORKER_STATE,
-            "classify_payload",
-            side_effect=RuntimeError("RPC connection refused"),
+            worker.classifier,
+            "_call_antigravity_ls_api",
+            return_value={"decision": "allow", "provider": "antigravity", "confidence": 0.99},
         ):
-            req_data = json.dumps({"raw_prompt": "<test>prompt</test>"}).encode("utf-8")
-            req = urllib.request.Request(
-                url,
-                data=req_data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            try:
-                urllib.request.urlopen(req, timeout=3.0)
-                pytest.fail("Expected HTTP 500 on worker exception")
-            except urllib.error.HTTPError as e:
-                assert e.code == 500
-                body = json.loads(e.read().decode("utf-8"))
-                assert body["decision"] == "ask"
-                assert "RPC connection refused" in body["reason"]
+            result = worker.classify("the-prompt")
+        self.assertEqual(result["decision"], "allow")
+        self.assertEqual(result["provider"], "antigravity")
 
-    def test_shutdown_endpoint(self, mock_server):
-        url = f"http://127.0.0.1:{mock_server}/shutdown"
-        req = urllib.request.Request(
-            url,
-            data=b"{}",
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=3.0) as resp:
-            assert resp.status == 200
-            data = json.loads(resp.read().decode("utf-8"))
-            assert data["status"] == "shutting_down"
+    def test_classify_fails_closed_on_classifier_error(self):
+        with patch.object(
+            worker.classifier,
+            "_call_antigravity_ls_api",
+            side_effect=RuntimeError("LS unreachable"),
+        ):
+            result = worker.classify("the-prompt")
+        self.assertEqual(result["decision"], "ask")
+        self.assertIn("Classifier fallback (sidecar)", result["reason"])
 
-    def test_probe_sidecar_health(self, mock_server):
-        from hooks.classifier import _probe_sidecar_health
+    def test_classify_forwards_prompt(self):
+        captured = {}
 
-        # Active mock server
-        assert _probe_sidecar_health(port=mock_server, timeout_secs=1.0) is True
-        # Unused closed port
-        assert _probe_sidecar_health(port=59999, timeout_secs=0.1) is False
+        def fake_ls_api(raw_prompt, timeout_secs=worker.TIMEOUT_SECS):
+            captured["prompt"] = raw_prompt
+            return {"decision": "allow", "provider": "antigravity"}
 
-    def test_resolve_sidecar_worker_script(self):
-        from hooks.classifier import _resolve_sidecar_worker_script
+        with patch.object(worker.classifier, "_call_antigravity_ls_api", side_effect=fake_ls_api):
+            worker.classify("forward-me")
+        self.assertEqual(captured["prompt"], "forward-me")
 
-        script = _resolve_sidecar_worker_script()
-        assert script is not None
-        assert script.endswith("sidecars/worker.py")
+    def test_port_env_override(self):
+        # The hook and the sidecar share the same fixed default port; the env
+        # var lets a user move it without touching the hook's fallback default.
+        self.assertEqual(worker.PORT, int(os.environ.get("AUTO_PERMISSIONS_SIDECAR_PORT", "4020")))
 
-    def test_ensure_sidecar_running_already_active(self, mock_server):
-        from hooks.classifier import _ensure_sidecar_running
 
-        # Already active on mock_server port
-        assert _ensure_sidecar_running(port=mock_server, max_wait_secs=0.5) is True
+if __name__ == "__main__":
+    unittest.main()

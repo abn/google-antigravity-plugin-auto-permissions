@@ -26,7 +26,7 @@ tags:
 
 # Antigravity Skills Overview & Discovery
 
-The `auto-permissions` plugin includes 4 specialized agent skills providing automated configuration, log inspection, policy remediation, and simulation testing.
+The `auto-permissions` plugin includes 5 specialized agent skills providing automated configuration, log inspection, policy remediation, simulation testing, and accuracy benchmarking.
 
 ---
 
@@ -38,6 +38,7 @@ The `auto-permissions` plugin includes 4 specialized agent skills providing auto
 | **[`auto-permissions-audit`](audit-skill.md)** | "View audit log", "Check denials" | Inspects audit trails, latency metrics, and failure diagnostics. |
 | **[`auto-permissions-fix`](fix-skill.md)** | "Fix permission denials", "Allow blocked tools" | Automatically analyzes audit denials and synthesizes scoped ACL rules. |
 | **[`auto-permissions-test`](test-skill.md)** | "Test permission for <command>" | Dry-run simulation tool evaluating candidate tool calls against prompt history. |
+| **[`auto-permissions-benchmark`](benchmark-skill.md)** | "Benchmark classifier accuracy" | Runs a labeled accuracy battery against any provider/model and reports a score. |
 
 ---
 

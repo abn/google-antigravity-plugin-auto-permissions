@@ -61,6 +61,27 @@ class TestTranscriptParser(unittest.TestCase):
         extracted = extract_user_content(step)
         self.assertEqual(extracted, "Build the project and run pytest")
 
+        # Step with nested classifier payload envelopes
+        nested_xml = (
+            "<USER_REQUEST>\n"
+            "<workspace_roots>\n"
+            '["/workspace/project"]\n'
+            "</workspace_roots>\n\n"
+            "<active_user_prompt>\n"
+            "<USER_REQUEST>\n"
+            "<active_user_prompt>\n"
+            "why are we using MODEL_PLACEHOLDER_M298?\n"
+            "</active_user_prompt>\n"
+            "</USER_REQUEST>\n"
+            "</active_user_prompt>\n"
+            "</USER_REQUEST>"
+        )
+        step_nested = {"type": "USER_INPUT", "content": nested_xml}
+        self.assertEqual(
+            extract_user_content(step_nested),
+            "why are we using MODEL_PLACEHOLDER_M298?",
+        )
+
     def test_read_user_prompts_empty_or_missing(self):
         prior, active = read_user_prompts_from_transcript("/non/existent/path.jsonl")
         self.assertEqual(prior, [])

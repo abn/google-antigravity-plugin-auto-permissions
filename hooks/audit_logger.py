@@ -314,6 +314,8 @@ def generate_markdown_summary(
         # Collapse all newlines, carriage returns, tabs, and backticks into single-line snippet
         cleaned_cmd = " ".join(raw_cmd.replace("`", "").split()).strip()
         cmd_snippet = cleaned_cmd[:42] + "..." if len(cleaned_cmd) > 45 else cleaned_cmd
+        # Escape pipe so the Target cell cannot split the Markdown table columns.
+        cmd_snippet = cmd_snippet.replace("|", "\\|")
 
         dec = r.get("hook_output", {}).get("decision", "unknown").lower()
         if dec == "allow":
@@ -326,10 +328,17 @@ def generate_markdown_summary(
         classification = r.get("classification", {})
         risk_cat = classification.get("risk_category", "")
         latency = classification.get("latency_ms", 0.0)
-        provider = str(classification.get("provider", "gemini")).lower()
-        provider_name = (
-            "Claude" if provider == "anthropic" else "OpenAI" if provider == "openai" else "Gemini"
-        )
+        provider = str(classification.get("provider", "antigravity")).lower()
+        if provider == "antigravity":
+            provider_name = "Antigravity"
+        elif provider == "cloudcode":
+            provider_name = "Cloud Code"
+        elif provider == "anthropic":
+            provider_name = "Claude"
+        elif provider == "openai":
+            provider_name = "OpenAI"
+        else:
+            provider_name = "Gemini"
 
         if "static_policy" in risk_cat:
             mode_str = f"Static ACL ({latency:.1f}ms)"

@@ -50,6 +50,14 @@ This guide provides diagnostic steps for resolving common security gate warnings
   ```
   Verify health via `configure_permissions.py --probe`.
 
+### B2. Zero-key `antigravity` provider fails with `Client sent an HTTP request to an HTTPS server`
+* **Symptom:** Every guarded tool falls back to `ask` with reason `... HTTP 400 Bad Request: Client sent an HTTP request to an HTTPS server`.
+* **Root Cause:** The Antigravity Language Server loopback is HTTPS-only (self-signed), but the classifier defaulted the `ANTIGRAVITY_LS_ADDRESS` (injected as a bare `host:port`) to plain `http://`.
+* **Resolution:** Use a current release where the loopback defaults to `https://` (with an unverified cert) and falls back to the alternate scheme on a transport-level failure. Verify the provider is reachable:
+  ```bash
+  configure_permissions.py --list-models --provider antigravity
+  ```
+
 ### C. Scope Deviation (`soft_deny`) on Legitimate Developer Action
 * **Symptom:** Gate returns `Security Gate (Scope Deviation): ...`.
 * **Root Cause:** The classifier detected that the proposed command (e.g. `cargo build --release`) deviated from the user's immediate prompt phrasing (e.g. "check types").

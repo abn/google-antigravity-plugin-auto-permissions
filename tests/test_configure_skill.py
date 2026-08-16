@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import importlib.util
+import json
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from hooks.policy_engine import (
     SESSION_OVERRIDES_FILENAME,
@@ -28,6 +30,9 @@ spec.loader.exec_module(configure_permissions)
 
 get_effective_configuration = configure_permissions.get_effective_configuration
 format_markdown_summary = configure_permissions.format_markdown_summary
+normalize_provider_alias = configure_permissions.normalize_provider_alias
+normalize_antigravity_model = configure_permissions.normalize_antigravity_model
+_models_endpoint_from_chat = configure_permissions._models_endpoint_from_chat
 
 
 class TestConfigureSkill(unittest.TestCase):
@@ -243,6 +248,66 @@ class TestConfigureSkill(unittest.TestCase):
             )
             config_info2 = get_effective_configuration(workspace_dir=ws)
             self.assertTrue(config_info2["effective_show_turn_summary"])
+
+    def test_normalize_provider_alias(self):
+        self.assertEqual(normalize_provider_alias("gemini"), "google")
+        self.assertEqual(normalize_provider_alias("claude"), "anthropic")
+        self.assertEqual(normalize_provider_alias("oauth"), "cloudcode")
+        self.assertEqual(normalize_provider_alias("antigravity"), "antigravity")
+        self.assertEqual(normalize_provider_alias(None), "")
+
+    @patch.object(configure_permissions.classifier_module, "list_available_models")
+    def test_normalize_antigravity_model_resolves_label(self, mock_models):
+        mock_models.return_value = [
+            {"id": "MODEL_PLACEHOLDER_M298", "label": "Gemini 3.7 Flash (High)"},
+            {"id": "MODEL_OPENAI_GPT_OSS_120B_MEDIUM", "label": "GPT-OSS 120B (Medium)"},
+        ]
+        self.assertEqual(
+            normalize_antigravity_model("Gemini 3.7 Flash (High)"),
+            "MODEL_PLACEHOLDER_M298",
+        )
+        # Already a MODEL_* token -> unchanged
+        self.assertEqual(
+            normalize_antigravity_model("MODEL_PLACEHOLDER_M298"),
+            "MODEL_PLACEHOLDER_M298",
+        )
+        # Unknown label with roster reachable -> returned unchanged
+        self.assertEqual(normalize_antigravity_model("Nope"), "Nope")
+
+    def test_models_endpoint_from_chat(self):
+        self.assertEqual(
+            _models_endpoint_from_chat("http://localhost:13305/v1/chat/completions"),
+            "http://localhost:13305/v1/models",
+        )
+        self.assertEqual(
+            _models_endpoint_from_chat("http://localhost:13305/v1/openai/chat/completions"),
+            "http://localhost:13305/v1/openai/models",
+        )
+        self.assertEqual(
+            _models_endpoint_from_chat("http://localhost:8000"), "http://localhost:8000/models"
+        )
+        self.assertIsNone(_models_endpoint_from_chat(None))
+
+    @patch.object(configure_permissions, "urllib")
+    def test_fetch_openai_models(self, mock_urllib):
+        mock_resp = mock_urllib.request.urlopen.return_value.__enter__.return_value
+        mock_resp.read.return_value = json.dumps(
+            {"data": [{"id": "model-a"}, {"id": "model-b"}]}
+        ).encode("utf-8")
+        self.assertEqual(
+            configure_permissions._fetch_openai_models(
+                "http://localhost:13305/v1/chat/completions"
+            ),
+            ["model-a", "model-b"],
+        )
+        # Unreachable -> []
+        mock_urllib.request.urlopen.side_effect = Exception("down")
+        self.assertEqual(
+            configure_permissions._fetch_openai_models(
+                "http://localhost:13305/v1/chat/completions"
+            ),
+            [],
+        )
 
 
 if __name__ == "__main__":

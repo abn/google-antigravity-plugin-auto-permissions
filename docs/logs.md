@@ -65,4 +65,6 @@ This log tracks documentation additions, structural refactors, benchmark refresh
 - **Zero-Key Authentication & Persistent Sidecar Worker:**
   - Introduced bundled background sidecar daemon (`sidecars/worker.py`, `sidecars/sidecar.json`) bridging the security gate to the active Antigravity Language Server session with persistent KV-prefix cache warmth.
   - Implemented multi-tier zero-key fallback cascade in `hooks/classifier.py` (`_call_antigravity_sidecar_api` -> `_call_cloudcode_oauth_api` -> fail closed).
+  - **Superseded (2026-08-16):** The sidecar worker was removed. Zero-key classification now calls the Language Server directly via single-turn `GetModelResponse` over the HTTPS Connect-RPC loopback (transport defaulted to `https://`), resolving the model from the live `GetUserStatus` roster for self-healing on model retirement.
+  - **Revised (2026-08-16):** A thin plugin sidecar (`sidecars/auto-permissions-worker/`) was restored. PreToolUse hooks run without the LS connection environment, so the gate calls the sidecar over loopback HTTP; the sidecar (spawned by Antigravity with the env injected) calls the single-turn `GetModelResponse` directly. This is the cross-platform hook path; contexts that carry the env still classify directly.
 

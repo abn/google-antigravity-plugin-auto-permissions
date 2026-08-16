@@ -57,6 +57,18 @@ The bundled CLI tool (`configure_permissions.py`) allows viewing and updating al
 python3 skills/auto-permissions-configure/scripts/configure_permissions.py
 ```
 
+### List Available Models
+```bash
+# Live Antigravity account roster (with quota)
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --list-models --provider antigravity
+
+# Local OpenAI-compatible /v1/models endpoint
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --list-models --provider openai --endpoint-url "http://localhost:8000/v1/chat/completions"
+```
+> Only Antigravity exposes a curated, quota-bearing roster. Local/OpenAI-compatible endpoints can expose hundreds of models (e.g. OpenRouter), so the default for those providers is to enter a model name directly via `--model`; listing is available only when an endpoint is supplied.
+
 ### Add Static ACL Rule to Repository
 ```bash
 # Allow specific build command in Project scope
