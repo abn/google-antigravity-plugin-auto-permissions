@@ -587,6 +587,11 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
                 ):
                     if bool_k in data and isinstance(data[bool_k], bool):
                         policy[bool_k] = data[bool_k]
+                raw_gov_surfaces = data.get("governed_surfaces")
+                if isinstance(raw_gov_surfaces, dict):
+                    for k in ("subagents", "schedule", "images"):
+                        if k in raw_gov_surfaces and isinstance(raw_gov_surfaces[k], bool):
+                            policy[f"govern_{k}"] = raw_gov_surfaces[k]
                 if (
                     policy.get("show_turn_summary") is None
                     and policy.get("disclose_turn_summary") is not None
@@ -653,13 +658,14 @@ def resolve_governed_surfaces(
 ) -> dict[str, bool]:
     """
     Resolves whether subagents, schedule, and images require security gate classification.
-    Defaults to False (opt-in) unless configured in Session, Project, Global, bundles, or env vars.
+    Defaults: subagents=True, schedule=True, images=False.
+    Can be overridden in Session, Project, Global scopes, bundles, or environment variables.
     """
     scope_files = [f for _, f in get_scope_file_candidates(session_dir, workspace_paths)]
 
     governed = {
-        "subagents": False,
-        "schedule": False,
+        "subagents": True,
+        "schedule": True,
         "images": False,
     }
 
@@ -669,7 +675,7 @@ def resolve_governed_surfaces(
         pol = load_policy_file(f_path)
         for k in ("subagents", "schedule", "images"):
             pol_key = f"govern_{k}"
-            if pol.get(pol_key) is not None and not governed[k]:
+            if pol.get(pol_key) is not None:
                 governed[k] = bool(pol[pol_key])
         for s in pol.get("govern_surfaces", []):
             clean_s = s.strip().lower()
@@ -682,13 +688,19 @@ def resolve_governed_surfaces(
         if v and k in governed:
             governed[k] = True
 
-    # Environment variables
-    if os.environ.get("AUTO_PERMISSIONS_GOVERN_SUBAGENTS") in ("1", "true", "yes"):
-        governed["subagents"] = True
-    if os.environ.get("AUTO_PERMISSIONS_GOVERN_SCHEDULE") in ("1", "true", "yes"):
-        governed["schedule"] = True
-    if os.environ.get("AUTO_PERMISSIONS_GOVERN_IMAGES") in ("1", "true", "yes"):
-        governed["images"] = True
+    # Environment variables (explicit true or false overrides)
+    for k, env_var in (
+        ("subagents", "AUTO_PERMISSIONS_GOVERN_SUBAGENTS"),
+        ("schedule", "AUTO_PERMISSIONS_GOVERN_SCHEDULE"),
+        ("images", "AUTO_PERMISSIONS_GOVERN_IMAGES"),
+    ):
+        val = os.environ.get(env_var)
+        if val is not None:
+            clean_v = val.strip().lower()
+            if clean_v in ("1", "true", "yes"):
+                governed[k] = True
+            elif clean_v in ("0", "false", "no"):
+                governed[k] = False
 
     env_surfaces = os.environ.get("AUTO_PERMISSIONS_GOVERN_SURFACES", "")
     if env_surfaces:
