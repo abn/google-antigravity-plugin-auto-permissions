@@ -104,6 +104,29 @@ class TestConfigureSkill(unittest.TestCase):
                 local_policy["endpoint_url"], "http://localhost:8000/v1/chat/completions"
             )
 
+    def test_configure_antigravity_and_cloudcode_providers(self):
+        with tempfile.TemporaryDirectory() as ws:
+            update_classifier_settings_in_scope(
+                settings={"provider": "antigravity"},
+                scope="project",
+                workspace_dir=ws,
+            )
+            proj_file = resolve_scope_file_path("project", workspace_dir=ws)
+            proj_policy = load_policy_file(proj_file)
+            self.assertEqual(proj_policy["provider"], "antigravity")
+
+            config_info = get_effective_configuration(workspace_dir=ws)
+            self.assertEqual(config_info["effective_classifier"]["provider"], "antigravity")
+
+            update_classifier_settings_in_scope(
+                settings={"provider": "cloudcode"},
+                scope="project_local",
+                workspace_dir=ws,
+            )
+            local_file = resolve_scope_file_path("project_local", workspace_dir=ws)
+            local_policy = load_policy_file(local_file)
+            self.assertEqual(local_policy["provider"], "cloudcode")
+
     def test_configure_timeout_setting(self):
         with tempfile.TemporaryDirectory() as ws:
             update_classifier_settings_in_scope(
