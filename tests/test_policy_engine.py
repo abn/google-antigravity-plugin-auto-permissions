@@ -733,6 +733,10 @@ class TestPolicyEngine(unittest.TestCase):
         self.assertFalse(is_safe_read_only_command("echo $(cat ~/.ssh/id_rsa)"))
         self.assertFalse(is_safe_read_only_command("head -n 10 file.txt | rm -rf"))
         self.assertFalse(is_safe_read_only_command("cat /etc/shadow"))
+        self.assertFalse(
+            is_safe_read_only_command("head -n 20 README.md | grep secret ~/.ssh/id_rsa")
+        )
+        self.assertFalse(is_safe_read_only_command("cat README.md | grep secret /etc/shadow"))
 
     def test_check_same_turn_file_grant(self):
         with tempfile.TemporaryDirectory() as tmpdir:

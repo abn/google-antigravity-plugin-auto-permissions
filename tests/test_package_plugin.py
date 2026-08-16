@@ -38,6 +38,8 @@ class TestPackagePlugin(unittest.TestCase):
                 self.assertIn("auto-permissions/README.md", names)
                 self.assertIn("auto-permissions/hooks/auto_approve_gate.py", names)
                 self.assertIn("auto-permissions/rules/auto_permissions.md", names)
+                self.assertIn("auto-permissions/sidecars/sidecar.json", names)
+                self.assertIn("auto-permissions/sidecars/worker.py", names)
                 self.assertIn("auto-permissions/skills/auto-permissions-configure/SKILL.md", names)
 
                 # Development files that MUST NOT be present

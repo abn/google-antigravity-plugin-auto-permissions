@@ -307,18 +307,22 @@ def main():
         "--provider",
         "-P",
         choices=[
+            "antigravity",
             "google",
+            "cloudcode",
             "openai",
             "anthropic",
             "gemini",
             "claude",
-            "antigravity",
             "sidecar",
             "worker",
-            "cloudcode",
             "oauth",
         ],
-        help="Set classifier provider protocol (antigravity, google, cloudcode, etc.).",
+        metavar="PROVIDER",
+        help=(
+            "Set classifier provider (canonical: antigravity, google, "
+            "cloudcode, openai, anthropic; aliases: gemini, claude, sidecar, oauth)."
+        ),
     )
     parser.add_argument(
         "--model",

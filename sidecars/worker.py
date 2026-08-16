@@ -106,10 +106,10 @@ class ClassifierWorkerState:
                 pass
 
         return {
-            "decision": res.get("decision", "allow"),
-            "reason": res.get("reason", "Approved via Antigravity Language Server worker"),
-            "risk_category": res.get("risk_category", "safe_routine"),
-            "confidence": float(res.get("confidence", 0.95)),
+            "decision": str(res.get("decision", "ask")).lower(),
+            "reason": res.get("reason", "Evaluated via Antigravity Language Server worker"),
+            "risk_category": res.get("risk_category", "unknown"),
+            "confidence": float(res.get("confidence", 0.0)),
             "provider": "antigravity_worker",
         }
 
