@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "python-tooling",
+  "description": "Standard Python test, lint, and formatting tools (pytest, ruff, black, flake8, mypy, uv lock, uv run pytest)",
+  "version": "1.0.0",
+  "allow": [
+    "command(pytest*)",
+    "command(python -m pytest*)",
+    "command(python3 -m pytest*)",
+    "command(uv run pytest*)",
+    "command(uv run --frozen pytest*)",
+    "command(ruff check*)",
+    "command(ruff format*)",
+    "command(black*)",
+    "command(flake8*)",
+    "command(mypy*)",
+    "command(uv lock*)"
+  ]
+}

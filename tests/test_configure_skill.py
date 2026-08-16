@@ -5,8 +5,6 @@ import tempfile
 import unittest
 
 from hooks.policy_engine import (
-    PROJECT_CONFIG_REL_PATH,
-    PROJECT_LOCAL_CONFIG_REL_PATH,
     SESSION_OVERRIDES_FILENAME,
     add_guideline_to_scope,
     add_rule_to_scope,
@@ -14,6 +12,7 @@ from hooks.policy_engine import (
     load_policy_file,
     remove_guideline_from_scope,
     remove_rule_from_scope,
+    resolve_scope_file_path,
     update_classifier_settings_in_scope,
 )
 
@@ -42,7 +41,7 @@ class TestConfigureSkill(unittest.TestCase):
                 workspace_dir=ws,
             )
 
-            proj_file = os.path.join(ws, PROJECT_CONFIG_REL_PATH)
+            proj_file = resolve_scope_file_path("project", workspace_dir=ws)
             policy = load_policy_file(proj_file)
             self.assertIn("command(pytest -v)", policy["allow"])
 
@@ -64,7 +63,7 @@ class TestConfigureSkill(unittest.TestCase):
                 workspace_dir=ws,
             )
 
-            local_file = os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH)
+            local_file = resolve_scope_file_path("project_local", workspace_dir=ws)
             local_policy = load_policy_file(local_file)
             self.assertIn("~/.nowledge-mem/skills-active", local_policy["allowed_skill_paths"])
 
@@ -97,7 +96,7 @@ class TestConfigureSkill(unittest.TestCase):
                 workspace_dir=ws,
             )
 
-            local_file = os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH)
+            local_file = resolve_scope_file_path("project_local", workspace_dir=ws)
             local_policy = load_policy_file(local_file)
             self.assertEqual(local_policy["provider"], "openai")
             self.assertEqual(local_policy["model"], "gemma-2-9b-it")
@@ -113,7 +112,7 @@ class TestConfigureSkill(unittest.TestCase):
                 workspace_dir=ws,
             )
 
-            proj_file = os.path.join(ws, PROJECT_CONFIG_REL_PATH)
+            proj_file = resolve_scope_file_path("project", workspace_dir=ws)
             proj_policy = load_policy_file(proj_file)
             self.assertEqual(proj_policy["timeout"], 8.0)
 

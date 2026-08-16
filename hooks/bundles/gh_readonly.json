@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "gh-readonly",
+  "description": "Read-only GitHub CLI queries (pr view/list/checks/diff/status, run list/view, issue list/view, release list/view, repo view)",
+  "version": "1.0.0",
+  "allow": [
+    "command(gh pr view*)",
+    "command(gh pr list*)",
+    "command(gh pr checks*)",
+    "command(gh pr diff*)",
+    "command(gh pr status*)",
+    "command(gh run list*)",
+    "command(gh run view*)",
+    "command(gh issue list*)",
+    "command(gh issue view*)",
+    "command(gh release list*)",
+    "command(gh release view*)",
+    "command(gh repo view*)"
+  ]
+}

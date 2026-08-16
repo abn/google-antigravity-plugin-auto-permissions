@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "dev-docs-read",
+  "description": "Safe read access to official developer documentation websites (python, mdn, readthedocs, pkg.go.dev, crates.io, docs.rs, npmjs)",
+  "version": "1.0.0",
+  "allow": [
+    "read_url(https://docs.python.org/*)",
+    "read_url(https://developer.mozilla.org/*)",
+    "read_url(https://*.readthedocs.io/*)",
+    "read_url(https://pkg.go.dev/*)",
+    "read_url(https://docs.rs/*)",
+    "read_url(https://crates.io/*)",
+    "read_url(https://www.npmjs.com/*)",
+    "read_url(https://github.com/*/wiki/*)"
+  ]
+}

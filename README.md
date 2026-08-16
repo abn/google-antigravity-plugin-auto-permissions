@@ -163,9 +163,118 @@ Simulates how the security classifier and static policies would evaluate a hypot
 
 ---
 
-## Configuration: Providers, Endpoints & Static ACLs
+---
 
-You can configure project-level policies in `.agents/auto-permissions.json` (tracked) or `.agents/auto-permissions.local.json` (untracked local secrets/overrides, ignored by git), or globally in `~/.gemini/config/auto-permissions.json`:
+## Permission Bundles
+
+**Permission Bundles** provide curated, reusable sets of static ACL rules, semantic guidelines, and skill whitelists that can be enabled with a single command or configuration entry. Instead of writing dozens of individual regex rules for standard tools, developers can activate domain-specific bundles.
+
+### 1. Built-in Bundles Catalog
+
+`auto-permissions` ships with 8 pre-packaged, zero-dependency built-in bundles:
+
+| Bundle Slug | Domain / Tools | Included Rules & Capabilities |
+| :--- | :--- | :--- |
+| **`git-inspect`** | Git Inspection | Read-only repository inspection (`git status`, `log`, `diff`, `branch`, `show`, `tag`, `remote`, `rev-parse`, `describe`). |
+| **`gh-readonly`** | GitHub CLI | Read-only GitHub queries (`gh pr view/list/checks/diff/status`, `run list/view`, `issue list/view`, `release list/view`, `repo view`). |
+| **`python-tooling`** | Python Dev Tools | Safe Python testing, formatting, and linting (`pytest`, `python -m pytest`, `uv run pytest`, `ruff check/format`, `black`, `flake8`, `mypy`, `uv lock`). |
+| **`rust-tooling`** | Rust / Cargo | Standard Cargo build, test, and lint commands (`cargo test`, `check`, `clippy`, `fmt`, `doc`, `build`). |
+| **`node-tooling`** | Node.js / Web | Common JavaScript/TypeScript testing and linting (`npm/pnpm/yarn/bun test/lint`, `eslint`, `prettier`). |
+| **`container-inspect`** | Docker & Podman | Safe container status inspection (`podman/docker ps`, `logs`, `images`, `inspect`). |
+| **`dev-docs-read`** | Web Documentation | Whitelisted read access to official documentation sites (`docs.python.org`, `developer.mozilla.org`, `readthedocs.io`, `pkg.go.dev`, `crates.io`, `docs.rs`, `npmjs.com`). |
+| **`mcp-nmem`** | Nowledge Mem MCP | Read-only search, lookup, and memory query tools for Nowledge Mem. |
+
+### 2. Enabling Bundles
+
+Enable bundles via CLI:
+```bash
+# Enable in the active project (.agents/auto-permissions/config.json)
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --scope project \
+  --enable-bundle git-inspect \
+  --enable-bundle gh-readonly \
+  --enable-bundle python-tooling
+
+# Enable globally for all workspaces (~/.gemini/config/auto-permissions/config.json)
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --scope global \
+  --enable-bundle git-inspect
+```
+
+Or configure directly in your `config.json`:
+```json
+{
+  "bundles": [
+    "git-inspect",
+    "gh-readonly",
+    "python-tooling"
+  ]
+}
+```
+
+### 3. Disabling & Overriding Global Bundles in Projects
+
+If a bundle is enabled globally, a specific project or session can mask or disable it:
+
+```bash
+# Disable rust-tooling in this specific project
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --scope project \
+  --disable-bundle rust-tooling
+```
+
+In `config.json`:
+```json
+{
+  "bundles": {
+    "enabled": ["python-tooling"],
+    "disabled": ["rust-tooling"]
+  }
+}
+```
+
+### 4. Custom & Extensible Bundles
+
+You can define custom bundles in three ways:
+
+1. **Project Bundles:** Place JSON files in `.agents/auto-permissions/bundles/<name>.json` (tracked) or `.agents/auto-permissions/bundles.local/<name>.json` (local).
+2. **Global Bundles:** Place JSON files in `~/.gemini/config/auto-permissions/bundles/<name>.json`.
+3. **Inline Custom Bundles:** Define them directly under `"custom_bundles"` in `config.json`.
+
+Custom bundles can extend existing bundles via `"extends"`:
+```json
+{
+  "name": "custom-ci-tools",
+  "description": "Custom testing suite combining Python and container tools",
+  "extends": ["python-tooling", "container-inspect"],
+  "allow": [
+    "command(make test)",
+    "command(docker compose ps)"
+  ]
+}
+```
+
+---
+
+## Configuration: Providers, Endpoints & Scoped Layout
+
+### Scoped Configuration Layout
+
+`auto-permissions` uses a clean, encapsulated directory structure that prevents namespace collisions with other agent tools:
+
+* **Project Tracked:** `.agents/auto-permissions/config.json` (committed to git, shared with team).
+* **Project Local:** `.agents/auto-permissions/config.local.json` (gitignored, private tokens/endpoints).
+* **Global:** `~/.gemini/config/auto-permissions/config.json` (applies to all user workspaces).
+* **Session:** `<session_dir>/auto-permissions/session_overrides.json` (active turn/session overrides).
+
+*(Note: Legacy flat filenames `.agents/auto-permissions.json` and `~/.gemini/config/auto-permissions.json` remain fully supported via backward-compatible fallback resolution).*
+
+To automatically migrate an existing repository to the new scoped structure:
+```bash
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py --migrate-layout
+```
+
+### Configuration File Format (`config.json`)
 
 ```json
 {
@@ -173,9 +282,13 @@ You can configure project-level policies in `.agents/auto-permissions.json` (tra
   "model": "gemini-2.5-flash",
   "endpoint_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
   "api_key_env": "GEMINI_API_KEY",
+  "bundles": [
+    "git-inspect",
+    "gh-readonly",
+    "python-tooling"
+  ],
   "allow": [
     "command(uv lock)",
-    "command(pytest -v)",
     "mcp(nowledge-mem:*)"
   ],
   "ask": [
@@ -213,14 +326,16 @@ You can configure project-level policies in `.agents/auto-permissions.json` (tra
 
 ### Complete Configuration Levers Reference
 
-#### 1. JSON Policy Configuration Levers (`auto-permissions.json`, `auto-permissions.local.json`, `session_overrides.json`)
+#### 1. JSON Policy Configuration Levers (`config.json`, `config.local.json`, `session_overrides.json`)
 
 | Configuration Field | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
+| `bundles` | `array[string]` or `object` | `[]` | Active permission bundles (`["git-inspect", ...]` or `{"enabled": [...], "disabled": [...]}`). |
+| `custom_bundles` | `object` | `{}` | Inline custom bundle definitions dictionary. |
 | `provider` | `string` | `"google"` | Classification provider/protocol (`"google"`, `"openai"`, `"anthropic"`). |
 | `model` | `string` | `"gemini-2.5-flash"` | Target LLM model name (e.g. `gemini-2.5-flash`, `gpt-4o-mini`, `claude-3-5-haiku-20241022`). |
 | `endpoint_url` | `string` | *Provider default* | Custom REST API endpoint URI (e.g. local vLLM/Lemonade/Ollama or reverse proxy). |
-| `api_key` | `string` | `null` | Direct API token string (recommended only in `.agents/auto-permissions.local.json`). |
+| `api_key` | `string` | `null` | Direct API token string (recommended only in `config.local.json`). |
 | `api_key_env` | `string` | *Provider default* | Name of custom environment variable holding the API key. |
 | `allow` | `array[string]` | `[]` | Static ACL rules auto-approved in `0.1ms` without invoking LLM classifier. |
 | `ask` | `array[string]` | `[]` | Static ACL rules forcing interactive human prompt in `0.1ms`. |
@@ -267,9 +382,22 @@ auto-permissions/
 ├── hooks.json                               # Lifecycle hook configuration
 ├── pyproject.toml                           # uv project and test configuration
 ├── .agents/
-│   ├── auto-permissions.json               # Project-level static ACL policy grants (tracked)
-│   └── auto-permissions.local.json         # Local untracked secrets & overrides (gitignored)
+│   └── auto-permissions/
+│       ├── config.json                      # Project-level static ACL grants & active bundles (tracked)
+│       ├── config.local.json                # Local untracked secrets & overrides (gitignored)
+│       ├── bundles/                         # Project-specific custom bundles (tracked)
+│       └── bundles.local/                   # Project-specific local custom bundles (untracked)
 ├── hooks/
+│   ├── bundles/                             # Built-in zero-dependency bundles
+│   │   ├── __init__.py                      # Bundle loader and registry
+│   │   ├── git_inspect.json                 # git-inspect bundle
+│   │   ├── gh_readonly.json                 # gh-readonly bundle
+│   │   ├── python_tooling.json              # python-tooling bundle
+│   │   ├── rust_tooling.json                # rust-tooling bundle
+│   │   ├── node_tooling.json                # node-tooling bundle
+│   │   ├── container_inspect.json           # container-inspect bundle
+│   │   ├── dev_docs_read.json               # dev-docs-read bundle
+│   │   └── mcp_nmem.json                    # mcp-nmem bundle
 │   ├── auto_approve_gate.py                 # Main PreToolUse entrypoint
 │   ├── pre_invocation.py                    # PreInvocation dynamic summary injector
 │   ├── policy_engine.py                     # Fast-path static policy evaluation & scoping
@@ -298,7 +426,8 @@ auto-permissions/
 ├── docs/
 │   └── architecture.md                      # Comprehensive technical architecture
 └── tests/
-    ├── test_configure_skill.py
+    ├── test_bundles.py                      # Unit tests for permission bundles & resolution
+    ├── test_configure_skill.py              # Unit tests for configure CLI
     ├── test_transcript_parser.py
     ├── test_audit_logger.py
     ├── test_classifier.py
