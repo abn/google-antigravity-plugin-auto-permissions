@@ -99,3 +99,24 @@ class TestSidecarWorker:
             assert resp.status == 200
             data = json.loads(resp.read().decode("utf-8"))
             assert data["status"] == "shutting_down"
+
+    def test_probe_sidecar_health(self, mock_server):
+        from hooks.classifier import _probe_sidecar_health
+
+        # Active mock server
+        assert _probe_sidecar_health(port=mock_server, timeout_secs=1.0) is True
+        # Unused closed port
+        assert _probe_sidecar_health(port=59999, timeout_secs=0.1) is False
+
+    def test_resolve_sidecar_worker_script(self):
+        from hooks.classifier import _resolve_sidecar_worker_script
+
+        script = _resolve_sidecar_worker_script()
+        assert script is not None
+        assert script.endswith("sidecars/worker.py")
+
+    def test_ensure_sidecar_running_already_active(self, mock_server):
+        from hooks.classifier import _ensure_sidecar_running
+
+        # Already active on mock_server port
+        assert _ensure_sidecar_running(port=mock_server, max_wait_secs=0.5) is True
