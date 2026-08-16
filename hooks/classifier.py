@@ -16,6 +16,7 @@ from typing import Any
 
 DEFAULT_PROVIDER = "google"
 DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_TIMEOUT_SECS = 6.0
 GOOGLE_ENDPOINT_TEMPLATE = (
     "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
 )
@@ -336,7 +337,7 @@ def _call_anthropic_api(
         return _parse_decision_text(raw_text)
 
 
-def _format_request_error(exc: Exception) -> str:
+def _format_request_error(exc: Exception, timeout_secs: float = DEFAULT_TIMEOUT_SECS) -> str:
     """Extracts granular, sanitized HTTP error code and response payload snippet."""
     if isinstance(exc, urllib.error.HTTPError):
         body_snippet = ""
@@ -364,8 +365,8 @@ def _format_request_error(exc: Exception) -> str:
     if isinstance(exc, urllib.error.URLError):
         reason = str(exc.reason)
         return f"Network/Connection error: {reason}"
-    if isinstance(exc, TimeoutError):
-        return "Request timed out (>4.0s)"
+    if isinstance(exc, TimeoutError) or "timed out" in str(exc).lower():
+        return f"Request timed out (>{timeout_secs:.1f}s)"
     return str(exc)
 
 
@@ -383,7 +384,7 @@ def classify_tool_call(
     model: str = DEFAULT_MODEL,
     endpoint_url: str | None = None,
     api_key: str | None = None,
-    timeout_secs: float = 4.0,
+    timeout_secs: float = DEFAULT_TIMEOUT_SECS,
 ) -> tuple[str, dict[str, Any], str | None, float]:
     """
     Invokes the security classifier using the specified provider ('google', 'openai', 'anthropic').
@@ -408,7 +409,9 @@ def classify_tool_call(
     elif norm_provider == "claude":
         norm_provider = "anthropic"
 
-    env_timeout = os.environ.get("AUTO_PERMISSIONS_TIMEOUT")
+    env_timeout = os.environ.get("AUTO_PERMISSIONS_TIMEOUT") or os.environ.get(
+        "AUTO_PERMISSIONS_TIMEOUT_SECS"
+    )
     if env_timeout:
         with contextlib.suppress(ValueError, TypeError):
             timeout_secs = float(env_timeout)
@@ -446,7 +449,7 @@ def classify_tool_call(
 
     except Exception as exc:
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-        err_msg = _format_request_error(exc)
+        err_msg = _format_request_error(exc, timeout_secs=timeout_secs)
         fallback = {
             "decision": "ask",
             "reason": f"Classifier fallback on error ({norm_provider}): {err_msg}",

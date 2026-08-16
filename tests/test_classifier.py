@@ -284,6 +284,25 @@ class TestClassifier(unittest.TestCase):
         self.assertEqual(decision["decision"], "ask")
         self.assertEqual(decision["risk_category"], "classifier_error_fallback")
 
+    @patch("urllib.request.urlopen")
+    def test_classify_tool_call_timeout_error(self, mock_urlopen):
+        mock_urlopen.side_effect = TimeoutError("The read operation timed out")
+
+        raw_payload, decision, err, latency = classify_tool_call(
+            workspace_paths=["/tmp"],
+            prior_prompts=[],
+            active_prompt="Run tests",
+            tool_name="run_command",
+            tool_args={"CommandLine": "pytest"},
+            provider="google",
+            api_key="mock-gemini-key",
+            timeout_secs=6.0,
+        )
+
+        self.assertIn("Request timed out (>6.0s)", str(err))
+        self.assertEqual(decision["decision"], "ask")
+        self.assertEqual(decision["risk_category"], "classifier_error_fallback")
+
     def test_clean_json_text_variants(self):
         # 1. Plain JSON
         self.assertEqual(

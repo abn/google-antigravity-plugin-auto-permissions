@@ -224,7 +224,7 @@ Every classification event produces an atomic single-line JSON record:
 | Metric | Target | Measured (Live API) |
 | :--- | :--- | :--- |
 | **Classification Turnaround** | $< 1000\text{ms}$ | $300\text{ms} - 550\text{ms}$ |
-| **Socket Timeout** | $4.0\text{s}$ | Enforced |
+| **Socket Timeout** | $6.0\text{s}$ (Configurable) | Enforced (Default: 6.0s) |
 | **Hook Timeout Budget** | $10.0\text{s}$ | Configured in `hooks.json` |
 | **Audit Log Latency Impact** | $0.0\text{ms}$ (Async) | $< 0.1\text{ms}$ thread spawn |
 | **Token Overhead per Call** | $< 250\text{ tokens}$ | $\approx 120 - 180\text{ tokens}$ |
@@ -305,8 +305,8 @@ The `auto-permissions` gate intercepts all MCP tool invocations (`call_mcp_tool`
   2. **Local Project Scope (Untracked Secrets):** `<workspace>/.agents/auto-permissions.local.json` *(Ignored by `.gitignore`)*
   3. **Project Scope (Tracked Repository Policy):** `<workspace>/.agents/auto-permissions.json`
   4. **Global Scope:** `~/.gemini/config/auto-permissions.json`
-  5. **Environment Variables:** `AUTO_PERMISSIONS_PROVIDER`, `AUTO_PERMISSIONS_MODEL`, `AUTO_PERMISSIONS_ENDPOINT_URL`, `AUTO_PERMISSIONS_API_KEY` (or provider-specific vars like `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`). Timeouts can be extended for large local models via `AUTO_PERMISSIONS_TIMEOUT` (seconds, defaults to `4.0s`).
-  6. **Defaults:** Provider `google`, Model `gemini-2.5-flash`
+  5. **Environment Variables:** `AUTO_PERMISSIONS_PROVIDER`, `AUTO_PERMISSIONS_MODEL`, `AUTO_PERMISSIONS_ENDPOINT_URL`, `AUTO_PERMISSIONS_API_KEY` (or provider-specific vars like `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`). Timeouts can be extended via `AUTO_PERMISSIONS_TIMEOUT` (seconds, defaults to `6.0s`) or policy configuration files.
+  6. **Defaults:** Provider `google`, Model `gemini-2.5-flash`, Timeout `6.0s`
 
 ### 8.6 Symlink Canonicalization, Safe Skill Reading & Traversal Defense
 Agent skills and configurations frequently involve symbolic links (e.g. skills symlinked from external tool managers or virtual caches).

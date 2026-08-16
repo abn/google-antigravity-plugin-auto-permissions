@@ -249,7 +249,7 @@ You can configure project-level policies in `.agents/auto-permissions.json` (tra
 | `AUTO_PERMISSIONS_TRUST_WORKSPACE_WRITES` | `1` | Override workspace write fast-path (`1`/`0` or `true`/`false`). |
 | `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY` | `1` | Override turn-scoped security gate disclosure table (`1`/`0` or `true`/`false`). |
 | `AUTO_PERMISSIONS_DISCLOSE_TURN_SUMMARY` | `1` | Alias for `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY`. |
-| `AUTO_PERMISSIONS_TIMEOUT` | `4.0` | HTTP classifier timeout in seconds. Increase for large local LLMs (e.g. `60.0`). |
+| `AUTO_PERMISSIONS_TIMEOUT` | `6.0` | HTTP classifier timeout in seconds (or `AUTO_PERMISSIONS_TIMEOUT_SECS`). Configurable via policy files (`timeout`) or CLI. |
 | `AUTO_PERMISSIONS_GOVERN_SUBAGENTS` | `0` | Set `1` to enable classifier evaluation for `invoke_subagent`. |
 | `AUTO_PERMISSIONS_GOVERN_SCHEDULE` | `0` | Set `1` to enable classifier evaluation for `schedule`. |
 | `AUTO_PERMISSIONS_GOVERN_IMAGES` | `0` | Set `1` to enable classifier evaluation for `generate_image`. |

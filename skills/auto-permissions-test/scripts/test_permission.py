@@ -106,6 +106,7 @@ def evaluate_simulated_permission(
         model=resolved_model,
         endpoint_url=resolved_endpoint,
         api_key=resolved_key,
+        timeout_secs=cfg.get("timeout_secs", 6.0),
     )
 
     return {

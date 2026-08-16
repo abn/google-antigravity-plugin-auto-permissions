@@ -177,6 +177,19 @@ python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
   --show-turn-summary
 ```
 
+### 8. Configure Classifier Timeout
+```bash
+# Set project-scoped classifier timeout to 8.0s (for high-latency networks)
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --scope project \
+  --timeout 8.0
+
+# Set global classifier timeout to 6.0s (default)
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --scope global \
+  --timeout 6.0
+```
+
 ---
 
 ## Step 3: Validate with `auto-permissions-test`

@@ -16,6 +16,7 @@ PROJECT_CONFIG_REL_PATH = os.path.join(".agents", "auto-permissions.json")
 PROJECT_LOCAL_CONFIG_REL_PATH = os.path.join(".agents", "auto-permissions.local.json")
 SESSION_PLUGIN_SUBDIR = "auto-permissions"
 SESSION_OVERRIDES_FILENAME = "session_overrides.json"
+DEFAULT_TIMEOUT_SECS = 6.0
 
 
 def resolve_session_override_path(session_dir: str | None) -> str | None:
@@ -452,6 +453,8 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
         "endpoint_url": None,
         "api_key": None,
         "api_key_env": None,
+        "timeout": None,
+        "timeout_secs": None,
     }
     if not file_path or not os.path.isfile(file_path):
         return policy
@@ -486,6 +489,15 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
                     and policy.get("disclose_turn_summary") is not None
                 ):
                     policy["show_turn_summary"] = policy["disclose_turn_summary"]
+                for num_k in ("timeout", "timeout_secs"):
+                    val = data.get(num_k)
+                    if val is not None:
+                        with contextlib.suppress(ValueError, TypeError):
+                            policy[num_k] = float(val)
+                if policy.get("timeout") is None and policy.get("timeout_secs") is not None:
+                    policy["timeout"] = policy["timeout_secs"]
+                elif policy.get("timeout") is not None and policy.get("timeout_secs") is None:
+                    policy["timeout_secs"] = policy["timeout"]
                 for str_k in (
                     "provider",
                     "protocol",
@@ -1249,6 +1261,7 @@ def resolve_classifier_config(
         "endpoint_url": None,
         "api_key": None,
         "api_key_env": None,
+        "timeout_secs": None,
     }
 
     for f_path in scope_files:
@@ -1258,6 +1271,12 @@ def resolve_classifier_config(
         for k in ("provider", "model", "endpoint_url", "api_key", "api_key_env"):
             if merged[k] is None and pol.get(k):
                 merged[k] = pol[k]
+        if merged["timeout_secs"] is None:
+            for tk in ("timeout", "timeout_secs"):
+                if pol.get(tk) is not None:
+                    with contextlib.suppress(ValueError, TypeError):
+                        merged["timeout_secs"] = float(pol[tk])
+                        break
 
     # Environment variable overrides/fallbacks
     env_provider = os.environ.get("AUTO_PERMISSIONS_PROVIDER") or os.environ.get(
@@ -1282,6 +1301,13 @@ def resolve_classifier_config(
     )
     if merged["endpoint_url"] is None and env_endpoint:
         merged["endpoint_url"] = env_endpoint.strip()
+
+    env_timeout = os.environ.get("AUTO_PERMISSIONS_TIMEOUT") or os.environ.get(
+        "AUTO_PERMISSIONS_TIMEOUT_SECS"
+    )
+    if merged["timeout_secs"] is None and env_timeout:
+        with contextlib.suppress(ValueError, TypeError):
+            merged["timeout_secs"] = float(env_timeout)
 
     # Determine provider (normalize 'gemini' -> 'google', 'claude' -> 'anthropic')
     provider = (merged["provider"] or "").lower()
@@ -1334,12 +1360,42 @@ def resolve_classifier_config(
     if not api_key:
         api_key = os.environ.get("AUTO_PERMISSIONS_API_KEY")
 
+    resolved_timeout = (
+        merged["timeout_secs"] if merged["timeout_secs"] is not None else DEFAULT_TIMEOUT_SECS
+    )
+
     return {
         "provider": provider,
         "model": model,
         "endpoint_url": endpoint or None,
         "api_key": api_key,
+        "timeout_secs": resolved_timeout,
     }
+
+
+def resolve_classifier_timeout(
+    session_dir: str | None = None,
+    workspace_paths: list[str] | None = None,
+) -> float:
+    """Resolves the configured classifier timeout in seconds across the hierarchy."""
+    cfg = resolve_classifier_config(session_dir=session_dir, workspace_paths=workspace_paths)
+    return float(cfg.get("timeout_secs") or DEFAULT_TIMEOUT_SECS)
+
+
+def update_classifier_timeout_setting(
+    timeout_secs: float,
+    scope: str,
+    workspace_dir: str | None = None,
+    session_dir: str | None = None,
+) -> str:
+    """Persists the timeout setting to the specified configuration scope."""
+    target_path = resolve_scope_file_path(
+        scope, workspace_dir=workspace_dir, session_dir=session_dir
+    )
+    policy = load_policy_file(target_path)
+    policy["timeout"] = timeout_secs
+    save_policy_file(target_path, policy)
+    return target_path
 
 
 def resolve_configured_model(
@@ -1548,12 +1604,20 @@ def update_classifier_settings_in_scope(
     workspace_dir: str | None = None,
     session_dir: str | None = None,
 ) -> str:
-    """Updates provider, model, endpoint_url, api_key, api_key_env in specified scope."""
+    """Updates provider, model, endpoint_url, api_key, api_key_env, timeout in scope."""
     target_path = resolve_scope_file_path(
         scope, workspace_dir=workspace_dir, session_dir=session_dir
     )
     policy = load_policy_file(target_path)
-    for k in ("provider", "model", "endpoint_url", "api_key", "api_key_env"):
+    for k in (
+        "provider",
+        "model",
+        "endpoint_url",
+        "api_key",
+        "api_key_env",
+        "timeout",
+        "timeout_secs",
+    ):
         if k in settings:
             policy[k] = settings[k]
     save_policy_file(target_path, policy)
