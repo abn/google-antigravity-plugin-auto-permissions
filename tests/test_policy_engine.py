@@ -453,28 +453,28 @@ class TestPolicyEngine(unittest.TestCase):
 
     def test_governed_surfaces_opt_in(self):
         with tempfile.TemporaryDirectory() as ws:
-            # 1. By default, subagents, schedule, and images are UNGOVERNED (opt-in is False)
-            self.assertTrue(is_ungoverned_surface("invoke_subagent", workspace_paths=[ws]))
-            self.assertTrue(is_ungoverned_surface("schedule", workspace_paths=[ws]))
+            # 1. By default, subagents and schedule are GOVERNED, while images is UNGOVERNED
+            self.assertFalse(is_ungoverned_surface("invoke_subagent", workspace_paths=[ws]))
+            self.assertFalse(is_ungoverned_surface("schedule", workspace_paths=[ws]))
             self.assertTrue(is_ungoverned_surface("generate_image", workspace_paths=[ws]))
             self.assertFalse(is_ungoverned_surface("run_command", workspace_paths=[ws]))
 
-            # 2. Opt-in to subagents and schedule in project config
+            # 2. Opt-out of subagents and opt-in to images in project config
             update_governed_surfaces_in_scope(
-                governed={"subagents": True, "schedule": True},
+                governed={"subagents": False, "images": True},
                 scope="project",
                 workspace_dir=ws,
             )
 
-            # 3. Now subagents and schedule are governed, but images remains ungoverned
+            # 3. Now subagents is ungoverned, but schedule and images are governed
             gov = resolve_governed_surfaces(workspace_paths=[ws])
-            self.assertTrue(gov["subagents"])
+            self.assertFalse(gov["subagents"])
             self.assertTrue(gov["schedule"])
-            self.assertFalse(gov["images"])
+            self.assertTrue(gov["images"])
 
-            self.assertFalse(is_ungoverned_surface("invoke_subagent", workspace_paths=[ws]))
+            self.assertTrue(is_ungoverned_surface("invoke_subagent", workspace_paths=[ws]))
             self.assertFalse(is_ungoverned_surface("schedule", workspace_paths=[ws]))
-            self.assertTrue(is_ungoverned_surface("generate_image", workspace_paths=[ws]))
+            self.assertFalse(is_ungoverned_surface("generate_image", workspace_paths=[ws]))
 
     def test_is_safe_session_artifact_read(self):
         with tempfile.TemporaryDirectory() as session_tmp:
