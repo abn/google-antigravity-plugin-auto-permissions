@@ -497,6 +497,79 @@ class TestGateE2E(unittest.TestCase):
                 # Sensitive path MUST call classifier
                 self.assertEqual(mock_classify.call_count, 1)
 
+    @patch("hooks.auto_approve_gate.classify_tool_call")
+    def test_gate_e2e_circuit_breaker(self, mock_classify):
+        # Configure mock_classify to simulate provider failure/fallback on first call
+        mock_classify.return_value = (
+            "<mock_raw_prompt>",
+            {
+                "decision": "ask",
+                "reason": "Classifier fallback on error (google): Network timeout after 4.0s",
+                "risk_category": "classifier_error_fallback",
+                "confidence": 0.0,
+                "provider": "google",
+                "error": "Network timeout after 4.0s",
+            },
+            "Network timeout after 4.0s",
+            4000.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            transcript_path = os.path.join(tmpdir, "transcript.jsonl")
+            with open(transcript_path, "w", encoding="utf-8") as f:
+                f.write(
+                    json.dumps(
+                        {"type": "USER_INPUT", "step_index": 10, "content": "Deploy changes"}
+                    )
+                    + "\n"
+                )
+
+            # Configure provider 'google' in project scope within tmpdir
+            cfg_path = os.path.join(tmpdir, ".agents", "auto-permissions", "config.json")
+            os.makedirs(os.path.dirname(cfg_path), exist_ok=True)
+            with open(cfg_path, "w", encoding="utf-8") as f:
+                json.dump({"provider": "google"}, f)
+
+            # 1. First tool call in active turn (step 11 >= 10):
+            # Calls classifier and fails closed with fallback
+            input_payload1 = {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "./deploy_a.sh"}},
+                "stepIdx": 11,
+                "conversationId": "test-e2e-cb",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+                "transcriptPath": transcript_path,
+            }
+            with (
+                patch("sys.stdin", io.StringIO(json.dumps(input_payload1))),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout1,
+            ):
+                gate.main()
+                res1 = json.loads(mock_stdout1.getvalue().strip())
+                self.assertEqual(res1["decision"], "ask")
+                self.assertEqual(mock_classify.call_count, 1)
+
+            # 2. Second tool call in SAME turn with DIFFERENT args (step 12 >= 10):
+            # Should trip the intra-turn circuit breaker in 0.1ms without calling mock_classify!
+            input_payload2 = {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "./deploy_b.sh"}},
+                "stepIdx": 12,
+                "conversationId": "test-e2e-cb",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+                "transcriptPath": transcript_path,
+            }
+            with (
+                patch("sys.stdin", io.StringIO(json.dumps(input_payload2))),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout2,
+            ):
+                gate.main()
+                res2 = json.loads(mock_stdout2.getvalue().strip())
+                self.assertEqual(res2["decision"], "ask")
+                self.assertIn("Circuit breaker tripped", res2["reason"])
+                # Zero additional classifier calls! (Call count remains 1)
+                self.assertEqual(mock_classify.call_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

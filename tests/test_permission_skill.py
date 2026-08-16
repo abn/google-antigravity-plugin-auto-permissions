@@ -82,6 +82,7 @@ class TestPermissionSkill(unittest.TestCase):
             tool_name="run_command",
             tool_args={"CommandLine": "git push origin main"},
             workspace_paths=["/tmp"],
+            provider="google",
             api_key="mock-key",
         )
 
