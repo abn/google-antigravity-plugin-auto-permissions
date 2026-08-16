@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "node-tooling",
+  "description": "Standard Node.js testing and linting tools (npm/pnpm/yarn/bun test/lint, eslint, prettier)",
+  "version": "1.0.0",
+  "allow": [
+    "command(npm test*)",
+    "command(npm run lint*)",
+    "command(pnpm test*)",
+    "command(pnpm lint*)",
+    "command(yarn test*)",
+    "command(yarn lint*)",
+    "command(bun test*)",
+    "command(eslint*)",
+    "command(npx eslint*)",
+    "command(prettier*)",
+    "command(npx prettier*)"
+  ]
+}

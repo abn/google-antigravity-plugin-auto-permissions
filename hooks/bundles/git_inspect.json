@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "git-inspect",
+  "description": "Read-only repository inspection (status, log, diff, branch, show, remote, rev-parse, tag, describe)",
+  "version": "1.0.0",
+  "allow": [
+    "command(git status*)",
+    "command(git log*)",
+    "command(git diff*)",
+    "command(git branch*)",
+    "command(git show*)",
+    "command(git tag*)",
+    "command(git remote*)",
+    "command(git rev-parse*)",
+    "command(git describe*)"
+  ]
+}

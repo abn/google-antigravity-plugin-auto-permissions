@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto-Permissions — Security Moderator Plugin for Google Antigravity</title>
+  <meta name="description" content="Autonomous security authorization, decoupled LLM classifier, and sub-millisecond static ACL gate for Google Antigravity 2.0.">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <!-- Top Identity Accent Rainbow Bar -->
+  <div class="top-rainbow-rule"></div>
+
+  <!-- Sticky Glassmorphic Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="header-brand">
+        <a href="#" class="pixmark" aria-label="Auto-Permissions Home">
+          auto-permissions<span class="accent-dot">.</span>
+        </a>
+      </div>
+      <nav class="header-nav" aria-label="Main Navigation">
+        <a href="#simulator" class="nav-link">Simulator</a>
+        <a href="#taxonomy" class="nav-link">Taxonomy</a>
+        <a href="#docs" class="nav-link">Docs & Skills</a>
+        <a href="#benchmarks" class="nav-link">Benchmarks</a>
+        <a href="https://github.com/abn/google-antigravity-plugin-auto-permissions" target="_blank" rel="noopener noreferrer" class="nav-link">GitHub ↗</a>
+        <button id="theme-toggle" class="theme-toggle-btn" type="button" aria-label="Toggle theme">
+          <span id="theme-icon">🌙</span>
+          <span id="theme-label">Dark</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <main>
+    <section class="hero">
+      <div class="container hero-content">
+        <span class="eyebrow">Google Antigravity 2.0 Plugin</span>
+        <h1 class="hero-title">
+          Taming Permission Fatigue in <span class="hero-title-gradient">Agentic Coding</span>.
+        </h1>
+        <p class="hero-lead">
+          An autonomous security moderator and auto-permission classifier plugin. 
+          Intercepts sensitive tool calls via <code>PreToolUse</code>, provides strictly sanitized intent to a decoupled LLM classifier, enables <strong>0.1ms fast-path execution</strong> for routine work, and permanently blocks hostile or out-of-scope actions.
+        </p>
+
+        <div class="hero-actions">
+          <a href="#quickstart" class="btn btn-primary">Quickstart Install</a>
+          <a href="#simulator" class="btn btn-secondary">Interactive Playground</a>
+          <a href="#docs" class="btn btn-secondary">Architecture & Docs</a>
+        </div>
+
+        <!-- Quick 1-Line Install Codeblock -->
+        <div class="codeblock" style="max-width: 780px;">
+          <div class="codeblock-chrome">
+            <span class="codeblock-lang">One-Shot Global Install (bash)</span>
+            <button class="copy-btn" type="button">Copy</button>
+          </div>
+          <pre><code>mkdir -p ~/.gemini/config/plugins/auto-permissions && \
+curl -sL https://github.com/abn/google-antigravity-plugin-auto-permissions/releases/latest/download/auto-permissions.tar.gz | \
+tar -xz -C ~/.gemini/config/plugins/auto-permissions --strip-components=1 --overwrite</code></pre>
+        </div>
+
+        <!-- Metrics Strip -->
+        <div class="metrics-strip">
+          <div class="metric-item">
+            <span class="metric-value">0.1ms</span>
+            <span class="metric-label">Fast-Path Static ACL & Cache</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-value">Zero</span>
+            <span class="metric-label">External Runtime Dependencies</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-value">100%</span>
+            <span class="metric-label">Fail-Closed Safety Guarantee</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-value">&gt;93%</span>
+            <span class="metric-label">KV-Cache Prefix Retention</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive Simulator Section -->
+    <section id="simulator" class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="eyebrow">Interactive Evaluation Engine</span>
+          <h2 class="section-title">Live Security Gate Simulator</h2>
+          <p class="section-desc">
+            Test how candidate tool operations are evaluated against user prompts across Static ACLs, Same-Turn File Grants, Safe Read Fast-Paths, and the Decoupled Security Classifier.
+          </p>
+        </div>
+
+        <div class="simulator-box">
+          <div class="simulator-header">
+            <span style="font-size: var(--text-xs); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-heading);">
+              Scenario Presets:
+            </span>
+            <div class="preset-pills">
+              <button class="preset-pill" data-preset="routine-lint">1. Routine Linter</button>
+              <button class="preset-pill" data-preset="file-chunk">2. File Multi-Chunk</button>
+              <button class="preset-pill" data-preset="safe-read">3. Safe CLI Read</button>
+              <button class="preset-pill" data-preset="scope-deviation">4. Scope Deviation</button>
+              <button class="preset-pill" data-preset="prod-deploy">5. Production Cloud</button>
+              <button class="preset-pill" data-preset="destructive-wipe">6. Destructive Wipe</button>
+            </div>
+          </div>
+
+          <div class="simulator-body">
+            <!-- Left Pane: Inputs -->
+            <div class="sim-pane">
+              <div>
+                <label class="sim-label" for="sim-tool">Tool Name</label>
+                <select id="sim-tool" class="sim-select">
+                  <option value="run_command">run_command</option>
+                  <option value="replace_file_content">replace_file_content</option>
+                  <option value="write_to_file">write_to_file</option>
+                  <option value="read_url_content">read_url_content</option>
+                  <option value="invoke_subagent">invoke_subagent</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="sim-label" for="sim-prompt">Active User Prompt</label>
+                <input id="sim-prompt" class="sim-input" type="text" placeholder="e.g. Fix test errors in auth.py" />
+              </div>
+
+              <div>
+                <label class="sim-label" for="sim-args">Tool Arguments (CLI / JSON)</label>
+                <input id="sim-args" class="sim-input" type="text" placeholder="e.g. uv run pytest -v" />
+              </div>
+
+              <button id="sim-run-btn" class="btn btn-primary" style="margin-top: var(--space-2);">
+                Evaluate Simulation
+              </button>
+            </div>
+
+            <!-- Right Pane: Live Decision Output -->
+            <div class="sim-pane">
+              <div class="sim-result-card">
+                <div class="sim-result-verdict">
+                  <span id="sim-verdict-badge" class="badge badge-allow">🟢 ALLOW</span>
+                  <div style="display: flex; gap: var(--space-2); align-items: center;">
+                    <span id="sim-mode-badge" class="badge badge-cache">Turn Cache</span>
+                    <span id="sim-latency" class="sim-latency">Latency: 0.1ms</span>
+                  </div>
+                </div>
+
+                <div style="border-top: 1px solid var(--color-line); padding-top: var(--space-3);">
+                  <span style="font-size: var(--text-xs); color: var(--color-text-muted); text-transform: uppercase; font-weight: var(--fw-bold); display: block; margin-bottom: 4px;">
+                    Verdict Explanation:
+                  </span>
+                  <p id="sim-reason" style="font-size: var(--text-sm); line-height: 1.5; color: var(--color-heading);">
+                    Linter verification matches active prompt intent (Intra-turn cache hit).
+                  </p>
+                </div>
+
+                <details style="margin-top: var(--space-2);">
+                  <summary style="font-size: var(--text-xs); cursor: pointer; color: var(--color-accent-text); font-weight: var(--fw-semibold);">
+                    View Decoupled Classifier Prompt Trace (XML)
+                  </summary>
+                  <pre id="sim-raw-prompt" style="background: var(--c-void); color: var(--c-text-d); padding: var(--space-3); border-radius: var(--radius-md); font-size: 11px; margin-top: var(--space-2); overflow-x: auto; line-height: 1.5; font-family: var(--font-code);"></pre>
+                </details>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4-Tier Decision Taxonomy -->
+    <section id="taxonomy" class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="eyebrow">Security Governance</span>
+          <h2 class="section-title">4-Tier Permission Taxonomy</h2>
+          <p class="section-desc">
+            How the security gate routes candidate operations to maximize agent velocity without sacrificing human control.
+          </p>
+        </div>
+
+        <div class="grid-2">
+          <!-- Allow Card -->
+          <div class="card card-elevate">
+            <div class="card-header">
+              <h3 class="card-title">1. ALLOW</h3>
+              <span class="badge badge-allow">🟢 ZERO FRICTION</span>
+            </div>
+            <div class="card-body">
+              <p>Safe, non-destructive operations that strictly match stated developer intent (e.g. running unit tests, formatting code, reading workspace files).</p>
+              <div class="callout callout-note" style="margin-top: var(--space-4);">
+                <div class="callout-eyebrow">Agent Behavior</div>
+                <div class="callout-body">Tool executes immediately with sub-millisecond fast-path or cached authorization.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Soft Deny Card -->
+          <div class="card card-elevate">
+            <div class="card-header">
+              <h3 class="card-title">2. SOFT_DENY</h3>
+              <span class="badge badge-deny">🔴 SELF-CORRECTION</span>
+            </div>
+            <div class="card-body">
+              <p>Non-malicious actions that diverge from the active prompt scope (e.g. unrequested branch deletions, modifying unprompted files).</p>
+              <div class="callout callout-tip" style="margin-top: var(--space-4);">
+                <div class="callout-eyebrow">Deny-and-Continue Loop</div>
+                <div class="callout-body">The agent receives a scope explanation, self-corrects without crashing, and stays within bounds.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ask Card -->
+          <div class="card card-elevate">
+            <div class="card-header">
+              <h3 class="card-title">3. ASK</h3>
+              <span class="badge badge-ask">🟡 HUMAN ESCALATION</span>
+            </div>
+            <div class="card-body">
+              <p>High-impact, sensitive actions (e.g. production deployments, database migrations, cloud credentials, network tunnels).</p>
+              <div class="callout callout-warn" style="margin-top: var(--space-4);">
+                <div class="callout-eyebrow">Interactive Modal</div>
+                <div class="callout-body">Execution pauses and presents an interactive confirmation dialog directly to the developer.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hard Deny Card -->
+          <div class="card card-elevate">
+            <div class="card-header">
+              <h3 class="card-title">4. HARD_DENY</h3>
+              <span class="badge badge-deny">🔴 SECURITY BLOCK</span>
+            </div>
+            <div class="card-body">
+              <p>Hostile, destructive, or exfiltrative actions (e.g. credential extraction, reading <code>~/.ssh</code>, destructive wipes <code>rm -rf /</code>, prompt injection).</p>
+              <div class="callout callout-warn" style="margin-top: var(--space-4);">
+                <div class="callout-eyebrow">Permanent Termination</div>
+                <div class="callout-body">Operation is permanently blocked and an incident record is logged to the session audit trail.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabbed Documentation & Guides -->
+    <section id="docs" class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="eyebrow">Developer Reference</span>
+          <h2 class="section-title">Documentation & Technical Guides</h2>
+          <p class="section-desc">
+            Deep dive into installation, core invariants, specialized agent skills, static ACL policies, and BYOM configurations.
+          </p>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="doc-tabs-nav">
+          <button class="doc-tab-btn active" data-tab="tab-quickstart">1. Quickstart & Setup</button>
+          <button class="doc-tab-btn" data-tab="tab-architecture">2. Architecture & Invariants</button>
+          <button class="doc-tab-btn" data-tab="tab-skills">3. Skills & CLI Tools</button>
+          <button class="doc-tab-btn" data-tab="tab-acls">4. Static ACL Policies</button>
+          <button class="doc-tab-btn" data-tab="tab-byom">5. BYOM & Local Inference</button>
+          <button class="doc-tab-btn" data-tab="tab-benchmarks">6. Latency & Benchmarks</button>
+        </div>
+
+        <!-- Tab 1: Quickstart -->
+        <div id="tab-quickstart" class="doc-tab-pane active">
+          <div class="card">
+            <h3 class="card-title" style="margin-bottom: var(--space-4);">Installation Options</h3>
+            <p style="margin-bottom: var(--space-4); color: var(--color-text);">
+              Choose between one-shot release artifact installation (recommended for immediate use) or cloning the repository for development:
+            </p>
+
+            <div class="codeblock">
+              <div class="codeblock-chrome">
+                <span class="codeblock-lang">Option 1: Release Tarball (Global Scope)</span>
+                <button class="copy-btn" type="button">Copy</button>
+              </div>
+              <pre><code>mkdir -p ~/.gemini/config/plugins/auto-permissions && \
+curl -sL https://github.com/abn/google-antigravity-plugin-auto-permissions/releases/latest/download/auto-permissions.tar.gz | \
+tar -xz -C ~/.gemini/config/plugins/auto-permissions --strip-components=1 --overwrite</code></pre>
+            </div>
+
+            <div class="codeblock">
+              <div class="codeblock-chrome">
+                <span class="codeblock-lang">Option 2: Git Clone (Workspace Scope)</span>
+                <button class="copy-btn" type="button">Copy</button>
+              </div>
+              <pre><code>git clone https://github.com/abn/google-antigravity-plugin-auto-permissions &lt;your-workspace&gt;/.agents/plugins/auto-permissions</code></pre>
+            </div>
+
+            <div class="callout callout-note">
+              <div class="callout-eyebrow">API Key Configuration</div>
+              <div class="callout-body">
+                Set your API key in your shell environment:
+                <br><code>export GEMINI_API_KEY="your-api-key"</code> or <code>export ANTHROPIC_API_KEY="..."</code> or <code>export OPENAI_API_KEY="..."</code>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Architecture & Invariants -->
+        <div id="tab-architecture" class="doc-tab-pane">
+          <div class="grid-2">
+            <div class="card">
+              <h3 class="card-title" style="margin-bottom: var(--space-3);">The Decoupled Classifier</h3>
+              <p class="card-body">
+                The safety classifier runs as an isolated decision gate blinded to the agent's internal chain-of-thought (CoT) and raw tool outputs. It observes strictly authentic user prompts, candidate tool calls, and workspace roots.
+              </p>
+              <div class="callout callout-tip" style="margin-top: var(--space-4);">
+                <div class="callout-eyebrow">IPI Immunity</div>
+                <div class="callout-body">Blinding eliminates Indirect Prompt Injection attacks originating from untrusted web pages or repositories.</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3 class="card-title" style="margin-bottom: var(--space-3);">KV-Cache Prefix Stability</h3>
+              <p class="card-body">
+                The classifier prompt enforces strict top-to-bottom volatility layering: static system instructions $\rightarrow$ workspace roots $\rightarrow$ monotonic chronological user turns (<code>[Turn 0]</code>, <code>[Turn 1]</code>) $\rightarrow$ dynamic tail.
+              </p>
+              <div class="callout callout-note" style="margin-top: var(--space-4);">
+                <div class="callout-eyebrow">Cache Retention</div>
+                <div class="callout-body">Maintains &gt;93% prefix cache hits within turns and &gt;51% across multi-turn handoffs.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Skills & CLI -->
+        <div id="tab-skills" class="doc-tab-pane">
+          <div class="grid-2">
+            <div class="card">
+              <h3 class="card-title">/auto-permissions-configure</h3>
+              <p class="card-body" style="margin-top: var(--space-2);">
+                Interactive configuration tool for setting static ACL rules, custom semantic guidelines, LLM providers, and endpoints across Session, Project, or Global scopes.
+              </p>
+              <div class="codeblock">
+                <div class="codeblock-chrome">
+                  <span class="codeblock-lang">CLI Usage</span>
+                  <button class="copy-btn" type="button">Copy</button>
+                </div>
+                <pre><code>python3 skills/auto-permissions-configure/scripts/configure_permissions.py --list
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py --scope project --add-rule "command(pytest)" --decision allow</code></pre>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3 class="card-title">auto-permissions-fix</h3>
+              <p class="card-body" style="margin-top: var(--space-2);">
+                Denial remediation tool that translates blocked operations in <code>audit.jsonl</code> into persistent ACL grants without manual JSON editing.
+              </p>
+              <div class="codeblock">
+                <div class="codeblock-chrome">
+                  <span class="codeblock-lang">CLI Usage</span>
+                  <button class="copy-btn" type="button">Copy</button>
+                </div>
+                <pre><code>python3 skills/auto-permissions-fix/scripts/fix_permissions.py --last --allow --scope project
+python3 skills/auto-permissions-fix/scripts/fix_permissions.py --rule "command(git)" --allow --scope project</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Static ACLs -->
+        <div id="tab-acls" class="doc-tab-pane">
+          <div class="card">
+            <h3 class="card-title" style="margin-bottom: var(--space-3);">Hierarchical Static ACL Engine</h3>
+            <p class="card-body" style="margin-bottom: var(--space-4);">
+              Static rules evaluate across 4 hierarchical scopes with strict <strong>Deny &gt; Ask &gt; Allow</strong> precedence. Matching static rules execute with <strong>sub-millisecond latency (0.1ms)</strong> with zero API calls.
+            </p>
+
+            <div class="codeblock">
+              <div class="codeblock-chrome">
+                <span class="codeblock-lang">.agents/auto-permissions.json (Project Scope)</span>
+                <button class="copy-btn" type="button">Copy</button>
+              </div>
+              <pre><code>{
+  "permissions": {
+    "allow": [
+      "command(git status*)",
+      "command(git diff*)",
+      "command(git log*)",
+      "command(uv run --frozen ruff *)",
+      "command(uv run --frozen pytest *)",
+      "command(gh pr *)"
+    ],
+    "deny": [
+      "command(rm -rf /.*)"
+    ]
+  },
+  "custom_guidelines": [
+    "Treat read-only inspection operations on *.test.internal as safe."
+  ]
+}</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 5: BYOM -->
+        <div id="tab-byom" class="doc-tab-pane">
+          <div class="card">
+            <h3 class="card-title" style="margin-bottom: var(--space-3);">Bring Your Own Model (BYOM) Recipes</h3>
+            <p class="card-body" style="margin-bottom: var(--space-4);">
+              Configure the plugin to use Google Gemini, Anthropic Claude, OpenAI GPT-4o, or local GPU inference backends (Lemonade, vLLM, Ollama):
+            </p>
+
+            <div class="codeblock">
+              <div class="codeblock-chrome">
+                <span class="codeblock-lang">Local GPU (Lemonade / vLLM)</span>
+                <button class="copy-btn" type="button">Copy</button>
+              </div>
+              <pre><code>python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --scope project_local \
+  --provider openai \
+  --model Gemma-4-26B-A4B-NoThinking-qat-MTP \
+  --endpoint-url "http://localhost:13305/v1/chat/completions" \
+  --api-key-env LEMONADE_API_KEY</code></pre>
+            </div>
+
+            <div class="codeblock">
+              <div class="codeblock-chrome">
+                <span class="codeblock-lang">Anthropic Claude 3.7 Sonnet</span>
+                <button class="copy-btn" type="button">Copy</button>
+              </div>
+              <pre><code>python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --scope global \
+  --provider anthropic \
+  --model claude-3-7-sonnet-20250219</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 6: Benchmarks -->
+        <div id="tab-benchmarks" class="doc-tab-pane">
+          <div class="card">
+            <h3 class="card-title" style="margin-bottom: var(--space-3);">Performance & Latency Breakdown</h3>
+            <p class="card-body" style="margin-bottom: var(--space-4);">
+              Empirical latency comparisons measured across execution modes:
+            </p>
+
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Evaluation Mode</th>
+                    <th>Mechanism</th>
+                    <th>Average Latency</th>
+                    <th>API Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>Turn Cache</code></td>
+                    <td>Intra-Turn Exact Request Memoization</td>
+                    <td><span class="badge badge-cache">0.1ms</span></td>
+                    <td>$0.00</td>
+                  </tr>
+                  <tr>
+                    <td><code>File Grant</code></td>
+                    <td>Same-Turn Multi-Chunk Target Authorization</td>
+                    <td><span class="badge badge-allow">0.1ms</span></td>
+                    <td>$0.00</td>
+                  </tr>
+                  <tr>
+                    <td><code>Safe Read</code></td>
+                    <td>Non-Mutating Inspection Fast-Path</td>
+                    <td><span class="badge badge-read">0.1ms</span></td>
+                    <td>$0.00</td>
+                  </tr>
+                  <tr>
+                    <td><code>Static ACL</code></td>
+                    <td>Hierarchical Rule Precedence</td>
+                    <td><span class="badge badge-neutral">0.2ms</span></td>
+                    <td>$0.00</td>
+                  </tr>
+                  <tr>
+                    <td><code>Gemini 2.5 Flash</code></td>
+                    <td>Decoupled Remote LLM REST API</td>
+                    <td><span class="badge badge-ask">~1350ms</span></td>
+                    <td>&lt;$0.0001</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Collapsible Security Gate Disclosure Demo -->
+    <section id="demo" class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="eyebrow">Observability</span>
+          <h2 class="section-title">Transparent End-of-Round Disclosure</h2>
+          <p class="section-desc">
+            At the conclusion of each conversation turn, the plugin automatically produces a collapsible Markdown summary table showing evaluated actions, verdicts, and execution modes.
+          </p>
+        </div>
+
+        <div class="card" style="background: var(--color-surface-sunken); border-color: var(--color-line-strong);">
+          <details open>
+            <summary style="font-weight: var(--fw-bold); color: var(--color-heading); cursor: pointer; padding: var(--space-2) 0;">
+              🛡️ <b>Security Gate Summary:</b> 5 actions in this turn (5 allowed, 0 denied)
+            </summary>
+            <div class="table-container" style="margin-top: var(--space-4);">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tool Action</th>
+                    <th>Target</th>
+                    <th>Verdict</th>
+                    <th>Evaluation Mode</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>run_command</code></td>
+                    <td><code>git status -s</code></td>
+                    <td><span class="badge badge-allow">🟢 ALLOW</span></td>
+                    <td>Static ACL (0.2ms)</td>
+                  </tr>
+                  <tr>
+                    <td><code>replace_file_content</code></td>
+                    <td><code>/workspace/auth.py</code></td>
+                    <td><span class="badge badge-allow">🟢 ALLOW</span></td>
+                    <td>Gemini (1240ms)</td>
+                  </tr>
+                  <tr>
+                    <td><code>replace_file_content</code></td>
+                    <td><code>/workspace/auth.py</code></td>
+                    <td><span class="badge badge-allow">🟢 ALLOW</span></td>
+                    <td>File Grant (0.1ms)</td>
+                  </tr>
+                  <tr>
+                    <td><code>run_command</code></td>
+                    <td><code>uv run --frozen pytest -v</code></td>
+                    <td><span class="badge badge-allow">🟢 ALLOW</span></td>
+                    <td>Turn Cache (0.1ms)</td>
+                  </tr>
+                  <tr>
+                    <td><code>run_command</code></td>
+                    <td><code>wc -l README.md</code></td>
+                    <td><span class="badge badge-allow">🟢 ALLOW</span></td>
+                    <td>Safe Read (0.1ms)</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-top">
+        <div>
+          <a href="#" class="pixmark">auto-permissions<span class="accent-dot">.</span></a>
+          <p style="margin-top: var(--space-2); font-size: var(--text-xs); color: var(--color-text-muted);">
+            Autonomous Security Moderator Plugin for Google Antigravity 2.0.
+          </p>
+        </div>
+        <div style="display: flex; gap: var(--space-6);">
+          <a href="https://github.com/abn/google-antigravity-plugin-auto-permissions" target="_blank" rel="noopener noreferrer">GitHub Repository ↗</a>
+          <a href="https://github.com/abn/google-antigravity-plugin-auto-permissions/releases" target="_blank" rel="noopener noreferrer">Releases ↗</a>
+          <a href="https://abn.is" target="_blank" rel="noopener noreferrer">abn.is ↗</a>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span>MIT License · Built with the design foundations of abn.is</span>
+        <span>v0.4.0</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="site.js"></script>
+</body>
+</html>

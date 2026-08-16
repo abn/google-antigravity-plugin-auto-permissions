@@ -11,9 +11,39 @@ import os
 import re
 from typing import Any
 
-GLOBAL_CONFIG_PATH = os.path.expanduser("~/.gemini/config/auto-permissions.json")
-PROJECT_CONFIG_REL_PATH = os.path.join(".agents", "auto-permissions.json")
-PROJECT_LOCAL_CONFIG_REL_PATH = os.path.join(".agents", "auto-permissions.local.json")
+try:
+    from hooks.bundles import (
+        get_builtin_bundle,
+        list_builtin_bundles,
+        load_bundle_from_file,
+    )
+except ImportError:
+    from bundles import (
+        get_builtin_bundle,
+        list_builtin_bundles,
+        load_bundle_from_file,
+    )
+
+# Global Configuration Paths
+GLOBAL_CONFIG_DIR = os.path.expanduser("~/.gemini/config/auto-permissions")
+GLOBAL_CONFIG_PRIMARY = os.path.join(GLOBAL_CONFIG_DIR, "config.json")
+GLOBAL_CONFIG_LEGACY = os.path.expanduser("~/.gemini/config/auto-permissions.json")
+GLOBAL_CONFIG_PATH = GLOBAL_CONFIG_LEGACY  # Kept for backward compatibility
+GLOBAL_BUNDLES_DIR = os.path.join(GLOBAL_CONFIG_DIR, "bundles")
+
+# Project Scoped Configuration Paths
+PROJECT_CONFIG_DIR_REL = os.path.join(".agents", "auto-permissions")
+PROJECT_CONFIG_PRIMARY_REL = os.path.join(PROJECT_CONFIG_DIR_REL, "config.json")
+PROJECT_CONFIG_LEGACY_REL = os.path.join(".agents", "auto-permissions.json")
+PROJECT_CONFIG_REL_PATH = PROJECT_CONFIG_LEGACY_REL  # Kept for backward compatibility
+
+PROJECT_LOCAL_CONFIG_PRIMARY_REL = os.path.join(PROJECT_CONFIG_DIR_REL, "config.local.json")
+PROJECT_LOCAL_CONFIG_LEGACY_REL = os.path.join(".agents", "auto-permissions.local.json")
+PROJECT_LOCAL_CONFIG_REL_PATH = PROJECT_LOCAL_CONFIG_LEGACY_REL
+
+PROJECT_BUNDLES_DIR_REL = os.path.join(PROJECT_CONFIG_DIR_REL, "bundles")
+PROJECT_LOCAL_BUNDLES_DIR_REL = os.path.join(PROJECT_CONFIG_DIR_REL, "bundles.local")
+
 SESSION_PLUGIN_SUBDIR = "auto-permissions"
 SESSION_OVERRIDES_FILENAME = "session_overrides.json"
 DEFAULT_TIMEOUT_SECS = 6.0
@@ -33,6 +63,76 @@ def resolve_session_override_path(session_dir: str | None) -> str | None:
     if os.path.isfile(legacy):
         return legacy
     return scoped
+
+
+def resolve_project_config_path(
+    workspace_dir: str | None = None, prefer_existing: bool = True
+) -> str:
+    """Resolves project config path (.agents/auto-permissions/config.json with legacy fallback)."""
+    ws = workspace_dir or os.getcwd()
+    primary = os.path.join(ws, PROJECT_CONFIG_PRIMARY_REL)
+    legacy = os.path.join(ws, PROJECT_CONFIG_LEGACY_REL)
+    if prefer_existing:
+        if os.path.isfile(primary):
+            return primary
+        if os.path.isfile(legacy):
+            return legacy
+    return primary
+
+
+def resolve_project_local_config_path(
+    workspace_dir: str | None = None, prefer_existing: bool = True
+) -> str:
+    """
+    Resolves local project config path
+    (.agents/auto-permissions/config.local.json with legacy fallback).
+    """
+    ws = workspace_dir or os.getcwd()
+    primary = os.path.join(ws, PROJECT_LOCAL_CONFIG_PRIMARY_REL)
+    legacy = os.path.join(ws, PROJECT_LOCAL_CONFIG_LEGACY_REL)
+    if prefer_existing:
+        if os.path.isfile(primary):
+            return primary
+        if os.path.isfile(legacy):
+            return legacy
+    return primary
+
+
+def resolve_global_config_path(prefer_existing: bool = True) -> str:
+    """
+    Resolves global config path
+    (~/.gemini/config/auto-permissions/config.json with legacy fallback).
+    """
+    if prefer_existing:
+        if os.path.isfile(GLOBAL_CONFIG_PRIMARY):
+            return GLOBAL_CONFIG_PRIMARY
+        if os.path.isfile(GLOBAL_CONFIG_LEGACY):
+            return GLOBAL_CONFIG_LEGACY
+    return GLOBAL_CONFIG_PRIMARY
+
+
+def get_scope_file_candidates(
+    session_dir: str | None = None,
+    workspace_paths: list[str] | None = None,
+) -> list[tuple[str, str]]:
+    """
+    Returns ordered list of (scope_name, file_path) pairs for policy evaluation
+    (Session > Local Project > Tracked Project > Global).
+    """
+    files: list[tuple[str, str]] = []
+    if session_dir and os.path.isdir(session_dir):
+        sf = resolve_session_override_path(session_dir)
+        if sf:
+            files.append(("session", sf))
+    if workspace_paths:
+        for ws in workspace_paths:
+            lf = resolve_project_local_config_path(ws)
+            files.append(("project_local", lf))
+            pf = resolve_project_config_path(ws)
+            files.append(("project", pf))
+    gf = resolve_global_config_path()
+    files.append(("global", gf))
+    return files
 
 
 def parse_resource_rule(rule_str: str) -> tuple[str, str] | None:
@@ -433,7 +533,8 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
     """
     Loads a policy JSON file returning a dict with keys
     'allow', 'ask', 'deny', 'custom_guidelines', 'allowed_skill_paths',
-    'provider', 'model', 'endpoint_url', 'api_key', 'api_key_env'.
+    'provider', 'model', 'endpoint_url', 'api_key', 'api_key_env', 'timeout',
+    'bundles', 'custom_bundles'.
     """
     policy: dict[str, Any] = {
         "allow": [],
@@ -455,6 +556,8 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
         "api_key_env": None,
         "timeout": None,
         "timeout_secs": None,
+        "bundles": [],
+        "custom_bundles": {},
     }
     if not file_path or not os.path.isfile(file_path):
         return policy
@@ -521,6 +624,24 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
                             policy["api_key"] = clean_v
                         elif str_k == "api_key_env":
                             policy["api_key_env"] = clean_v
+                raw_bundles = data.get("bundles")
+                if isinstance(raw_bundles, list):
+                    policy["bundles"] = [str(x) for x in raw_bundles if str(x).strip()]
+                elif isinstance(raw_bundles, dict):
+                    enabled = [
+                        str(x)
+                        for x in raw_bundles.get("enabled", [])
+                        if isinstance(raw_bundles.get("enabled"), list) and str(x).strip()
+                    ]
+                    disabled = [
+                        str(x)
+                        for x in raw_bundles.get("disabled", [])
+                        if isinstance(raw_bundles.get("disabled"), list) and str(x).strip()
+                    ]
+                    policy["bundles"] = {"enabled": enabled, "disabled": disabled}
+                raw_custom_bundles = data.get("custom_bundles")
+                if isinstance(raw_custom_bundles, dict):
+                    policy["custom_bundles"] = raw_custom_bundles
     except Exception:
         pass
     return policy
@@ -532,18 +653,9 @@ def resolve_governed_surfaces(
 ) -> dict[str, bool]:
     """
     Resolves whether subagents, schedule, and images require security gate classification.
-    Defaults to False (opt-in) unless configured in Session, Project, Global, or env vars.
+    Defaults to False (opt-in) unless configured in Session, Project, Global, bundles, or env vars.
     """
-    scope_files = []
-    if session_dir and os.path.isdir(session_dir):
-        session_file = resolve_session_override_path(session_dir)
-        if session_file:
-            scope_files.append(session_file)
-    if workspace_paths:
-        for ws in workspace_paths:
-            scope_files.append(os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH))
-            scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
-    scope_files.append(GLOBAL_CONFIG_PATH)
+    scope_files = [f for _, f in get_scope_file_candidates(session_dir, workspace_paths)]
 
     governed = {
         "subagents": False,
@@ -563,6 +675,12 @@ def resolve_governed_surfaces(
             clean_s = s.strip().lower()
             if clean_s in governed:
                 governed[clean_s] = True
+
+    # Bundled surfaces
+    bundled = resolve_active_bundles(session_dir=session_dir, workspace_paths=workspace_paths)
+    for k, v in bundled.get("govern_surfaces", {}).items():
+        if v and k in governed:
+            governed[k] = True
 
     # Environment variables
     if os.environ.get("AUTO_PERMISSIONS_GOVERN_SUBAGENTS") in ("1", "true", "yes"):
@@ -604,7 +722,7 @@ def load_allowed_skill_paths(
 ) -> list[str]:
     """
     Loads allowed skill directory paths from default standard locations plus
-    any user-configured 'allowed_skill_paths' in Global, Project, or Session policies.
+    any user-configured 'allowed_skill_paths' in policies or active bundles.
     Also automatically discovers realpaths of installed and symlinked plugins.
     """
     # Standard Antigravity defaults
@@ -639,16 +757,7 @@ def load_allowed_skill_paths(
             pass
 
     # Load configured overrides
-    scope_files = []
-    scope_files.append(GLOBAL_CONFIG_PATH)
-    if workspace_paths:
-        for ws in workspace_paths:
-            scope_files.append(os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH))
-            scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
-    if session_dir and os.path.isdir(session_dir):
-        session_file = resolve_session_override_path(session_dir)
-        if session_file:
-            scope_files.append(session_file)
+    scope_files = [f for _, f in get_scope_file_candidates(session_dir, workspace_paths)]
 
     for f_path in scope_files:
         if not os.path.isfile(f_path):
@@ -658,6 +767,13 @@ def load_allowed_skill_paths(
             clean_p = os.path.abspath(os.path.expanduser(custom_path.strip()))
             if clean_p and clean_p not in allowed:
                 allowed.append(clean_p)
+
+    # Bundled allowed skill paths
+    bundled = resolve_active_bundles(session_dir=session_dir, workspace_paths=workspace_paths)
+    for custom_path in bundled.get("allowed_skill_paths", []):
+        clean_p = os.path.abspath(os.path.expanduser(custom_path.strip()))
+        if clean_p and clean_p not in allowed:
+            allowed.append(clean_p)
 
     return allowed
 
@@ -932,16 +1048,7 @@ def resolve_trust_workspace_writes(
     Resolves whether workspace file writes qualify for sub-millisecond fast-path.
     Precedence: Session -> Local Project -> Project -> Global -> Env Var -> Default (True).
     """
-    scope_files = []
-    if session_dir and os.path.isdir(session_dir):
-        session_file = resolve_session_override_path(session_dir)
-        if session_file:
-            scope_files.append(session_file)
-    if workspace_paths:
-        for ws in workspace_paths:
-            scope_files.append(os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH))
-            scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
-    scope_files.append(GLOBAL_CONFIG_PATH)
+    scope_files = [f for _, f in get_scope_file_candidates(session_dir, workspace_paths)]
 
     for f_path in scope_files:
         if not os.path.isfile(f_path):
@@ -1043,16 +1150,7 @@ def resolve_show_turn_summary(
     Resolves whether the turn-scoped PreInvocation Security Gate disclosure summary is enabled.
     Precedence: Session -> Local Project -> Project -> Global -> Env Var -> Default (True).
     """
-    scope_files = []
-    if session_dir and os.path.isdir(session_dir):
-        session_file = resolve_session_override_path(session_dir)
-        if session_file:
-            scope_files.append(session_file)
-    if workspace_paths:
-        for ws in workspace_paths:
-            scope_files.append(os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH))
-            scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
-    scope_files.append(GLOBAL_CONFIG_PATH)
+    scope_files = [f for _, f in get_scope_file_candidates(session_dir, workspace_paths)]
 
     for f_path in scope_files:
         if not os.path.isfile(f_path):
@@ -1232,28 +1330,9 @@ def resolve_classifier_config(
     """
     Resolves the complete classifier configuration (provider, model, endpoint_url, api_key)
     across the hierarchy:
-    Session -> Local Project (.agents/*.local.json) -> Project (.agents/*.json)
-    -> Global -> Environment Variables -> Defaults.
+    Session -> Local Project -> Project -> Global -> Environment Variables -> Defaults.
     """
-    scope_files = []
-    # 1. Session scope
-    if session_dir and os.path.isdir(session_dir):
-        session_file = resolve_session_override_path(session_dir)
-        if session_file:
-            scope_files.append(session_file)
-
-    # 2. Local Project scope (untracked)
-    if workspace_paths:
-        for ws in workspace_paths:
-            scope_files.append(os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH))
-
-    # 3. Project scope (tracked)
-    if workspace_paths:
-        for ws in workspace_paths:
-            scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
-
-    # 4. Global scope
-    scope_files.append(GLOBAL_CONFIG_PATH)
+    scope_files = [f for _, f in get_scope_file_candidates(session_dir, workspace_paths)]
 
     merged: dict[str, Any] = {
         "provider": None,
@@ -1413,25 +1492,13 @@ def load_custom_guidelines(
     session_dir: str | None = None,
 ) -> list[str]:
     """
-    Loads and aggregates custom semantic guidelines across Global, Project, and Session scopes.
-    Returns a deduplicated list of strings.
+    Loads and aggregates custom semantic guidelines across Global, Project, Session scopes,
+    and any active permission bundles. Returns a deduplicated list of strings.
     """
     guidelines: list[str] = []
     seen: set[str] = set()
 
-    scope_files = []
-    # 1. Global
-    scope_files.append(GLOBAL_CONFIG_PATH)
-    # 2. Project
-    if workspace_paths:
-        for ws in workspace_paths:
-            scope_files.append(os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH))
-            scope_files.append(os.path.join(ws, PROJECT_CONFIG_REL_PATH))
-    # 3. Session
-    if session_dir and os.path.isdir(session_dir):
-        session_file = resolve_session_override_path(session_dir)
-        if session_file:
-            scope_files.append(session_file)
+    scope_files = [f for _, f in get_scope_file_candidates(session_dir, workspace_paths)]
 
     for file_path in scope_files:
         if not os.path.isfile(file_path):
@@ -1443,10 +1510,18 @@ def load_custom_guidelines(
                 seen.add(clean_g)
                 guidelines.append(clean_g)
 
+    # Bundled custom guidelines
+    bundled = resolve_active_bundles(session_dir=session_dir, workspace_paths=workspace_paths)
+    for g in bundled.get("custom_guidelines", []):
+        clean_g = g.strip()
+        if clean_g and clean_g not in seen:
+            seen.add(clean_g)
+            guidelines.append(clean_g)
+
     return guidelines
 
 
-def save_policy_file(file_path: str, policy: dict[str, list[str]]) -> None:
+def save_policy_file(file_path: str, policy: dict[str, Any]) -> None:
     """Saves policy dictionary to file atomically."""
     parent_dir = os.path.dirname(os.path.abspath(file_path))
     os.makedirs(parent_dir, exist_ok=True)
@@ -1458,6 +1533,7 @@ def resolve_scope_file_path(
     scope: str,
     workspace_dir: str | None = None,
     session_dir: str | None = None,
+    prefer_existing: bool = True,
 ) -> str:
     """Resolves target configuration file path for a given scope."""
     scope = scope.lower()
@@ -1465,15 +1541,15 @@ def resolve_scope_file_path(
         if not session_dir:
             msg = "Session directory is required for session-scope configuration."
             raise ValueError(msg)
-        return resolve_session_override_path(session_dir)
+        return resolve_session_override_path(session_dir) or os.path.join(
+            session_dir, SESSION_PLUGIN_SUBDIR, SESSION_OVERRIDES_FILENAME
+        )
     if scope in ("project_local", "local"):
-        ws = workspace_dir or os.getcwd()
-        return os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH)
+        return resolve_project_local_config_path(workspace_dir, prefer_existing=prefer_existing)
     if scope == "project":
-        ws = workspace_dir or os.getcwd()
-        return os.path.join(ws, PROJECT_CONFIG_REL_PATH)
+        return resolve_project_config_path(workspace_dir, prefer_existing=prefer_existing)
     if scope == "global":
-        return GLOBAL_CONFIG_PATH
+        return resolve_global_config_path(prefer_existing=prefer_existing)
     msg = f"Invalid scope '{scope}'. Must be 'session', 'project_local', 'project', or 'global'."
     raise ValueError(msg)
 
@@ -1642,6 +1718,347 @@ def update_governed_surfaces_in_scope(
     return target_path
 
 
+# ============================================================================
+# Permission Bundles Management & Resolution
+# ============================================================================
+
+
+def find_bundle_definition(
+    bundle_name: str,
+    workspace_paths: list[str] | None = None,
+    custom_bundles_map: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """
+    Finds a bundle definition by name across:
+    1. custom_bundles_map (inline definitions)
+    2. Project local bundles (.agents/auto-permissions/bundles.local/<name>.json)
+    3. Project tracked bundles (.agents/auto-permissions/bundles/<name>.json)
+    4. Global bundles (~/.gemini/config/auto-permissions/bundles/<name>.json)
+    5. Builtin bundles (hooks/bundles/<name>.json)
+    """
+    clean_name = bundle_name.strip().lower()
+    if not clean_name:
+        return None
+
+    # 1. Inline custom bundle
+    if custom_bundles_map and clean_name in custom_bundles_map:
+        b_data = custom_bundles_map[clean_name]
+        if isinstance(b_data, dict):
+            b_dict = dict(b_data)
+            b_dict.setdefault("name", clean_name)
+            b_dict.setdefault("source", "inline")
+            return b_dict
+
+    # 2. Project local bundles
+    if workspace_paths:
+        for ws in workspace_paths:
+            fpath = os.path.join(ws, PROJECT_LOCAL_BUNDLES_DIR_REL, f"{clean_name}.json")
+            if os.path.isfile(fpath):
+                b = load_bundle_from_file(fpath)
+                if b:
+                    b.setdefault("source", "project_local")
+                    return b
+
+    # 3. Project tracked bundles
+    if workspace_paths:
+        for ws in workspace_paths:
+            fpath = os.path.join(ws, PROJECT_BUNDLES_DIR_REL, f"{clean_name}.json")
+            if os.path.isfile(fpath):
+                b = load_bundle_from_file(fpath)
+                if b:
+                    b.setdefault("source", "project")
+                    return b
+
+    # 4. Global bundles
+    gpath = os.path.join(GLOBAL_BUNDLES_DIR, f"{clean_name}.json")
+    if os.path.isfile(gpath):
+        b = load_bundle_from_file(gpath)
+        if b:
+            b.setdefault("source", "global")
+            return b
+
+    # 5. Built-in bundle
+    builtin = get_builtin_bundle(clean_name)
+    if builtin:
+        b_copy = dict(builtin)
+        b_copy.setdefault("source", "builtin")
+        return b_copy
+
+    return None
+
+
+def list_available_bundles(
+    workspace_paths: list[str] | None = None,
+    session_dir: str | None = None,
+) -> dict[str, dict[str, Any]]:
+    """
+    Discovers all available bundles across Built-in, Global, Project, and Inline sources.
+    Returns catalog keyed by bundle slug.
+    """
+    catalog: dict[str, dict[str, Any]] = {}
+
+    # 1. Built-in
+    for b_name, b_val in list_builtin_bundles().items():
+        b_copy = dict(b_val)
+        b_copy.setdefault("source", "builtin")
+        catalog[b_name] = b_copy
+
+    # 2. Global
+    if os.path.isdir(GLOBAL_BUNDLES_DIR):
+        for fname in sorted(os.listdir(GLOBAL_BUNDLES_DIR)):
+            if fname.endswith(".json"):
+                b = load_bundle_from_file(os.path.join(GLOBAL_BUNDLES_DIR, fname))
+                if b and "name" in b:
+                    b["source"] = "global"
+                    catalog[b["name"]] = b
+
+    # 3. Project tracked & local
+    if workspace_paths:
+        for ws in workspace_paths:
+            # Tracked
+            p_dir = os.path.join(ws, PROJECT_BUNDLES_DIR_REL)
+            if os.path.isdir(p_dir):
+                for fname in sorted(os.listdir(p_dir)):
+                    if fname.endswith(".json"):
+                        b = load_bundle_from_file(os.path.join(p_dir, fname))
+                        if b and "name" in b:
+                            b["source"] = "project"
+                            catalog[b["name"]] = b
+            # Local
+            pl_dir = os.path.join(ws, PROJECT_LOCAL_BUNDLES_DIR_REL)
+            if os.path.isdir(pl_dir):
+                for fname in sorted(os.listdir(pl_dir)):
+                    if fname.endswith(".json"):
+                        b = load_bundle_from_file(os.path.join(pl_dir, fname))
+                        if b and "name" in b:
+                            b["source"] = "project_local"
+                            catalog[b["name"]] = b
+
+    # 4. Inline bundles across scope files
+    scope_files = [f for _, f in get_scope_file_candidates(session_dir, workspace_paths)]
+    for sf in scope_files:
+        if not os.path.isfile(sf):
+            continue
+        pol = load_policy_file(sf)
+        for cb_name, cb_def in pol.get("custom_bundles", {}).items():
+            if isinstance(cb_def, dict):
+                cb_copy = dict(cb_def)
+                cb_copy.setdefault("name", cb_name)
+                cb_copy.setdefault("source", "inline")
+                catalog[cb_name] = cb_copy
+
+    return catalog
+
+
+def expand_bundle_hierarchy(
+    bundle_names: list[str],
+    disabled_bundles: set[str] | None = None,
+    workspace_paths: list[str] | None = None,
+    custom_bundles_map: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Expands bundle names and inheritance (extends) into flattened rule sets,
+    detecting dependency cycles and filtering out disabled bundles.
+    """
+    disabled = disabled_bundles or set()
+    expanded_rules: dict[str, Any] = {
+        "active_bundles": [],
+        "allow": [],
+        "ask": [],
+        "deny": [],
+        "custom_guidelines": [],
+        "allowed_skill_paths": [],
+        "govern_surfaces": {"subagents": False, "schedule": False, "images": False},
+        "provenance": {},
+    }
+
+    visited: set[str] = set()
+    queue = list(bundle_names)
+
+    while queue:
+        current = queue.pop(0).strip().lower()
+        if not current or current in visited or current in disabled:
+            continue
+        visited.add(current)
+
+        b_def = find_bundle_definition(
+            current,
+            workspace_paths=workspace_paths,
+            custom_bundles_map=custom_bundles_map,
+        )
+        if not b_def:
+            continue
+
+        expanded_rules["active_bundles"].append(current)
+
+        # Process extends
+        extends = b_def.get("extends", [])
+        if isinstance(extends, list):
+            for ext in extends:
+                ext_clean = str(ext).strip().lower()
+                if ext_clean and ext_clean not in visited and ext_clean not in disabled:
+                    queue.append(ext_clean)
+
+        # Merge rules
+        for bucket in ("allow", "ask", "deny", "custom_guidelines", "allowed_skill_paths"):
+            for item in b_def.get(bucket, []):
+                clean_item = str(item).strip()
+                if clean_item and clean_item not in expanded_rules[bucket]:
+                    expanded_rules[bucket].append(clean_item)
+                    if bucket in ("allow", "ask", "deny"):
+                        expanded_rules["provenance"][clean_item] = current
+
+        # Merge govern surfaces
+        gov = b_def.get("govern_surfaces", {})
+        if isinstance(gov, dict):
+            for k in ("subagents", "schedule", "images"):
+                if gov.get(k) is True:
+                    expanded_rules["govern_surfaces"][k] = True
+
+    return expanded_rules
+
+
+def resolve_active_bundles(
+    session_dir: str | None = None,
+    workspace_paths: list[str] | None = None,
+) -> dict[str, Any]:
+    """
+    Resolves the effective bundles across the 5-tier policy hierarchy
+    (Session > Local Project > Tracked Project > Global).
+    """
+    scope_files = [f for _, f in get_scope_file_candidates(session_dir, workspace_paths)]
+
+    enabled_bundles: list[str] = []
+    disabled_bundles: set[str] = set()
+    custom_bundles_map: dict[str, Any] = {}
+
+    for sf in scope_files:
+        if not os.path.isfile(sf):
+            continue
+        pol = load_policy_file(sf)
+        # Collect inline custom bundles
+        for cb_name, cb_def in pol.get("custom_bundles", {}).items():
+            if cb_name not in custom_bundles_map:
+                custom_bundles_map[cb_name] = cb_def
+
+        b_cfg = pol.get("bundles")
+        if isinstance(b_cfg, list):
+            for b in b_cfg:
+                b_name = str(b).strip().lower()
+                if b_name and b_name not in disabled_bundles and b_name not in enabled_bundles:
+                    enabled_bundles.append(b_name)
+        elif isinstance(b_cfg, dict):
+            # Disabled at higher/current scope masks lower scopes
+            for d in b_cfg.get("disabled", []):
+                disabled_bundles.add(str(d).strip().lower())
+            for e in b_cfg.get("enabled", []):
+                e_name = str(e).strip().lower()
+                if e_name and e_name not in disabled_bundles and e_name not in enabled_bundles:
+                    enabled_bundles.append(e_name)
+
+    return expand_bundle_hierarchy(
+        bundle_names=enabled_bundles,
+        disabled_bundles=disabled_bundles,
+        workspace_paths=workspace_paths,
+        custom_bundles_map=custom_bundles_map,
+    )
+
+
+def update_bundles_in_scope(
+    enabled_bundles: list[str] | None = None,
+    disabled_bundles: list[str] | None = None,
+    scope: str = "project",
+    workspace_dir: str | None = None,
+    session_dir: str | None = None,
+) -> str:
+    """Enables or disables bundles in the specified scope."""
+    target_path = resolve_scope_file_path(
+        scope, workspace_dir=workspace_dir, session_dir=session_dir, prefer_existing=True
+    )
+    policy = load_policy_file(target_path)
+    current_bundles = policy.get("bundles")
+
+    if isinstance(current_bundles, list):
+        cur_enabled = list(current_bundles)
+        cur_disabled = []
+    elif isinstance(current_bundles, dict):
+        cur_enabled = list(current_bundles.get("enabled", []))
+        cur_disabled = list(current_bundles.get("disabled", []))
+    else:
+        cur_enabled = []
+        cur_disabled = []
+
+    if enabled_bundles:
+        for b in enabled_bundles:
+            b_clean = b.strip().lower()
+            if b_clean:
+                if b_clean in cur_disabled:
+                    cur_disabled.remove(b_clean)
+                if b_clean not in cur_enabled:
+                    cur_enabled.append(b_clean)
+
+    if disabled_bundles:
+        for b in disabled_bundles:
+            b_clean = b.strip().lower()
+            if b_clean:
+                if b_clean in cur_enabled:
+                    cur_enabled.remove(b_clean)
+                if b_clean not in cur_disabled:
+                    cur_disabled.append(b_clean)
+
+    if cur_disabled:
+        policy["bundles"] = {"enabled": cur_enabled, "disabled": cur_disabled}
+    else:
+        policy["bundles"] = cur_enabled
+
+    save_policy_file(target_path, policy)
+    return target_path
+
+
+def migrate_config_layout(
+    workspace_dir: str | None = None,
+    migrate_global: bool = True,
+) -> dict[str, str]:
+    """
+    Migrates legacy flat configuration files to the new scoped directory layout.
+    Moves .agents/auto-permissions.json -> .agents/auto-permissions/config.json
+    Moves .agents/auto-permissions.local.json -> .agents/auto-permissions/config.local.json
+    Moves ~/.gemini/config/auto-permissions.json -> ~/.gemini/config/auto-permissions/config.json
+    """
+    import shutil
+
+    results: dict[str, str] = {}
+    ws = workspace_dir or os.getcwd()
+
+    # 1. Project tracked config
+    old_proj = os.path.join(ws, PROJECT_CONFIG_LEGACY_REL)
+    new_proj = os.path.join(ws, PROJECT_CONFIG_PRIMARY_REL)
+    if os.path.isfile(old_proj) and not os.path.isfile(new_proj):
+        os.makedirs(os.path.dirname(new_proj), exist_ok=True)
+        shutil.move(old_proj, new_proj)
+        results["project"] = f"Migrated {old_proj} -> {new_proj}"
+
+    # 2. Project local config
+    old_local = os.path.join(ws, PROJECT_LOCAL_CONFIG_LEGACY_REL)
+    new_local = os.path.join(ws, PROJECT_LOCAL_CONFIG_PRIMARY_REL)
+    if os.path.isfile(old_local) and not os.path.isfile(new_local):
+        os.makedirs(os.path.dirname(new_local), exist_ok=True)
+        shutil.move(old_local, new_local)
+        results["project_local"] = f"Migrated {old_local} -> {new_local}"
+
+    # 3. Global config
+    if (
+        migrate_global
+        and os.path.isfile(GLOBAL_CONFIG_LEGACY)
+        and not os.path.isfile(GLOBAL_CONFIG_PRIMARY)
+    ):
+        os.makedirs(GLOBAL_CONFIG_DIR, exist_ok=True)
+        shutil.move(GLOBAL_CONFIG_LEGACY, GLOBAL_CONFIG_PRIMARY)
+        results["global"] = f"Migrated {GLOBAL_CONFIG_LEGACY} -> {GLOBAL_CONFIG_PRIMARY}"
+
+    return results
+
+
 def evaluate_static_policies(
     tool_name: str,
     tool_args: dict[str, Any],
@@ -1649,33 +2066,15 @@ def evaluate_static_policies(
     workspace_paths: list[str] | None = None,
 ) -> tuple[str, str, str] | None:
     """
-    Evaluates tool against Session, Project, and Global policies with priority Deny > Ask > Allow.
+    Evaluates tool against explicit policies AND active Permission Bundles
+    with strict priority Deny > Ask > Allow.
 
     Returns:
         Tuple of (decision, reason, scope) if matched, or None if no static match.
     """
-    scope_files = []
+    scope_files = get_scope_file_candidates(session_dir, workspace_paths)
 
-    # 1. Session scope (highest specificity)
-    if session_dir and os.path.isdir(session_dir):
-        session_file = resolve_session_override_path(session_dir)
-        if session_file:
-            scope_files.append(("session", session_file))
-
-    # 2. Local Project scope (untracked local overrides)
-    if workspace_paths:
-        for ws in workspace_paths:
-            scope_files.append(("project_local", os.path.join(ws, PROJECT_LOCAL_CONFIG_REL_PATH)))
-
-    # 3. Project scope (tracked project rules)
-    if workspace_paths:
-        for ws in workspace_paths:
-            scope_files.append(("project", os.path.join(ws, PROJECT_CONFIG_REL_PATH)))
-
-    # 4. Global scope
-    scope_files.append(("global", GLOBAL_CONFIG_PATH))
-
-    # Evaluate each scope with strict Deny > Ask > Allow precedence
+    # 1. Evaluate explicit scope rules (Deny > Ask > Allow)
     for scope_name, file_path in scope_files:
         if not os.path.isfile(file_path):
             continue
@@ -1708,7 +2107,40 @@ def evaluate_static_policies(
                     scope_name,
                 )
 
-    # 4. Built-in fast-path for read-only workspace inspection
+    # 2. Evaluate Compiled Permission Bundles (Deny > Ask > Allow)
+    bundled = resolve_active_bundles(session_dir=session_dir, workspace_paths=workspace_paths)
+
+    # 2.1 Bundled Deny
+    for rule in bundled.get("deny", []):
+        if match_tool_against_rule(rule, tool_name, tool_args):
+            b_src = bundled.get("provenance", {}).get(rule, "bundle")
+            return (
+                "deny",
+                f"Blocked by bundled policy ({b_src}) rule '{rule}'",
+                f"bundle:{b_src}",
+            )
+
+    # 2.2 Bundled Ask
+    for rule in bundled.get("ask", []):
+        if match_tool_against_rule(rule, tool_name, tool_args):
+            b_src = bundled.get("provenance", {}).get(rule, "bundle")
+            return (
+                "ask",
+                f"Escalated by bundled policy ({b_src}) rule '{rule}'",
+                f"bundle:{b_src}",
+            )
+
+    # 2.3 Bundled Allow
+    for rule in bundled.get("allow", []):
+        if match_tool_against_rule(rule, tool_name, tool_args):
+            b_src = bundled.get("provenance", {}).get(rule, "bundle")
+            return (
+                "allow",
+                f"Auto-approved by bundled policy ({b_src}) rule '{rule}'",
+                f"bundle:{b_src}",
+            )
+
+    # 3. Built-in fast-path for read-only workspace inspection
     if tool_name in ("view_file", "list_dir", "grep_search"):
         target_path = ""
         if tool_name == "view_file":
@@ -1725,7 +2157,7 @@ def evaluate_static_policies(
                 "workspace_boundary",
             )
 
-    # 5. Built-in fast-path for active session artifacts, scratch, and audit logs
+    # 4. Built-in fast-path for active session artifacts, scratch, and audit logs
     if is_safe_session_artifact_read(
         tool_name=tool_name,
         tool_args=tool_args,
@@ -1737,7 +2169,7 @@ def evaluate_static_policies(
             "session_artifact",
         )
 
-    # 5.1 Built-in fast-path for active session artifact writes (plans, notes, drafts)
+    # 4.1 Built-in fast-path for active session artifact writes (plans, notes, drafts)
     if is_safe_session_artifact_write(
         tool_name=tool_name,
         tool_args=tool_args,
@@ -1750,7 +2182,7 @@ def evaluate_static_policies(
             "session_artifact",
         )
 
-    # 6. Built-in fast-path for safe skill definitions
+    # 5. Built-in fast-path for safe skill definitions
     if is_safe_skill_read(
         tool_name=tool_name,
         tool_args=tool_args,

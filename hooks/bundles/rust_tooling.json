@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "rust-tooling",
+  "description": "Standard Rust / Cargo test, check, lint, and formatting tools (cargo test/check/clippy/fmt/doc/build)",
+  "version": "1.0.0",
+  "allow": [
+    "command(cargo test*)",
+    "command(cargo check*)",
+    "command(cargo clippy*)",
+    "command(cargo fmt*)",
+    "command(cargo doc*)",
+    "command(cargo build*)"
+  ]
+}

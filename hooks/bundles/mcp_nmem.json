@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "mcp-nmem",
+  "description": "Read-only lookup and search tools for Nowledge Mem MCP",
+  "version": "1.0.0",
+  "allow": [
+    "mcp(nowledge-mem:read_*)",
+    "mcp(nowledge-mem:search_*)",
+    "mcp(nowledge-mem:list_*)",
+    "mcp(nowledge-mem:get_*)",
+    "mcp(nowledge-mem:find_*)",
+    "mcp(nowledge-mem:query_*)"
+  ]
+}

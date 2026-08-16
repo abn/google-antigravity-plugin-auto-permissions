@@ -351,6 +351,48 @@ Grounded in empirical findings from Anthropic's Claude Code Auto-Mode benchmarks
 * **Final-Response Enforcement:** The summary is restricted strictly to final conversational conclusions, omitting disclosures from intermediate progress pings or background task execution notifications.
 * **Opt-Out Configuration:** Users and teams can opt out of the turn summary disclosure by setting `"show_turn_summary": false` (or `--no-show-turn-summary` / `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY=0`) across Session, Local Project, Project, or Global scopes.
 
+### 8.10 Permission Bundles & Scoped Directory Layout
+
+#### The Ergonomic Challenge
+Maintaining granular static ACL rules across multiple development environments creates configuration bloat and maintenance overhead. Rather than repeating identical regex patterns for standard dev tools (e.g. `pytest`, `cargo`, `npm`, `git`, `gh`), **Permission Bundles** provide modular, shareable packages of static rules, semantic guidelines, and skill paths.
+
+#### Scoped Directory Encapsulation
+To eliminate root namespace collisions within `.agents/` and maintain architectural symmetry with session storage (`<session_dir>/auto-permissions/`), configuration is organized into dedicated scoped subdirectories:
+
+* **Tracked Project Config:** `<workspace>/.agents/auto-permissions/config.json`
+* **Local Project Overrides:** `<workspace>/.agents/auto-permissions/config.local.json`
+* **Project Custom Bundles:** `<workspace>/.agents/auto-permissions/bundles/<slug>.json`
+* **Project Local Bundles:** `<workspace>/.agents/auto-permissions/bundles.local/<slug>.json`
+* **Global Config:** `~/.gemini/config/auto-permissions/config.json`
+* **Global Custom Bundles:** `~/.gemini/config/auto-permissions/bundles/<slug>.json`
+* **Built-in Bundles:** `hooks/bundles/<slug>.json`
+
+*(Backward Compatibility: Dual-resolution path resolution transparently falls back to `.agents/auto-permissions.json` and `~/.gemini/config/auto-permissions.json` if present).*
+
+#### Bundle Resolution Hierarchy & DAG Inheritance
+Bundles support hierarchical composition via `"extends": ["<parent-bundle>"]`. The engine resolves bundles using bread-first traversal with cycle detection and strict precedence:
+
+```mermaid
+flowchart TD
+    subgraph Evaluation Precedence [Strict Deny > Ask > Allow]
+        A[Explicit Static Rules: Session > Local > Project > Global] --> B[Compiled Bundle Rules: bundle:<slug>]
+        B --> C[Workspace Write Fast-Path: trust_workspace_writes]
+        C --> D[Built-in Fast-Paths: Read, Artifact, Skill]
+        D --> E[Decoupled Security Classifier: Gemini / Local / Claude]
+    end
+
+    subgraph Bundle Lookup [5-Tier Discovery]
+        B1[1. Inline custom_bundles in config.json]
+        B2[2. Project Local: .agents/auto-permissions/bundles.local/]
+        B3[3. Project Tracked: .agents/auto-permissions/bundles/]
+        B4[4. Global: ~/.gemini/config/auto-permissions/bundles/]
+        B5[5. Built-in: hooks/bundles/]
+    end
+```
+
+* **Disabled Bundle Masking:** Higher scopes can selectively disable bundles enabled by lower scopes (e.g. `"bundles": {"disabled": ["rust-tooling"]}`).
+* **Provenance Attribution:** All decisions matched via bundled rules include provenance metadata in audit logs and gate responses (e.g. `Auto-approved by bundled policy (git-inspect) rule 'command(git status*)'`).
+
 ---
 
 ## 9. Two-Tier Security Architecture: Plugin Gate vs. Platform Container Sandbox

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "container-inspect",
+  "description": "Safe read-only inspection of container runtimes (podman/docker ps, logs, images, inspect)",
+  "version": "1.0.0",
+  "allow": [
+    "command(podman ps*)",
+    "command(podman logs*)",
+    "command(podman images*)",
+    "command(podman inspect*)",
+    "command(docker ps*)",
+    "command(docker logs*)",
+    "command(docker images*)",
+    "command(docker inspect*)"
+  ]
+}
