@@ -9,6 +9,7 @@ from hooks.policy_engine import (
     PROJECT_LOCAL_CONFIG_REL_PATH,
     add_rule_to_scope,
     check_intra_turn_cache,
+    check_intra_turn_circuit_breaker,
     check_same_turn_file_grant,
     evaluate_static_policies,
     evaluate_workspace_write_fast_path,
@@ -882,6 +883,92 @@ class TestPolicyEngine(unittest.TestCase):
                 session_dir=session_dir,
             )
             self.assertIsNone(opt_out_verdict)
+
+    def test_check_intra_turn_circuit_breaker(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = os.path.join(tmpdir, "audit.jsonl")
+
+            # 1. Non-existent log or no user step index -> None
+            self.assertIsNone(
+                check_intra_turn_circuit_breaker(log_path=None, last_user_step_idx=10)
+            )
+            self.assertIsNone(
+                check_intra_turn_circuit_breaker(log_path=log_path, last_user_step_idx=None)
+            )
+
+            # 2. Write prior-turn failure (stepIdx = 5, last_user_step_idx = 10)
+            with open(log_path, "w", encoding="utf-8") as f:
+                f.write(
+                    json.dumps(
+                        {
+                            "stepIdx": 5,
+                            "classification": {
+                                "decision": "ask",
+                                "risk_category": "classifier_error_fallback",
+                                "provider": "google",
+                                "error": "HTTP Error 401: Unauthorized",
+                            },
+                            "hook_output": {
+                                "decision": "ask",
+                                "reason": "Classifier fallback on error (google): HTTP Error 401",
+                            },
+                        }
+                    )
+                    + "\n"
+                )
+
+            # Prior turn failure should NOT trip circuit breaker for active turn (step 10)
+            self.assertIsNone(
+                check_intra_turn_circuit_breaker(
+                    log_path=log_path, last_user_step_idx=10, provider="google"
+                )
+            )
+
+            # 3. Write active-turn failure (stepIdx = 12, last_user_step_idx = 10)
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(
+                    json.dumps(
+                        {
+                            "stepIdx": 12,
+                            "classification": {
+                                "decision": "ask",
+                                "risk_category": "classifier_error_fallback",
+                                "provider": "google",
+                                "error": "Request timed out after 4.0s",
+                            },
+                            "hook_output": {
+                                "decision": "ask",
+                                "reason": "Classifier fallback (google): Request timed out",
+                            },
+                        }
+                    )
+                    + "\n"
+                )
+
+            # Circuit breaker SHOULD trip for google provider
+            cb = check_intra_turn_circuit_breaker(
+                log_path=log_path, last_user_step_idx=10, provider="google"
+            )
+            self.assertIsNotNone(cb)
+            decision, reason, failed_step, err = cb
+            self.assertEqual(decision, "ask")
+            self.assertEqual(failed_step, 12)
+            self.assertIn("Request timed out", err)
+            self.assertIn("Circuit breaker tripped", reason)
+
+            # Alias 'gemini' also trips for 'google'
+            cb_gemini = check_intra_turn_circuit_breaker(
+                log_path=log_path, last_user_step_idx=10, provider="gemini"
+            )
+            self.assertIsNotNone(cb_gemini)
+            self.assertEqual(cb_gemini[0], "ask")
+
+            # Different provider (e.g. anthropic) does not trip if google failed
+            self.assertIsNone(
+                check_intra_turn_circuit_breaker(
+                    log_path=log_path, last_user_step_idx=10, provider="anthropic"
+                )
+            )
 
 
 if __name__ == "__main__":

@@ -26,6 +26,7 @@ from audit_logger import (  # noqa: E402
 from classifier import classify_tool_call  # noqa: E402
 from policy_engine import (  # noqa: E402
     check_intra_turn_cache,
+    check_intra_turn_circuit_breaker,
     check_same_turn_file_grant,
     evaluate_static_policies,
     evaluate_workspace_write_fast_path,
@@ -390,6 +391,56 @@ def main():
             session_dir=session_dir,
             workspace_paths=workspace_paths,
         )
+
+        # 9b. FAST-PATH: Intra-Turn Circuit Breaker (prevent Timeout * N accumulation)
+        circuit_breaker = check_intra_turn_circuit_breaker(
+            log_path=log_path,
+            last_user_step_idx=last_user_step_idx,
+            provider=classifier_cfg["provider"],
+        )
+        if circuit_breaker:
+            cb_decision, cb_reason, cb_failed_step, cb_err = circuit_breaker
+            hook_output = {
+                "decision": cb_decision,
+                "reason": cb_reason,
+            }
+            classification = {
+                "decision": cb_decision,
+                "reason": cb_reason,
+                "risk_category": "circuit_breaker_active_turn",
+                "confidence": 0.0,
+                "provider": classifier_cfg["provider"],
+                "error": cb_err,
+            }
+            context_summary = {
+                "active_prompt": active_prompt,
+                "prior_prompts_count": len(prior_prompts),
+                "workspace_roots": workspace_paths,
+                "policy_scope": "circuit_breaker",
+            }
+            if session_goal:
+                context_summary["session_goal"] = session_goal
+
+            log_thread = log_audit_event_async(
+                artifact_dir=artifact_dir,
+                transcript_path=transcript_path,
+                conversation_id=conversation_id,
+                step_idx=step_idx,
+                tool_call=tool_call,
+                context=context_summary,
+                raw_prompt=(
+                    f"<circuit_breaker provider='{classifier_cfg['provider']}' "
+                    f"failed_at_step='{cb_failed_step}'>{cb_err}</circuit_breaker>"
+                ),
+                classification=classification,
+                hook_output=hook_output,
+                latency_ms=0.1,
+            )
+            print(json.dumps(hook_output))
+            sys.stdout.flush()
+            if log_thread and log_thread.is_alive():
+                log_thread.join(timeout=0.2)
+            return
 
         # 10. Invoke security classifier
         raw_prompt, classification, error, latency_ms = classify_tool_call(

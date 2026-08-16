@@ -1363,6 +1363,78 @@ def check_intra_turn_cache(
     return None
 
 
+def check_intra_turn_circuit_breaker(
+    log_path: str | None,
+    last_user_step_idx: int | None,
+    provider: str | None = None,
+) -> tuple[str, str, int, str] | None:
+    """
+    Checks if the security classifier for the given provider experienced a persistent
+    failure (timeout, auth failure, connection refused) in the active conversation turn
+    (stepIdx >= last_user_step_idx).
+
+    If tripped, short-circuits subsequent non-static calls in ~0.1ms to prevent
+    accumulating redundant timeouts (Timeout * N) within the same turn.
+
+    Returns:
+        (decision, reason, failed_step_idx, failure_detail) or None if circuit is healthy.
+    """
+    if last_user_step_idx is None or not log_path or not os.path.isfile(log_path):
+        return None
+
+    norm_provider = (provider or "google").lower()
+    if norm_provider == "gemini":
+        norm_provider = "google"
+    elif norm_provider == "claude":
+        norm_provider = "anthropic"
+    elif norm_provider in ("sidecar", "worker"):
+        norm_provider = "antigravity"
+    elif norm_provider == "oauth":
+        norm_provider = "cloudcode"
+
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+
+        for line in reversed(lines):
+            line = line.strip()
+            if not line:
+                continue
+            with contextlib.suppress(json.JSONDecodeError):
+                record = json.loads(line)
+                step_idx = record.get("stepIdx", 0)
+                if step_idx < last_user_step_idx:
+                    break
+
+                classification = record.get("classification", {})
+                risk_cat = classification.get("risk_category", "")
+                rec_provider = classification.get("provider", "").lower()
+                if rec_provider == "gemini":
+                    rec_provider = "google"
+                elif rec_provider == "claude":
+                    rec_provider = "anthropic"
+
+                is_fallback_error = risk_cat == "classifier_error_fallback" or (
+                    classification.get("decision") == "ask"
+                    and "fallback on error" in classification.get("reason", "").lower()
+                )
+
+                if is_fallback_error and (not rec_provider or rec_provider == norm_provider):
+                    err_detail = classification.get("error") or classification.get(
+                        "reason", "Provider failure"
+                    )
+                    reason_msg = (
+                        f"Circuit breaker tripped for active turn: Provider '{norm_provider}' "
+                        f"failed at step {step_idx} ({err_detail}). "
+                        "Escalating immediately to avoid repeated timeout accumulation."
+                    )
+                    return ("ask", reason_msg, step_idx, str(err_detail))
+    except Exception:
+        return None
+
+    return None
+
+
 def resolve_classifier_config(
     session_dir: str | None = None,
     workspace_paths: list[str] | None = None,
