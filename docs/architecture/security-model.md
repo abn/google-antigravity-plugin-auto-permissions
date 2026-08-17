@@ -84,3 +84,19 @@ In high-assurance security architectures, authorization gates must never fail op
 | **Silent Workspace Corruption** | Agent runs `git checkout -- .` or `git reset` during a formatting request. | Static ACL and classifier detect scope deviation $\rightarrow$ `soft_deny`. |
 | **Sandbox Bypass Escalation** | Agent attempts unsandboxed execution (`BypassSandbox: true`) without user request. | Classifier checks explicit user intent; blocks unprompted elevation. |
 | **Path Traversal via Symlinks** | Symlinks pointing outside workspace roots to `/etc/passwd`. | `policy_engine.is_path_in_workspaces` evaluates canonical resolved realpaths (`os.path.realpath`). |
+
+---
+
+## 4. Limitations & Operational Tradeoffs
+
+The gate is a pragmatic intent-classification and policy layer, not a security guarantee. The limits that matter to operators and contributors:
+
+- **Probabilistic, not provable.** Intent inference is an LLM judgment; it cannot prove an action is safe. It can over-block (a harmless help invocation misread as a risky mutation) and under-block (a genuinely dangerous command judged benign), and the miss rate rises on obfuscated, chained, or composite commands.
+- **Bias tradeoff.** The default-allow posture reduces permission fatigue but necessarily raises the chance that an action a human would have caught slips through. Every reduction in false prompts trades a little safety.
+- **Blinding is double-edged.** Excluding the agent's reasoning and tool outputs defeats prompt injection, but the classifier then judges only the command string and user intent, not the actual file contents or side effects the action will cause.
+- **Benchmark coverage is limited.** The accuracy battery is curated and model-specific. Weaker (especially local) models score measurably worse: the E4B QAT model false-`allow`ed `.env` secrets and `git push --force` that `gemini-2.5-flash` blocked. Validate any model choice with the `auto-permissions-benchmark` skill before adopting it.
+- **Fast-paths bypass review.** Sub-millisecond static rules and `trust_workspace_writes` auto-approve routine reads and workspace edits without any model review, so a compromised agent can still land benign-looking changes untouched.
+- **Undocumented-API / sidecar dependency.** The zero-key Antigravity path relies on the Language Server's internal Connect-RPC endpoint and Antigravity's sidecar spawn mechanism. These are undocumented and can change between releases; the gate fails closed (`ask`) if they break, but the zero-key mode then degrades until restored.
+- **Layer 2 still interacts.** An action the classifier `allow`s can still surface a prompt to the user in Antigravity's sandbox mode: `BypassSandbox` elevation or a sandbox-blocked command (for example one touching a read-only mount) may still require confirmation or fail closed regardless of the verdict. Classifier approval is necessary but never sufficient to avoid a human prompt.
+
+The plugin is an intent-verification gate only; it does not provide OS-level capability isolation. Pair it with kernel-enforced sandboxing as described in [sandbox and OS isolation](sandbox-and-os-isolation.md).
