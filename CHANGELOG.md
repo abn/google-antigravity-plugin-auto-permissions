@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.8.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.7.0...auto-permissions-v0.8.0) (2026-08-17)
+
+
+### Features
+
+* **classifier:** allow safe in-scope actions by default ([#47](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/47)) ([9686b58](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/9686b583620dad96bcf9ddd99ff8ff73de5b82bf))
+* **classifier:** auto-spawn persistent sidecar worker daemon on demand ([#42](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/42)) ([95065b4](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/95065b48d0bde0c820165bd7b2b043b084ea8486))
+* **classifier:** zero-key Antigravity classification via plugin sidecar ([#46](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/46)) ([6865a5b](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/6865a5b1c4183213c75aa04af68c01ee1945b0b7))
+* **policy:** add intra-turn circuit breaker to prevent repeated provider timeout accumulation ([#45](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/45)) ([f02d3e5](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/f02d3e5a840789166626ac2fd929e4ebbe9f9080))
+
+
+### Bug Fixes
+
+* **classifier:** allow help/usage invocations explicitly ([#48](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/48)) ([f1eb3f8](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/f1eb3f8dc9c3052a4083dd23fc2d660de279256e))
+* **sidecar:** pass dynamic session credentials in classification payload ([#44](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/44)) ([cdf936c](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/cdf936c9d4518ecde40274b10799c8bc436aad6d))
+
 ## [0.7.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.6.0...auto-permissions-v0.7.0) (2026-08-16)
 
 
