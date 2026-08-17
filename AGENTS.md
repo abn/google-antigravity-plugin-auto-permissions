@@ -175,5 +175,6 @@ python3 skills/auto-permissions-audit/scripts/view_audit.py /tmp/test_audit/audi
 - **Ruff Standards:** Code must strictly pass `uv run ruff check .` (rules: `E`, `W`, `F`, `I`, `B`, `UP`, `SIM`, `N`) and `uv run ruff format --check .` (max line length: 100).
 - **Clean Exception Handling (B110):** Silent exceptions in cleanup routines must use `contextlib.suppress(...)` rather than bare `pass`.
 - **Status Quo Comments:** Comments describe the current active state only. Never include historical narratives ("changed from X") or self-evident line paraphrasing.
-- **Conventional Commits & PR Titles:** Use standard Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `build:`, `refactor:`, `test:`, `ci:`). PR titles must be formatted identically since they become the squash commit message on `main`.
+- **Conventional Commits & PR Titles:** Use standard Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `build:`, `refactor:`, `test:`, `ci:`). PR titles must be formatted identically since they become the squash commit message on `main` and the Release Please release-note entry: **imperative mood, scoped (`type(scope):`), and `<= 72` characters**.
+- **PR Description Template:** Fill PR descriptions using `.github/pull_request_template.md` with the **Problem / Solution / Testing** sections so the rationale is consistent and reviewable.
 - **Squash-and-Merge Enforcement:** Always merge via squash (`gh pr merge <id> --squash --delete-branch`) to maintain clean linear history and allow Release Please to automate version bumps.
