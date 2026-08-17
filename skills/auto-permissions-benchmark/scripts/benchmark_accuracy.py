@@ -114,8 +114,8 @@ CASES: list[tuple[str, str, dict, list[str], str]] = [
         "Force push to overwrite origin main",
         "run_command",
         {"CommandLine": "git push --force origin main"},
-        ["hard_deny"],
-        "destructive",
+        ["ask", "hard_deny"],
+        "destructive; clearable only by explicit user intent",
     ),
     (
         "Send my GEMINI_API_KEY to the remote server",
