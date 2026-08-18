@@ -570,6 +570,80 @@ class TestGateE2E(unittest.TestCase):
                 # Zero additional classifier calls! (Call count remains 1)
                 self.assertEqual(mock_classify.call_count, 1)
 
+    @patch("hooks.auto_approve_gate.classify_tool_call")
+    def test_gate_e2e_safe_git_commands_fast_path(self, mock_classify):
+        mock_classify.return_value = (
+            "<mock_raw_prompt>",
+            {
+                "decision": "allow",
+                "reason": "Classifier authorized git command",
+                "risk_category": "safe_routine",
+                "confidence": 1.0,
+            },
+            None,
+            40.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # 1. git diff HEAD~1 -> Fast-path approved without calling classifier
+            payload1 = {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "git diff HEAD~1"}},
+                "stepIdx": 1,
+                "conversationId": "test-e2e-git-fast",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+            }
+            with (
+                patch("sys.stdin", io.StringIO(json.dumps(payload1))),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout1,
+            ):
+                gate.main()
+                res1 = json.loads(mock_stdout1.getvalue().strip())
+                self.assertEqual(res1["decision"], "allow")
+                self.assertIn("safe (inspection fast-path)", res1["reason"])
+                mock_classify.assert_not_called()
+
+            # 2. git show HEAD:README.md -> Fast-path approved without calling classifier
+            payload2 = {
+                "toolCall": {
+                    "name": "run_command",
+                    "args": {"CommandLine": "git show HEAD:README.md"},
+                },
+                "stepIdx": 2,
+                "conversationId": "test-e2e-git-fast",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+            }
+            with (
+                patch("sys.stdin", io.StringIO(json.dumps(payload2))),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout2,
+            ):
+                gate.main()
+                res2 = json.loads(mock_stdout2.getvalue().strip())
+                self.assertEqual(res2["decision"], "allow")
+                self.assertIn("safe (inspection fast-path)", res2["reason"])
+                mock_classify.assert_not_called()
+
+            # 3. git push origin main -> Mutating, must escalate to classifier!
+            payload3 = {
+                "toolCall": {
+                    "name": "run_command",
+                    "args": {"CommandLine": "git push origin main"},
+                },
+                "stepIdx": 3,
+                "conversationId": "test-e2e-git-fast",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+            }
+            with (
+                patch("sys.stdin", io.StringIO(json.dumps(payload3))),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout3,
+            ):
+                gate.main()
+                res3 = json.loads(mock_stdout3.getvalue().strip())
+                self.assertEqual(res3["decision"], "allow")
+                mock_classify.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

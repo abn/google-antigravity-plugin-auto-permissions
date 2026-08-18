@@ -75,7 +75,7 @@ Every tool call intercepted by the `PreToolUse` hook (`hooks/auto_approve_gate.p
 
 1. **Intra-Turn Cache (~0.05ms):** Exact repeat tool invocations within the same turn index immediately reuse the previous authorization verdict.
 2. **Ungoverned Surface Fast-Path (~0.05ms):** Read-only inspection tools (`list_dir`, `view_file`, `grep_search`, `read_url_content`) operate unhindered unless explicitly governed.
-3. **Safe Read & Skill Discovery (~0.1ms):** Whitelisted read commands (`cat`, `git status`, `head`) and skill definition reads (`~/.gemini/antigravity/builtin/skills`, `~/.agents/skills`) are auto-approved.
+3. **Safe Read & Git Inspection (~0.1ms):** Whitelisted read commands (`which`, `wc`, `cat`, `head`, `tail`, `uname`, `du`) and safe read-only Git inspection commands (`git diff`, `git show`, `git status`, `git log`, `git rev-parse`, `git describe`, `git blame`, `git branch -a`, `git tag -l`, etc.) are auto-approved instantly.
 4. **Workspace Write Fast-Path (~0.1ms):** When `trust_workspace_writes: true`, modifications to files strictly within workspace boundaries are auto-approved, while sensitive paths (`.git/`, `.ssh/`, `.env`) are escalated.
 5. **Static ACL Policy Hierarchy (~0.1ms):** Evaluates user-defined static rules across Session $\rightarrow$ Project Local $\rightarrow$ Project $\rightarrow$ Global with strict `Deny > Ask > Allow` priority.
 6. **Compiled Permission Bundles (~0.2ms):** Evaluates compiled rules across all active bundles (e.g. `git-inspect`, `python-tooling`, `gh-readonly`) with provenance attribution (`bundle:<slug>`).

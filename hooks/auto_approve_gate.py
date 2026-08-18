@@ -200,9 +200,19 @@ def main():
         if tool_name == "run_command":
             cmd_str = tool_args.get("CommandLine", "")
             if is_safe_read_only_command(cmd_str, workspace_paths=workspace_paths):
-                safe_read_reason = (
-                    f"Read-only utility '{cmd_str.split()[0]}' is safe (inspection pipeline)."
-                )
+                first_tok = cmd_str.split()[0] if cmd_str.split() else "command"
+                base_binary = os.path.basename(first_tok).lower()
+                if base_binary == "git":
+                    safe_read_reason = (
+                        f"Read-only git command '{cmd_str.strip()}' is safe (inspection fast-path)."
+                    )
+                    risk_cat = "safe_git_command"
+                else:
+                    safe_read_reason = (
+                        f"Read-only utility '{base_binary}' is safe (inspection pipeline)."
+                    )
+                    risk_cat = "safe_read_command"
+
                 hook_output = {
                     "decision": "allow",
                     "reason": safe_read_reason,
@@ -210,14 +220,14 @@ def main():
                 classification = {
                     "decision": "allow",
                     "reason": safe_read_reason,
-                    "risk_category": "safe_read_command",
+                    "risk_category": risk_cat,
                     "confidence": 1.0,
                 }
                 context_summary = {
                     "active_prompt": "(Safe read-only command fast-path)",
                     "prior_prompts_count": 0,
                     "workspace_roots": workspace_paths,
-                    "policy_scope": "safe_read_command",
+                    "policy_scope": risk_cat,
                 }
                 log_thread = log_audit_event_async(
                     artifact_dir=artifact_dir,
@@ -226,7 +236,7 @@ def main():
                     step_idx=step_idx,
                     tool_call=tool_call,
                     context=context_summary,
-                    raw_prompt=f"<safe_read_command command='{cmd_str}'/>",
+                    raw_prompt=f"<{risk_cat} command='{cmd_str}'/>",
                     classification=classification,
                     hook_output=hook_output,
                     latency_ms=0.1,
