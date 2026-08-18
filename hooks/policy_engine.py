@@ -9,6 +9,7 @@ import contextlib
 import json
 import os
 import re
+import shlex
 from typing import Any
 
 try:
@@ -1006,6 +1007,322 @@ SAFE_PIPE_FILTERS = {
     "fmt",
 }
 
+SAFE_GIT_READ_SUBCOMMANDS = {
+    "status",
+    "diff",
+    "log",
+    "show",
+    "rev-parse",
+    "describe",
+    "blame",
+    "check-ignore",
+    "ls-files",
+    "cat-file",
+    "shortlog",
+    "whatchanged",
+    "reflog",
+    "count-objects",
+    "fsck",
+    "verify-pack",
+    "verify-tag",
+    "verify-commit",
+    "merge-base",
+}
+
+DANGEROUS_GIT_GLOBAL_FLAGS = {
+    "-c",
+    "--config-env",
+    "--exec-path",
+    "--upload-pack",
+    "--receive-pack",
+    "--namespace",
+    "--super-prefix",
+}
+
+SAFE_GIT_GLOBAL_FLAGS = {
+    "--no-pager",
+    "-P",
+    "--paginate",
+    "-p",
+    "--no-optional-locks",
+    "--literal-pathspecs",
+    "--bare",
+    "-v",
+    "--version",
+    "-h",
+    "--help",
+}
+
+DANGEROUS_GIT_SUBCOMMAND_FLAGS = {
+    "--output",
+    "-o",
+    "--ext-cmd",
+    "--tool",
+    "-t",
+    "--filter",
+}
+
+
+def is_safe_git_stage(
+    stage_str: str,
+    workspace_paths: list[str] | None = None,
+) -> bool:
+    """
+    Evaluates whether a single git command stage is a safe, non-destructive read-only inspection.
+    """
+    if not stage_str or not stage_str.strip():
+        return False
+
+    try:
+        tokens = shlex.split(stage_str)
+    except Exception:
+        tokens = stage_str.split()
+
+    if not tokens:
+        return False
+
+    base_bin = os.path.basename(tokens[0]).lower()
+    if base_bin != "git":
+        return False
+
+    idx = 1
+    # Process global git options preceding the subcommand
+    while idx < len(tokens):
+        tok = tokens[idx]
+        if not tok.startswith("-"):
+            break
+
+        # Check dangerous global flags
+        if tok in DANGEROUS_GIT_GLOBAL_FLAGS or any(
+            tok.startswith(f"{df}=") for df in DANGEROUS_GIT_GLOBAL_FLAGS
+        ):
+            return False
+
+        if tok in SAFE_GIT_GLOBAL_FLAGS:
+            idx += 1
+            continue
+
+        if tok in ("-C", "--work-tree", "--git-dir"):
+            idx += 1
+            if idx < len(tokens):
+                target_dir = tokens[idx]
+                if is_sensitive_path(target_dir):
+                    return False
+                idx += 1
+                continue
+            return False
+
+        if any(tok.startswith(p) for p in ("-C=", "--work-tree=", "--git-dir=")):
+            target_dir = tok.split("=", 1)[1]
+            if is_sensitive_path(target_dir):
+                return False
+            idx += 1
+            continue
+
+        # Reject unknown global flags
+        return False
+
+    if idx >= len(tokens):
+        # No subcommand (e.g. `git`, `git --version`, `git --help`)
+        return any(t in ("--version", "-v", "--help", "-h", "version", "help") for t in tokens[1:])
+
+    subcmd = tokens[idx].lower()
+    subcmd_args = tokens[idx + 1 :]
+
+    # Check for dangerous subcommand flags across any subcommand
+    for arg in subcmd_args:
+        for df in DANGEROUS_GIT_SUBCOMMAND_FLAGS:
+            if arg == df or arg.startswith(f"{df}="):
+                return False
+        # Sensitive path check on arg (e.g. /etc/shadow or ~/.ssh)
+        val = arg.split("=", 1)[1] if "=" in arg else arg
+        if not val.startswith("-") and is_sensitive_path(val):
+            return False
+
+    # 1. Pure read-only subcommands
+    if subcmd in SAFE_GIT_READ_SUBCOMMANDS:
+        return True
+
+    # 2. Branch listing / query
+    if subcmd == "branch":
+        mutating_branch_flags = {
+            "-d",
+            "-D",
+            "--delete",
+            "-m",
+            "-M",
+            "--move",
+            "-c",
+            "-C",
+            "--copy",
+            "--set-upstream-to",
+            "-u",
+            "--unset-upstream",
+            "--edit-description",
+        }
+        for arg in subcmd_args:
+            if arg in mutating_branch_flags or any(
+                arg.startswith(f"{mf}=") for mf in mutating_branch_flags
+            ):
+                return False
+
+        # If positional args exist without listing/query flags, it creates a branch
+        positional = [a for a in subcmd_args if not a.startswith("-")]
+        query_flags = {
+            "-l",
+            "--list",
+            "--contains",
+            "--no-contains",
+            "--merged",
+            "--no-merged",
+            "--points-at",
+            "--show-current",
+        }
+        has_query_flag = any(
+            a in query_flags
+            or any(
+                a.startswith(f"{qf}=")
+                for qf in (
+                    "--contains",
+                    "--no-contains",
+                    "--merged",
+                    "--no-merged",
+                    "--points-at",
+                    "--sort",
+                    "--format",
+                )
+            )
+            for a in subcmd_args
+        )
+        return not (positional and not has_query_flag)
+
+    # 3. Tag listing / query
+    if subcmd == "tag":
+        mutating_tag_flags = {
+            "-a",
+            "-s",
+            "-u",
+            "-f",
+            "--force",
+            "-d",
+            "--delete",
+            "-m",
+            "--message",
+            "-F",
+            "--file",
+        }
+        for arg in subcmd_args:
+            if arg in mutating_tag_flags or any(
+                arg.startswith(f"{mf}=") for mf in mutating_tag_flags
+            ):
+                return False
+
+        positional = [a for a in subcmd_args if not a.startswith("-")]
+        query_tag_flags = {"-l", "--list", "--points-at", "--contains", "--no-contains"}
+        has_list_flag = any(
+            a in query_tag_flags
+            or any(
+                a.startswith(f"{qf}=")
+                for qf in ("--points-at", "--contains", "--no-contains", "--sort", "--format")
+            )
+            for a in subcmd_args
+        )
+        return not (positional and not has_list_flag)
+
+    # 4. Remote listing / query
+    if subcmd == "remote":
+        if not subcmd_args:
+            return True
+        first_arg = subcmd_args[0].lower()
+        if first_arg in ("-v", "--verbose"):
+            return True
+        return first_arg in ("show", "get-url")
+
+    # 5. Stash inspection (stash list, stash show)
+    if subcmd == "stash":
+        if not subcmd_args:
+            return False
+        first_arg = subcmd_args[0].lower()
+        return first_arg in ("list", "show")
+
+    # 6. Config inspection (git config --get, git config --list, git config -l)
+    if subcmd == "config":
+        if not subcmd_args:
+            return False
+        read_config_flags = {"-l", "--list", "--get", "--get-all", "--get-regexp"}
+        has_read_flag = any(
+            a in read_config_flags or any(a.startswith(f"{rf}=") for rf in read_config_flags)
+            for a in subcmd_args
+        )
+        mutating_config_flags = {
+            "--add",
+            "--replace-all",
+            "--unset",
+            "--unset-all",
+            "--remove-section",
+            "--rename-section",
+            "--edit",
+            "-e",
+        }
+        has_mutating_flag = any(
+            a in mutating_config_flags
+            or any(a.startswith(f"{mf}=") for mf in mutating_config_flags)
+            for a in subcmd_args
+        )
+        return bool(has_read_flag and not has_mutating_flag)
+
+    return False
+
+
+def is_safe_git_command(
+    command_line: str,
+    workspace_paths: list[str] | None = None,
+) -> bool:
+    """
+    Evaluates whether a command line or pipeline is a safe, read-only Git inspection command.
+    Supports piped filters (e.g. `git diff | head -n 30 | grep foo`, `git log -n 5 | cat`).
+    """
+    if not command_line or not command_line.strip():
+        return False
+
+    raw_cmd = command_line.strip()
+
+    # Reject any shell write redirections or substitutions
+    if any(tok in raw_cmd for tok in (">", ">>", "&>", "| tee", "$(", "`")):
+        return False
+
+    # Check for chained commands (&&, ||, ;, \n)
+    segments = [s.strip() for s in re.split(r"&&|\|\||;|\n", raw_cmd) if s.strip()]
+    if not segments:
+        return False
+
+    for segment in segments:
+        pipe_parts = [p.strip() for p in segment.split("|") if p.strip()]
+        if not pipe_parts:
+            return False
+
+        # First stage must be a safe git command
+        if not is_safe_git_stage(pipe_parts[0], workspace_paths=workspace_paths):
+            return False
+
+        # Downstream pipe stages must be safe filters
+        for filter_part in pipe_parts[1:]:
+            filter_tokens = filter_part.split()
+            if not filter_tokens:
+                return False
+            filter_binary = os.path.basename(filter_tokens[0]).lower()
+            if filter_binary not in SAFE_PIPE_FILTERS and filter_binary not in SAFE_READ_BINARIES:
+                return False
+
+            # Check sensitive paths on downstream filter args
+            for token in filter_tokens[1:]:
+                if token.startswith("-"):
+                    continue
+                if is_sensitive_path(token):
+                    return False
+
+    return True
+
 
 def normalize_command_string(command_line: str) -> str:
     """
@@ -1023,7 +1340,7 @@ def is_safe_read_only_command(
 ) -> bool:
     """
     Evaluates whether a command is a safe, non-destructive read-only shell pipeline
-    (e.g. `which uv`, `wc -l README.md`, `uname -m`, `head -n 20 file.txt | grep foo`).
+    (e.g. `which uv`, `wc -l README.md`, `uname -m`, `head -n 20 file.txt | grep foo`, `git diff`).
     Guarantees no file writes, redirections, command substitutions, or credential leaks.
     """
     if not command_line or not command_line.strip():
@@ -1046,13 +1363,16 @@ def is_safe_read_only_command(
         if not pipe_parts:
             return False
 
-        # First command in pipeline must be a whitelisted read binary
         first_cmd_tokens = pipe_parts[0].split()
         if not first_cmd_tokens:
             return False
         base_binary = os.path.basename(first_cmd_tokens[0]).lower()
 
-        if base_binary not in SAFE_READ_BINARIES:
+        # Handle git read-only inspection commands
+        if base_binary == "git":
+            if not is_safe_git_stage(pipe_parts[0], workspace_paths=workspace_paths):
+                return False
+        elif base_binary not in SAFE_READ_BINARIES:
             return False
 
         # Downstream pipe stages must be safe filters

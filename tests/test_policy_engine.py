@@ -15,6 +15,7 @@ from hooks.policy_engine import (
     evaluate_static_policies,
     evaluate_workspace_write_fast_path,
     is_path_in_workspaces,
+    is_safe_git_command,
     is_safe_read_only_command,
     is_safe_session_artifact_read,
     is_safe_session_artifact_write,
@@ -728,6 +729,10 @@ class TestPolicyEngine(unittest.TestCase):
         self.assertTrue(is_safe_read_only_command("uname -m"))
         self.assertTrue(is_safe_read_only_command("file src/main.py"))
         self.assertTrue(is_safe_read_only_command("du -sh ."))
+        self.assertTrue(is_safe_read_only_command("git diff"))
+        self.assertTrue(is_safe_read_only_command("git show HEAD:README.md"))
+        self.assertTrue(is_safe_read_only_command("git status -s"))
+        self.assertTrue(is_safe_read_only_command("git log -n 5 | cat"))
 
         # Dangerous or mutating commands (must be rejected)
         self.assertFalse(is_safe_read_only_command("rm -rf /"))
@@ -740,6 +745,123 @@ class TestPolicyEngine(unittest.TestCase):
             is_safe_read_only_command("head -n 20 README.md | grep secret ~/.ssh/id_rsa")
         )
         self.assertFalse(is_safe_read_only_command("cat README.md | grep secret /etc/shadow"))
+        self.assertFalse(is_safe_read_only_command("git push origin main"))
+        self.assertFalse(is_safe_read_only_command("git commit -m 'feat: test'"))
+
+    def test_is_safe_git_command(self):
+        # 1. Standard read-only inspection commands
+        self.assertTrue(is_safe_git_command("git status"))
+        self.assertTrue(is_safe_git_command("git status -s"))
+        self.assertTrue(is_safe_git_command("git status --porcelain"))
+        self.assertTrue(is_safe_git_command("git status --short"))
+        self.assertTrue(is_safe_git_command("git diff"))
+        self.assertTrue(is_safe_git_command("git diff HEAD~1"))
+        self.assertTrue(is_safe_git_command("git diff --staged"))
+        self.assertTrue(is_safe_git_command("git diff --cached"))
+        self.assertTrue(is_safe_git_command("git diff src/main.py"))
+        self.assertTrue(is_safe_git_command("git diff HEAD~1..HEAD"))
+        self.assertTrue(is_safe_git_command("git show"))
+        self.assertTrue(is_safe_git_command("git show HEAD:README.md"))
+        self.assertTrue(is_safe_git_command("git show --stat HEAD"))
+        self.assertTrue(is_safe_git_command("git log"))
+        self.assertTrue(is_safe_git_command("git log -n 10 --oneline"))
+        self.assertTrue(is_safe_git_command("git log -p -2"))
+        self.assertTrue(is_safe_git_command("git rev-parse HEAD"))
+        self.assertTrue(is_safe_git_command("git rev-parse --show-toplevel"))
+        self.assertTrue(is_safe_git_command("git rev-parse --abbrev-ref HEAD"))
+        self.assertTrue(is_safe_git_command("git describe --tags"))
+        self.assertTrue(is_safe_git_command("git describe --always"))
+        self.assertTrue(is_safe_git_command("git blame src/app.py"))
+        self.assertTrue(is_safe_git_command("git check-ignore -v file.txt"))
+        self.assertTrue(is_safe_git_command("git ls-files"))
+        self.assertTrue(is_safe_git_command("git ls-files -m"))
+        self.assertTrue(is_safe_git_command("git cat-file -p 1234567890abcdef"))
+        self.assertTrue(is_safe_git_command("git shortlog -sn"))
+
+        # 2. Safe global flags & path prefixes
+        self.assertTrue(is_safe_git_command("git --no-pager diff"))
+        self.assertTrue(is_safe_git_command("git -P log"))
+        self.assertTrue(is_safe_git_command("git --no-optional-locks status"))
+        self.assertTrue(is_safe_git_command("/usr/bin/git diff"))
+        self.assertTrue(is_safe_git_command("git --version"))
+
+        # 3. Read-only branch queries
+        self.assertTrue(is_safe_git_command("git branch"))
+        self.assertTrue(is_safe_git_command("git branch -a"))
+        self.assertTrue(is_safe_git_command("git branch -r"))
+        self.assertTrue(is_safe_git_command("git branch -v"))
+        self.assertTrue(is_safe_git_command("git branch -vv"))
+        self.assertTrue(is_safe_git_command("git branch --show-current"))
+        self.assertTrue(is_safe_git_command("git branch --list 'feat/*'"))
+        self.assertTrue(is_safe_git_command("git branch --contains abc1234"))
+        self.assertTrue(is_safe_git_command("git branch --merged main"))
+
+        # 4. Read-only tag queries
+        self.assertTrue(is_safe_git_command("git tag"))
+        self.assertTrue(is_safe_git_command("git tag -l"))
+        self.assertTrue(is_safe_git_command("git tag --list 'v1.*'"))
+        self.assertTrue(is_safe_git_command("git tag --points-at HEAD"))
+
+        # 5. Read-only remote queries
+        self.assertTrue(is_safe_git_command("git remote"))
+        self.assertTrue(is_safe_git_command("git remote -v"))
+        self.assertTrue(is_safe_git_command("git remote --verbose"))
+        self.assertTrue(is_safe_git_command("git remote show origin"))
+        self.assertTrue(is_safe_git_command("git remote get-url origin"))
+
+        # 6. Read-only stash and config queries
+        self.assertTrue(is_safe_git_command("git stash list"))
+        self.assertTrue(is_safe_git_command("git stash show -p"))
+        self.assertTrue(is_safe_git_command("git config --get user.name"))
+        self.assertTrue(is_safe_git_command("git config --list"))
+        self.assertTrue(is_safe_git_command("git config -l"))
+
+        # 7. Safe git pipelines
+        self.assertTrue(is_safe_git_command("git diff | head -n 30 | grep foo"))
+        self.assertTrue(is_safe_git_command("git log -n 5 | cat"))
+        self.assertTrue(is_safe_git_command("git status -s | wc -l"))
+
+        # 8. Mutating & dangerous git commands (MUST return False)
+        self.assertFalse(is_safe_git_command("git push"))
+        self.assertFalse(is_safe_git_command("git push --force origin main"))
+        self.assertFalse(is_safe_git_command("git pull"))
+        self.assertFalse(is_safe_git_command("git fetch"))
+        self.assertFalse(is_safe_git_command("git clone https://github.com/org/repo.git"))
+        self.assertFalse(is_safe_git_command("git commit -m 'feat: new feature'"))
+        self.assertFalse(is_safe_git_command("git add ."))
+        self.assertFalse(is_safe_git_command("git rm file.txt"))
+        self.assertFalse(is_safe_git_command("git reset --hard HEAD~1"))
+        self.assertFalse(is_safe_git_command("git checkout main"))
+        self.assertFalse(is_safe_git_command("git switch main"))
+        self.assertFalse(is_safe_git_command("git restore ."))
+        self.assertFalse(is_safe_git_command("git clean -fd"))
+        self.assertFalse(is_safe_git_command("git branch -d old-branch"))
+        self.assertFalse(is_safe_git_command("git branch -D old-branch"))
+        self.assertFalse(is_safe_git_command("git branch new-branch"))
+        self.assertFalse(is_safe_git_command("git tag v2.0.0"))
+        self.assertFalse(is_safe_git_command("git tag -d v1.0.0"))
+        self.assertFalse(is_safe_git_command("git tag -a v1.0 -m 'tag'"))
+        self.assertFalse(is_safe_git_command("git remote add upstream https://github.com/org/repo"))
+        self.assertFalse(is_safe_git_command("git remote rm origin"))
+        self.assertFalse(is_safe_git_command("git remote set-url origin https://evil.com"))
+        self.assertFalse(is_safe_git_command("git stash"))
+        self.assertFalse(is_safe_git_command("git stash pop"))
+        self.assertFalse(is_safe_git_command("git stash drop"))
+        self.assertFalse(is_safe_git_command("git config user.name 'Attacker'"))
+
+        # 9. Flag injection & sensitive path bypass attempts (MUST return False)
+        self.assertFalse(is_safe_git_command("git diff --output=file.txt"))
+        self.assertFalse(is_safe_git_command("git diff -o file.txt"))
+        self.assertFalse(is_safe_git_command("git diff --ext-cmd=rm"))
+        self.assertFalse(is_safe_git_command("git diff --tool=custom"))
+        self.assertFalse(is_safe_git_command("git -c core.pager=rm diff"))
+        self.assertFalse(is_safe_git_command("git --config-env=foo=bar diff"))
+        self.assertFalse(is_safe_git_command("git --exec-path=/tmp diff"))
+        self.assertFalse(is_safe_git_command("git diff /etc/shadow"))
+        self.assertFalse(is_safe_git_command("git show ~/.ssh/id_rsa"))
+        self.assertFalse(is_safe_git_command("git diff > output.txt"))
+        self.assertFalse(is_safe_git_command("git diff >> output.txt"))
+        self.assertFalse(is_safe_git_command("git log $(cat ~/.ssh/id_rsa)"))
 
     def test_check_same_turn_file_grant(self):
         with tempfile.TemporaryDirectory() as tmpdir:
