@@ -75,7 +75,17 @@ In high-assurance security architectures, authorization gates must never fail op
 
 ---
 
-## 3. Threat Mitigation Matrix
+## 3. User Intent Grounding & Explicit Path Directives
+
+A core tenet of the security model is that **User Intent is the Final Signal** for non-destructive operations:
+
+1. **Baseline Boundary Invariant:** Tools targeting paths outside active `<workspace_roots>` or sensitive system directories default to `ask` to prevent unrequested traversal or reconnaissance.
+2. **Explicit User Directive Clearance:** When `<active_user_prompt>` explicitly names, asks a question about, or directs inspection of a specific file path or resource (e.g. referencing a specific session audit log or artifact path), reading or inspecting that verbatim referenced resource is **authorized (`allow`)**.
+3. **Non-Overridable Core Boundaries:** User intent can clear `ask`-level inspections, but **never** clears `hard_deny` invariants (such as dumping raw private SSH keys, exfiltrating credential stores, destructive force-pushes, or gate bypass attempts).
+
+---
+
+## 4. Threat Mitigation Matrix
 
 | Threat Vector | Attack Scenario | Mitigation Mechanism |
 | :--- | :--- | :--- |
@@ -87,7 +97,7 @@ In high-assurance security architectures, authorization gates must never fail op
 
 ---
 
-## 4. Limitations & Operational Tradeoffs
+## 5. Limitations & Operational Tradeoffs
 
 The gate is a pragmatic intent-classification and policy layer, not a security guarantee. The limits that matter to operators and contributors:
 
