@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.9.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.8.0...auto-permissions-v0.9.0) (2026-08-18)
+
+
+### Features
+
+* **policy:** add fast-path evaluation for safe read-only git commands ([6b6faaa](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/6b6faaaa0269669c0472ea62d102b7a50371dd81))
+
+
+### Bug Fixes
+
+* **classifier:** authorize reads for user-explicit paths in prompt ([#53](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/53)) ([4c2ecd4](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/4c2ecd42ad57261b83f91cc889acdbe4fe8e627a))
+
+
+### Documentation
+
+* **contrib:** standardize PR title and description conventions ([#52](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/52)) ([3fe851c](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/3fe851cca2fb3de55980e202356debc27e9655f3))
+* **security:** classifier limitations and operational tradeoffs ([#49](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/49)) ([d419af8](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/d419af87ffcfdbba9973df32055349114e6733cd))
+
 ## [0.8.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.7.0...auto-permissions-v0.8.0) (2026-08-17)
 
 
