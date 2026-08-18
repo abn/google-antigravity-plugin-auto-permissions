@@ -830,6 +830,53 @@ class TestOpenAIGenerationConfig(unittest.TestCase):
         body2 = json.loads(mock_urlopen.call_args[0][0].data.decode())
         self.assertNotIn("response_format", body2)
 
+    def test_system_instruction_contains_explicit_path_guidance(self):
+        from hooks.classifier import SYSTEM_INSTRUCTION
+
+        self.assertIn("where the target path/file is explicitly", SYSTEM_INSTRUCTION)
+        self.assertIn("UNLESS the user prompt explicitly names, asks about", SYSTEM_INSTRUCTION)
+        self.assertIn("reading or inspecting that", SYSTEM_INSTRUCTION)
+
+    @patch("urllib.request.urlopen")
+    def test_explicit_user_path_in_question_prompt_allows_inspection(self, mock_urlopen):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "decision": "allow",
+                                    "reason": "User explicitly asked to inspect audit log.",
+                                    "risk_category": "safe_routine",
+                                    "confidence": 1.0,
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+        ).encode("utf-8")
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        target_path = "/home/abn/.gemini/antigravity/brain/277dcc0e/auto-permissions/audit.jsonl"
+        raw_prompt, decision, err, _ = classify_tool_call(
+            workspace_paths=["/home/abn/workspace/test-project"],
+            prior_prompts=[],
+            active_prompt=f"How many requests were prevented in {target_path} ?",
+            tool_name="view_file",
+            tool_args={"AbsolutePath": target_path},
+            provider="openai",
+            model="gpt-4o-mini",
+            api_key="mock-key",
+        )
+        self.assertIsNone(err)
+        self.assertEqual(decision["decision"], "allow")
+        self.assertEqual(decision["risk_category"], "safe_routine")
+        self.assertIn("/home/abn/.gemini/antigravity/brain/277dcc0e", raw_prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -68,3 +68,14 @@ This log tracks documentation additions, structural refactors, benchmark refresh
   - **Superseded (2026-08-16):** The sidecar worker was removed. Zero-key classification now calls the Language Server directly via single-turn `GetModelResponse` over the HTTPS Connect-RPC loopback (transport defaulted to `https://`), resolving the model from the live `GetUserStatus` roster for self-healing on model retirement.
   - **Revised (2026-08-16):** A thin plugin sidecar (`sidecars/auto-permissions-worker/`) was restored. PreToolUse hooks run without the LS connection environment, so the gate calls the sidecar over loopback HTTP; the sidecar (spawned by Antigravity with the env injected) calls the single-turn `GetModelResponse` directly. This is the cross-platform hook path; contexts that carry the env still classify directly.
 
+---
+
+### 2026-08-18: Classifier User Intent & Explicit Path Disambiguation
+
+- **Classifier Prompt Refinement (`hooks/classifier.py`, `docs/architecture/security-model.md`):**
+  - Clarified `SYSTEM_INSTRUCTION` Rule 1 (`allow`), Rule 3 (`ask`), and Rule 5 (User Intent) to explicitly authorize non-destructive file reads and inspections when the target resource path is verbatim referenced, asked about, or named in `<active_user_prompt>` or prior user turns.
+  - Prevents false-positive `ask` escalations on analytical questions referencing external files (such as previous session audit logs or transcripts) without weakening `hard_deny` invariants against credential/secret key exfiltration.
+- **Automated Regression Tests (`tests/test_classifier.py`):**
+  - Added unit test coverage for explicit user path prompt directives and system instruction alignment.
+
+
