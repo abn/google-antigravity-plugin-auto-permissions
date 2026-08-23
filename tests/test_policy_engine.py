@@ -679,7 +679,9 @@ class TestPolicyEngine(unittest.TestCase):
             # 5. Environment variable override when not set in policy files
             os.environ["AUTO_PERMISSIONS_SHOW_TURN_SUMMARY_DETAIL"] = "0"
             try:
-                self.assertFalse(resolve_show_turn_summary_detail(session_dir=None, workspace_paths=None))
+                self.assertFalse(
+                    resolve_show_turn_summary_detail(session_dir=None, workspace_paths=None)
+                )
             finally:
                 os.environ.pop("AUTO_PERMISSIONS_SHOW_TURN_SUMMARY_DETAIL", None)
 

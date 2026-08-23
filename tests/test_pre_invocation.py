@@ -224,7 +224,10 @@ class TestPreInvocationHook(unittest.TestCase):
             out = json.loads(res.stdout.strip())
             self.assertIn("injectSteps", out)
             msg = out["injectSteps"][0]["ephemeralMessage"]
-            self.assertIn("🛡️ <b>Security Gate Summary:</b> 1 actions in this turn (1 allowed, 0 denied)", msg)
+            self.assertIn(
+                "🛡️ <b>Security Gate Summary:</b> 1 actions in this turn (1 allowed, 0 denied)",
+                msg,
+            )
             self.assertNotIn("<details>", msg)
             self.assertNotIn("</details>", msg)
             self.assertNotIn("<summary>", msg)
