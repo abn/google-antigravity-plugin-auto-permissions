@@ -88,7 +88,8 @@ Configuration files (`.agents/auto-permissions/config.json`, `config.local.json`
     "api_key_env_var": { "type": "string" },
     "timeout": { "type": "number", "minimum": 0.5, "default": 6.0 },
     "trust_workspace_writes": { "type": "boolean", "default": true },
-    "show_turn_summary": { "type": "boolean", "default": true }
+    "show_turn_summary": { "type": "boolean", "default": true },
+    "show_turn_summary_detail": { "type": "boolean", "default": true }
   }
 }
 ```

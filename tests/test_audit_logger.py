@@ -179,6 +179,57 @@ class TestAuditLogger(unittest.TestCase):
         self.assertIn("Static ACL (0.2ms)", md)
         self.assertIn("Antigravity (320ms)", md)
 
+    def test_generate_markdown_summary_no_detail(self):
+        records = [
+            {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "pytest -v"}},
+                "hook_output": {"decision": "allow", "reason": "Tests safe"},
+                "classification": {
+                    "decision": "allow",
+                    "risk_category": "safe_routine",
+                    "latency_ms": 320.0,
+                },
+            },
+            {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "uv lock"}},
+                "hook_output": {"decision": "allow", "reason": "Static grant"},
+                "classification": {
+                    "decision": "allow",
+                    "risk_category": "static_policy_project",
+                    "latency_ms": 0.2,
+                },
+            },
+        ]
+
+        md = generate_markdown_summary(records, limit=2, detail=False)
+        self.assertNotIn("<details>", md)
+        self.assertNotIn("</details>", md)
+        self.assertNotIn("<summary>", md)
+        self.assertNotIn("pytest -v", md)
+        self.assertEqual(
+            md,
+            "🛡️ <b>Security Gate Summary:</b> 2 actions evaluated (2 allowed, 0 denied)",
+        )
+
+    def test_generate_markdown_summary_singular_plural(self):
+        records = [
+            {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "pytest -v"}},
+                "hook_output": {"decision": "allow", "reason": "Tests safe"},
+                "classification": {
+                    "decision": "allow",
+                    "risk_category": "safe_routine",
+                    "latency_ms": 320.0,
+                },
+            },
+        ]
+        # Singular case (1 action)
+        md_single = generate_markdown_summary(records, limit=1, detail=False)
+        self.assertEqual(
+            md_single,
+            "🛡️ <b>Security Gate Summary:</b> 1 action evaluated (1 allowed, 0 denied)",
+        )
+
     def test_generate_markdown_summary_error_fallback(self):
         records = [
             {

@@ -28,6 +28,7 @@ def inspect_audit_log(
     limit: int = 20,
     as_markdown: bool = False,
     diagnose: bool = False,
+    detail: bool = True,
 ) -> None:
     if not os.path.exists(audit_path):
         print(
@@ -45,7 +46,7 @@ def inspect_audit_log(
         return
 
     if as_markdown:
-        print(generate_markdown_summary(records, limit=limit))
+        print(generate_markdown_summary(records, limit=limit, detail=detail))
         return
 
     total = len(records)
@@ -152,7 +153,22 @@ def main():
     parser.add_argument("audit_log", nargs="?", default=None, help="Path to audit.jsonl")
     parser.add_argument("--limit", "-n", type=int, default=10, help="Number of traces to show.")
     parser.add_argument(
-        "--markdown", "-m", action="store_true", help="Output as collapsible Markdown table."
+        "--markdown",
+        "-m",
+        action="store_true",
+        help="Output as Markdown summary (collapsible table or compact header with --no-detail).",
+    )
+    parser.add_argument(
+        "--detail",
+        action="store_true",
+        default=True,
+        help="Include detailed Markdown action table when rendering Markdown (default: True).",
+    )
+    parser.add_argument(
+        "--no-detail",
+        dest="detail",
+        action="store_false",
+        help="Output compact single-line Markdown summary without action table.",
     )
     parser.add_argument(
         "--diagnose",
@@ -168,6 +184,7 @@ def main():
         limit=args.limit,
         as_markdown=args.markdown,
         diagnose=args.diagnose,
+        detail=args.detail,
     )
 
 

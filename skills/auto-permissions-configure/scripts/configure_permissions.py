@@ -34,10 +34,12 @@ from hooks.policy_engine import (  # noqa: E402
     resolve_governed_surfaces,
     resolve_scope_file_path,
     resolve_show_turn_summary,
+    resolve_show_turn_summary_detail,
     resolve_trust_workspace_writes,
     update_bundles_in_scope,
     update_classifier_settings_in_scope,
     update_governed_surfaces_in_scope,
+    update_show_turn_summary_detail_setting,
     update_show_turn_summary_setting,
     update_trust_workspace_writes_setting,
 )
@@ -178,6 +180,10 @@ def get_effective_configuration(
         session_dir=session_dir,
         workspace_paths=[ws],
     )
+    show_summary_detail = resolve_show_turn_summary_detail(
+        session_dir=session_dir,
+        workspace_paths=[ws],
+    )
     active_bundles = resolve_active_bundles(
         session_dir=session_dir,
         workspace_paths=[ws],
@@ -192,6 +198,7 @@ def get_effective_configuration(
         "effective_governed_surfaces": governed_surfaces,
         "effective_trust_workspace_writes": trust_writes,
         "effective_show_turn_summary": show_summary,
+        "effective_show_turn_summary_detail": show_summary_detail,
         "effective_bundles": active_bundles,
         "available_bundles": available_bundles,
         "scopes": policies_by_scope,
@@ -204,6 +211,7 @@ def format_markdown_summary(config_info: dict[str, Any]) -> str:
     gov = config_info.get("effective_governed_surfaces", {})
     trust_writes = config_info.get("effective_trust_workspace_writes", True)
     show_summary = config_info.get("effective_show_turn_summary", True)
+    show_summary_detail = config_info.get("effective_show_turn_summary_detail", True)
     active_b = config_info.get("effective_bundles", {})
     act_names = active_b.get("active_bundles", [])
     scopes = config_info["scopes"]
@@ -226,11 +234,17 @@ def format_markdown_summary(config_info: dict[str, Any]) -> str:
     )
     lines.append(f"| **Workspace Writes Trust** | {write_trust_display} |")
     summary_display = (
-        "👁️ **Enabled** (Turn-scoped `<details>` summary on final response) *(Default)*"
+        "👁️ **Enabled** (Turn-scoped summary on final response) *(Default)*"
         if show_summary
         else "🔇 **Disabled (Opt-Out)**"
     )
     lines.append(f"| **Security Gate Summary** | {summary_display} |")
+    summary_detail_display = (
+        "👁️ **Enabled** (Detailed Markdown action table in `<details>` fold) *(Default)*"
+        if show_summary_detail
+        else "🔇 **Disabled** (Compact single-line summary header only)"
+    )
+    lines.append(f"| **Security Gate Summary Detail** | {summary_detail_display} |")
     bundles_display = (
         ", ".join(f"`{name}`" for name in act_names) if act_names else "*(None active)*"
     )
@@ -500,6 +514,22 @@ def main():
         action="store_false",
         default=None,
         help="Disable (opt-out of) turn-scoped security gate summary disclosure.",
+    )
+    parser.add_argument(
+        "--show-turn-summary-detail",
+        "--summary-detail",
+        dest="show_turn_summary_detail",
+        action="store_true",
+        default=None,
+        help="Enable detailed action table in turn-scoped security gate summary (default).",
+    )
+    parser.add_argument(
+        "--no-show-turn-summary-detail",
+        "--no-summary-detail",
+        dest="show_turn_summary_detail",
+        action="store_false",
+        default=None,
+        help="Disable detailed action table (output concise single-line summary only).",
     )
     parser.add_argument(
         "--timeout",
@@ -934,6 +964,19 @@ def main():
         status_word = "enabled" if args.show_turn_summary else "disabled"
         actions_performed.append(
             f"{status_word.capitalize()} show_turn_summary in {scope} ({target_file})"
+        )
+
+    # 11. Update show_turn_summary_detail setting
+    if args.show_turn_summary_detail is not None:
+        target_file = update_show_turn_summary_detail_setting(
+            enabled=args.show_turn_summary_detail,
+            scope=scope,
+            workspace_dir=workspace_dir,
+            session_dir=session_dir,
+        )
+        status_word = "enabled" if args.show_turn_summary_detail else "disabled"
+        actions_performed.append(
+            f"{status_word.capitalize()} show_turn_summary_detail in {scope} ({target_file})"
         )
 
     config_info = get_effective_configuration(
