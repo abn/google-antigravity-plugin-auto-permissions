@@ -211,6 +211,25 @@ class TestAuditLogger(unittest.TestCase):
             "🛡️ <b>Security Gate Summary:</b> 2 actions evaluated (2 allowed, 0 denied)",
         )
 
+    def test_generate_markdown_summary_singular_plural(self):
+        records = [
+            {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "pytest -v"}},
+                "hook_output": {"decision": "allow", "reason": "Tests safe"},
+                "classification": {
+                    "decision": "allow",
+                    "risk_category": "safe_routine",
+                    "latency_ms": 320.0,
+                },
+            },
+        ]
+        # Singular case (1 action)
+        md_single = generate_markdown_summary(records, limit=1, detail=False)
+        self.assertEqual(
+            md_single,
+            "🛡️ <b>Security Gate Summary:</b> 1 action evaluated (1 allowed, 0 denied)",
+        )
+
     def test_generate_markdown_summary_error_fallback(self):
         records = [
             {

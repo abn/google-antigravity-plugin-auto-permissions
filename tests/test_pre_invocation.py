@@ -71,7 +71,7 @@ class TestPreInvocationHook(unittest.TestCase):
             self.assertIn("Security Gate Summary", msg)
             self.assertIn("pytest -v", msg)
             self.assertNotIn("`ls`", msg)
-            self.assertIn("1 actions in this turn", msg)
+            self.assertIn("1 action in this turn", msg)
 
     def test_pre_invocation_suppressed_when_no_records_in_active_turn(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -225,7 +225,7 @@ class TestPreInvocationHook(unittest.TestCase):
             self.assertIn("injectSteps", out)
             msg = out["injectSteps"][0]["ephemeralMessage"]
             self.assertIn(
-                "🛡️ <b>Security Gate Summary:</b> 1 actions in this turn (1 allowed, 0 denied)",
+                "🛡️ <b>Security Gate Summary:</b> 1 action in this turn (1 allowed, 0 denied)",
                 msg,
             )
             self.assertNotIn("<details>", msg)

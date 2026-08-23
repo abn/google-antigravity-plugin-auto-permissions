@@ -106,7 +106,7 @@ def main():
             "Append ONLY the exact Markdown summary below at the very end of your "
             "final response to the user. If you are outputting an intermediate progress update "
             "(such as waiting for a background task or subagent), do NOT include this summary. "
-            "Do not include headers, titles, or preamble text:\n\n"
+            "Do not include additional headers, titles, or preamble text:\n\n"
             f"{md_summary}\n"
         )
 

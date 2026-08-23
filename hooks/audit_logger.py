@@ -302,7 +302,10 @@ def generate_markdown_summary(
     )
     asked = len(subset) - allowed - denied
 
-    header_status = f"{len(subset)} actions {header_scope} ({allowed} allowed, {denied} denied"
+    action_noun = "action" if len(subset) == 1 else "actions"
+    header_status = (
+        f"{len(subset)} {action_noun} {header_scope} ({allowed} allowed, {denied} denied"
+    )
     if asked > 0:
         header_status += f", {asked} escalated"
     header_status += ")"

@@ -153,7 +153,10 @@ def main():
     parser.add_argument("audit_log", nargs="?", default=None, help="Path to audit.jsonl")
     parser.add_argument("--limit", "-n", type=int, default=10, help="Number of traces to show.")
     parser.add_argument(
-        "--markdown", "-m", action="store_true", help="Output as collapsible Markdown table."
+        "--markdown",
+        "-m",
+        action="store_true",
+        help="Output as Markdown summary (collapsible table or compact header with --no-detail).",
     )
     parser.add_argument(
         "--detail",
