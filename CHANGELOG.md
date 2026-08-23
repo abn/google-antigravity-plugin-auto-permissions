@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.9.0...auto-permissions-v0.10.0) (2026-08-23)
+
+
+### Features
+
+* **config:** allow disabling auto summary action details ([#55](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/55)) ([18eca7b](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/18eca7ba81874ac613d71a7b63b70936866bf06f))
+
 ## [0.9.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.8.0...auto-permissions-v0.9.0) (2026-08-18)
 
 
