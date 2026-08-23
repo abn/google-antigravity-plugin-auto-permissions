@@ -19,7 +19,8 @@ The plugin intercepts sensitive tool operations (commands, file writes, web requ
    - Automatically translates denials in `audit.jsonl` into candidate Antigravity ACL rules and writes them to Session, Project, or Global scopes.
 5. **Turn-Scoped Collapsible Security Gate Summary (with Opt-Out):**
    - Appends a clean, collapsible Markdown summary table at the bottom of the final response detailing evaluated actions, verdicts (`🟢 ALLOW`, `🔴 DENY`, `🟡 ASK`), and evaluation modes (`Static ACL`, `Gemini`, `Workspace Write`, `Session Artifact`).
-   - Supports opt-out via `"show_turn_summary": false` / `--no-show-turn-summary` / `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY=0`.
+   - Supports complete summary opt-out via `"show_turn_summary": false` / `--no-show-turn-summary` / `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY=0`.
+   - Supports detail table opt-out (concise single-line summary only) via `"show_turn_summary_detail": false` / `--no-show-turn-summary-detail` / `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY_DETAIL=0`.
 6. **Four-Tier Decision Taxonomy:**
    - **`allow`**: Safe, intent-aligned workspace operations execute seamlessly without human friction.
    - **`soft_deny`**: Unrequested or scope-divergent actions are blocked, triggering the agent's *Deny-and-Continue* self-correction loop.
@@ -364,6 +365,8 @@ python3 skills/auto-permissions-configure/scripts/configure_permissions.py --lis
 | `trust_workspace_writes` | `boolean` | `true` | When `true` (default), enables `0.1ms` fast-path for non-sensitive workspace writes. |
 | `show_turn_summary` | `boolean` | `true` | When `true` (default), appends turn-scoped collapsible security gate summary table to final response. |
 | `disclose_turn_summary` | `boolean` | `true` | Alias for `show_turn_summary`. |
+| `show_turn_summary_detail` | `boolean` | `true` | When `true` (default), includes detailed per-action table in summary. When `false`, outputs concise single-line summary header only. |
+| `disclose_turn_summary_detail` | `boolean` | `true` | Alias for `show_turn_summary_detail`. |
 | `govern_subagents` | `boolean` | `false` | When `true`, intercepts `invoke_subagent` and evaluates via classifier. |
 | `govern_schedule` | `boolean` | `false` | When `true`, intercepts `schedule` (cron/timers) and evaluates via classifier. |
 | `govern_images` | `boolean` | `false` | When `true`, intercepts `generate_image` and evaluates via classifier. |
@@ -383,6 +386,8 @@ python3 skills/auto-permissions-configure/scripts/configure_permissions.py --lis
 | `AUTO_PERMISSIONS_TRUST_WORKSPACE_WRITES` | `1` | Override workspace write fast-path (`1`/`0` or `true`/`false`). |
 | `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY` | `1` | Override turn-scoped security gate disclosure table (`1`/`0` or `true`/`false`). |
 | `AUTO_PERMISSIONS_DISCLOSE_TURN_SUMMARY` | `1` | Alias for `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY`. |
+| `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY_DETAIL` | `1` | Override summary action table detail (`1`/`0` or `true`/`false`). |
+| `AUTO_PERMISSIONS_DISCLOSE_TURN_SUMMARY_DETAIL` | `1` | Alias for `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY_DETAIL`. |
 | `AUTO_PERMISSIONS_TIMEOUT` | `6.0` | HTTP classifier timeout in seconds (or `AUTO_PERMISSIONS_TIMEOUT_SECS`). Configurable via policy files (`timeout`) or CLI. |
 | `AUTO_PERMISSIONS_GOVERN_SUBAGENTS` | `0` | Set `1` to enable classifier evaluation for `invoke_subagent`. |
 | `AUTO_PERMISSIONS_GOVERN_SCHEDULE` | `0` | Set `1` to enable classifier evaluation for `schedule`. |

@@ -221,6 +221,16 @@ python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
 python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
   --scope project \
   --show-turn-summary
+
+# Disable detailed action table (output concise single-line summary only)
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --scope project \
+  --no-show-turn-summary-detail
+
+# Re-enable detailed action table in summary (default)
+python3 skills/auto-permissions-configure/scripts/configure_permissions.py \
+  --scope project \
+  --show-turn-summary-detail
 ```
 
 ### 10. Configure Classifier Timeout

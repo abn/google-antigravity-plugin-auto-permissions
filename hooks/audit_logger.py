@@ -277,8 +277,9 @@ def generate_markdown_summary(
     limit: int = 10,
     since_step_idx: int | None = None,
     turn_scoped: bool = False,
+    detail: bool = True,
 ) -> str | None:
-    """Generates a compact, collapsible Markdown summary table of recent decisions."""
+    """Generates a compact Markdown summary header or collapsible table of recent decisions."""
     if not records:
         return None
 
@@ -305,6 +306,9 @@ def generate_markdown_summary(
     if asked > 0:
         header_status += f", {asked} escalated"
     header_status += ")"
+
+    if not detail:
+        return f"🛡️ <b>Security Gate Summary:</b> {header_status}"
 
     rows = []
     for r in subset:

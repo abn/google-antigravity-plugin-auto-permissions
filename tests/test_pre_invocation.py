@@ -172,6 +172,64 @@ class TestPreInvocationHook(unittest.TestCase):
             out = json.loads(res.stdout.strip())
             self.assertEqual(out, {"injectSteps": []})
 
+    def test_pre_invocation_summary_no_detail(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audit_path = os.path.join(tmpdir, "audit.jsonl")
+            transcript_path = os.path.join(tmpdir, "transcript.jsonl")
+            policy_path = os.path.join(tmpdir, ".agents", "auto-permissions.json")
+            os.makedirs(os.path.dirname(policy_path), exist_ok=True)
+
+            with open(transcript_path, "w", encoding="utf-8") as f:
+                prompt_step = {"type": "USER_INPUT", "step_index": 10, "content": "Run tests"}
+                f.write(json.dumps(prompt_step) + "\n")
+
+            turn_record = {
+                "timestamp": "2026-08-14T12:01:00Z",
+                "conversationId": "test-session-123",
+                "stepIdx": 12,
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "pytest -v"}},
+                "hook_output": {"decision": "allow", "reason": "Safe test"},
+                "classification": {
+                    "decision": "allow",
+                    "risk_category": "safe_routine",
+                    "latency_ms": 150.0,
+                },
+            }
+            with open(audit_path, "w", encoding="utf-8") as f:
+                f.write(json.dumps(turn_record) + "\n")
+
+            # Disable summary detail in project policy
+            with open(policy_path, "w", encoding="utf-8") as f:
+                json.dump({"show_turn_summary_detail": False}, f)
+
+            payload = {
+                "conversationId": "test-session-123",
+                "artifactDirectoryPath": tmpdir,
+                "transcriptPath": transcript_path,
+                "workspacePaths": [tmpdir],
+                "invocationNum": 1,
+            }
+
+            hook_script = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "../hooks/pre_invocation.py")
+            )
+            res = subprocess.run(
+                [sys.executable, hook_script],
+                input=json.dumps(payload),
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+            out = json.loads(res.stdout.strip())
+            self.assertIn("injectSteps", out)
+            msg = out["injectSteps"][0]["ephemeralMessage"]
+            self.assertIn("🛡️ <b>Security Gate Summary:</b> 1 actions in this turn (1 allowed, 0 denied)", msg)
+            self.assertNotIn("<details>", msg)
+            self.assertNotIn("</details>", msg)
+            self.assertNotIn("<summary>", msg)
+            self.assertNotIn("pytest -v", msg)
+
     def test_pre_invocation_without_records(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             payload = {

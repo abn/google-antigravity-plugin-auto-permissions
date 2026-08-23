@@ -354,10 +354,11 @@ Grounded in empirical findings from Anthropic's Claude Code Auto-Mode benchmarks
   Any write targeting these paths **immediately bypasses the fast-path** and escalates to the LLM Security Classifier.
 * **Opt-Out Configuration:** Teams operating in zero-trust or compliance-restricted environments can disable the fast-path by setting `"trust_workspace_writes": false` (or `--no-trust-workspace-writes`) at Session, Project, or Global scope.
 
-### 8.9 Security Gate Summary Disclosure & Opt-Out (`show_turn_summary`)
+### 8.9 Security Gate Summary Disclosure & Opt-Out (`show_turn_summary`, `show_turn_summary_detail`)
 * **Transparency & Auditability Invariant:** To maintain developer situational awareness, the `PreInvocation` hook injects a transient instruction into the conversation before the model generates its final response, prompting the model to append a collapsible `<details>` summary table detailing all tool actions, classification latencies, and verdicts evaluated during that turn.
 * **Final-Response Enforcement:** The summary is restricted strictly to final conversational conclusions, omitting disclosures from intermediate progress pings or background task execution notifications.
-* **Opt-Out Configuration:** Users and teams can opt out of the turn summary disclosure by setting `"show_turn_summary": false` (or `--no-show-turn-summary` / `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY=0`) across Session, Local Project, Project, or Global scopes.
+* **Summary Opt-Out Configuration:** Users and teams can opt out of the turn summary disclosure entirely by setting `"show_turn_summary": false` (or `--no-show-turn-summary` / `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY=0`) across Session, Local Project, Project, or Global scopes.
+* **Summary Detail Opt-Out Configuration:** To retain high-level situational awareness without multi-row table verbosity, users can disable per-action table details by setting `"show_turn_summary_detail": false` (or `--no-show-turn-summary-detail` / `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY_DETAIL=0`). When disabled, only the compact single-line summary header (`🛡️ <b>Security Gate Summary:</b> N actions in this turn (...)`) is output without `<details>` folds or action tables.
 
 ### 8.10 Permission Bundles & Scoped Directory Layout
 

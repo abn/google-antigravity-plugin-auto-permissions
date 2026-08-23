@@ -24,7 +24,10 @@ from audit_logger import (  # noqa: E402
     resolve_session_log_path,
     resolve_session_root_dir,
 )
-from policy_engine import resolve_show_turn_summary  # noqa: E402
+from policy_engine import (  # noqa: E402
+    resolve_show_turn_summary,
+    resolve_show_turn_summary_detail,
+)
 from transcript_parser import get_last_user_step_index  # noqa: E402
 
 
@@ -70,6 +73,10 @@ def main():
             sys.stdout.flush()
             return
 
+        show_detail = resolve_show_turn_summary_detail(
+            session_dir=session_dir, workspace_paths=workspace_paths
+        )
+
         records = load_audit_records(log_path)
 
         if not records:
@@ -85,6 +92,7 @@ def main():
             records=records,
             since_step_idx=last_user_step_idx,
             turn_scoped=True,
+            detail=show_detail,
         )
 
         # If no security gate actions were evaluated during this turn, suppress summary
@@ -95,7 +103,7 @@ def main():
 
         ephemeral_text = (
             "The security gate evaluated tool actions during this active turn. "
-            "Append ONLY the exact collapsible Markdown summary below at the very end of your "
+            "Append ONLY the exact Markdown summary below at the very end of your "
             "final response to the user. If you are outputting an intermediate progress update "
             "(such as waiting for a background task or subagent), do NOT include this summary. "
             "Do not include headers, titles, or preamble text:\n\n"

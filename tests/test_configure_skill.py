@@ -249,6 +249,32 @@ class TestConfigureSkill(unittest.TestCase):
             config_info2 = get_effective_configuration(workspace_dir=ws)
             self.assertTrue(config_info2["effective_show_turn_summary"])
 
+    def test_configure_show_turn_summary_detail(self):
+        with tempfile.TemporaryDirectory() as ws:
+            # Test disabling show_turn_summary_detail
+            configure_permissions.update_show_turn_summary_detail_setting(
+                enabled=False,
+                scope="project",
+                workspace_dir=ws,
+            )
+            config_info = get_effective_configuration(workspace_dir=ws)
+            self.assertFalse(config_info["effective_show_turn_summary_detail"])
+
+            md = format_markdown_summary(config_info)
+            self.assertIn("Security Gate Summary Detail", md)
+            self.assertIn("Compact single-line summary header only", md)
+
+            # Test re-enabling show_turn_summary_detail
+            configure_permissions.update_show_turn_summary_detail_setting(
+                enabled=True,
+                scope="project",
+                workspace_dir=ws,
+            )
+            config_info2 = get_effective_configuration(workspace_dir=ws)
+            self.assertTrue(config_info2["effective_show_turn_summary_detail"])
+            md2 = format_markdown_summary(config_info2)
+            self.assertIn("Detailed Markdown action table in `<details>` fold", md2)
+
     def test_normalize_provider_alias(self):
         self.assertEqual(normalize_provider_alias("gemini"), "google")
         self.assertEqual(normalize_provider_alias("claude"), "anthropic")

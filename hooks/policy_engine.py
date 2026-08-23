@@ -572,6 +572,11 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
         "trust_workspace_writes": None,
         "show_turn_summary": None,
         "disclose_turn_summary": None,
+        "show_turn_summary_detail": None,
+        "disclose_turn_summary_detail": None,
+        "summary_detail": None,
+        "show_summary_detail": None,
+        "auto_summary_detail": None,
         "provider": None,
         "model": None,
         "endpoint_url": None,
@@ -607,6 +612,11 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
                     "trust_workspace_writes",
                     "show_turn_summary",
                     "disclose_turn_summary",
+                    "show_turn_summary_detail",
+                    "disclose_turn_summary_detail",
+                    "summary_detail",
+                    "show_summary_detail",
+                    "auto_summary_detail",
                 ):
                     if bool_k in data and isinstance(data[bool_k], bool):
                         policy[bool_k] = data[bool_k]
@@ -620,6 +630,16 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
                     and policy.get("disclose_turn_summary") is not None
                 ):
                     policy["show_turn_summary"] = policy["disclose_turn_summary"]
+                if policy.get("show_turn_summary_detail") is None:
+                    for alias_k in (
+                        "disclose_turn_summary_detail",
+                        "summary_detail",
+                        "show_summary_detail",
+                        "auto_summary_detail",
+                    ):
+                        if policy.get(alias_k) is not None:
+                            policy["show_turn_summary_detail"] = policy[alias_k]
+                            break
                 for num_k in ("timeout", "timeout_secs"):
                     val = data.get(num_k)
                     if val is not None:
@@ -1542,6 +1562,67 @@ def update_show_turn_summary_setting(
     )
     policy = load_policy_file(target_path)
     policy["show_turn_summary"] = enabled
+    save_policy_file(target_path, policy)
+    return target_path
+
+
+DEFAULT_SHOW_TURN_SUMMARY_DETAIL = True
+
+
+def resolve_show_turn_summary_detail(
+    session_dir: str | None = None,
+    workspace_paths: list[str] | None = None,
+) -> bool:
+    """
+    Resolves whether the detailed action table is rendered in the turn-scoped PreInvocation
+    Security Gate disclosure summary.
+    Precedence: Session -> Local Project -> Project -> Global -> Env Var -> Default (True).
+    """
+    scope_files = [f for _, f in get_scope_file_candidates(session_dir, workspace_paths)]
+
+    for f_path in scope_files:
+        if not os.path.isfile(f_path):
+            continue
+        pol = load_policy_file(f_path)
+        for k in (
+            "show_turn_summary_detail",
+            "disclose_turn_summary_detail",
+            "summary_detail",
+            "show_summary_detail",
+            "auto_summary_detail",
+        ):
+            if k in pol and pol[k] is not None:
+                val = pol[k]
+                if isinstance(val, bool):
+                    return val
+                if isinstance(val, str):
+                    return val.strip().lower() in ("true", "1", "yes", "on")
+
+    env_val = (
+        os.environ.get("AUTO_PERMISSIONS_SHOW_TURN_SUMMARY_DETAIL")
+        or os.environ.get("AUTO_PERMISSIONS_SUMMARY_DETAIL")
+        or os.environ.get("AUTO_PERMISSIONS_DISCLOSE_TURN_SUMMARY_DETAIL")
+    )
+    if env_val is not None:
+        return env_val.strip().lower() in ("true", "1", "yes", "on")
+
+    return DEFAULT_SHOW_TURN_SUMMARY_DETAIL
+
+
+def update_show_turn_summary_detail_setting(
+    enabled: bool,
+    scope: str,
+    workspace_dir: str | None = None,
+    session_dir: str | None = None,
+) -> str:
+    """
+    Persists the show_turn_summary_detail boolean setting to the specified configuration scope.
+    """
+    target_path = resolve_scope_file_path(
+        scope, workspace_dir=workspace_dir, session_dir=session_dir
+    )
+    policy = load_policy_file(target_path)
+    policy["show_turn_summary_detail"] = enabled
     save_policy_file(target_path, policy)
     return target_path
 
