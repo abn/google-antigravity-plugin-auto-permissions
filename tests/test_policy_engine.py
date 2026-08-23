@@ -676,14 +676,24 @@ class TestPolicyEngine(unittest.TestCase):
                 resolve_show_turn_summary_detail(session_dir=session_dir, workspace_paths=[ws_dir])
             )
 
-            # 5. Environment variable override when not set in policy files
-            os.environ["AUTO_PERMISSIONS_SHOW_TURN_SUMMARY_DETAIL"] = "0"
-            try:
-                self.assertFalse(
-                    resolve_show_turn_summary_detail(session_dir=None, workspace_paths=None)
-                )
-            finally:
-                os.environ.pop("AUTO_PERMISSIONS_SHOW_TURN_SUMMARY_DETAIL", None)
+            # 5. Environment variable override when not set in policy files (hermetic)
+            nonexistent_global = os.path.join(tmpdir, "nonexistent_global.json")
+            with patch(
+                "hooks.policy_engine.resolve_global_config_path",
+                return_value=nonexistent_global,
+            ):
+                for env_key in (
+                    "AUTO_PERMISSIONS_SHOW_TURN_SUMMARY_DETAIL",
+                    "AUTO_PERMISSIONS_SUMMARY_DETAIL",
+                    "AUTO_PERMISSIONS_DISCLOSE_TURN_SUMMARY_DETAIL",
+                ):
+                    os.environ[env_key] = "0"
+                    try:
+                        self.assertFalse(
+                            resolve_show_turn_summary_detail(session_dir=None, workspace_paths=None)
+                        )
+                    finally:
+                        os.environ.pop(env_key, None)
 
     def test_check_intra_turn_cache(self):
         with tempfile.NamedTemporaryFile("w+", suffix=".jsonl", delete=False) as f:

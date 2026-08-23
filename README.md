@@ -387,6 +387,7 @@ python3 skills/auto-permissions-configure/scripts/configure_permissions.py --lis
 | `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY` | `1` | Override turn-scoped security gate disclosure table (`1`/`0` or `true`/`false`). |
 | `AUTO_PERMISSIONS_DISCLOSE_TURN_SUMMARY` | `1` | Alias for `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY`. |
 | `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY_DETAIL` | `1` | Override summary action table detail (`1`/`0` or `true`/`false`). |
+| `AUTO_PERMISSIONS_SUMMARY_DETAIL` | `1` | Alias for `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY_DETAIL`. |
 | `AUTO_PERMISSIONS_DISCLOSE_TURN_SUMMARY_DETAIL` | `1` | Alias for `AUTO_PERMISSIONS_SHOW_TURN_SUMMARY_DETAIL`. |
 | `AUTO_PERMISSIONS_TIMEOUT` | `6.0` | HTTP classifier timeout in seconds (or `AUTO_PERMISSIONS_TIMEOUT_SECS`). Configurable via policy files (`timeout`) or CLI. |
 | `AUTO_PERMISSIONS_GOVERN_SUBAGENTS` | `0` | Set `1` to enable classifier evaluation for `invoke_subagent`. |
