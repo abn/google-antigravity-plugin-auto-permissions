@@ -72,20 +72,7 @@ def extract_user_content(step_obj: dict) -> str | None:
     return None
 
 
-def _read_tail_lines(file_path: str, max_bytes: int = 128 * 1024) -> list[str]:
-    """Reads the last max_bytes of a file in O(1) time without parsing the full file."""
-    if not file_path or not os.path.isfile(file_path):
-        return []
-    try:
-        file_size = os.path.getsize(file_path)
-        with open(file_path, "rb") as f:
-            if file_size > max_bytes:
-                f.seek(file_size - max_bytes)
-                f.readline()  # Discard partial first line
-            raw_data = f.read()
-            return raw_data.decode("utf-8", errors="replace").splitlines()
-    except Exception:
-        return []
+DEFAULT_CHUNK_SIZE = 256 * 1024  # 256 KB
 
 
 def read_user_prompts_from_transcript(
@@ -93,22 +80,26 @@ def read_user_prompts_from_transcript(
 ) -> tuple[list[str], str | None]:
     """
     Parses transcript.jsonl to extract prior user prompts and active user prompt.
-    Uses tail-seeking to guarantee ultra-low latency (<1ms) on large transcripts.
+    Labels prior turns with absolute chronological turn numbers ([Turn 0], [Turn 1], ...)
+    to guarantee byte-stable prefix caching across turns.
+    Preserves Turn 0 session anchor across large conversations regardless of output volume.
     """
-    lines = _read_tail_lines(transcript_path)
-    if not lines:
+    if not transcript_path or not os.path.isfile(transcript_path):
         return [], None
 
-    user_prompts = []
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        with contextlib.suppress(json.JSONDecodeError):
-            step = json.loads(line)
-            text = extract_user_content(step)
-            if text:
-                user_prompts.append(text)
+    user_prompts: list[str] = []
+    try:
+        with open(transcript_path, "rb") as f:
+            for line in f:
+                if b'"USER' not in line and b'"user' not in line:
+                    continue
+                with contextlib.suppress(Exception):
+                    step = json.loads(line.decode("utf-8", errors="replace"))
+                    text = extract_user_content(step)
+                    if text:
+                        user_prompts.append(text)
+    except Exception:
+        return [], None
 
     if not user_prompts:
         return [], None
@@ -139,20 +130,45 @@ def read_user_prompts_from_transcript(
 def get_last_user_step_index(transcript_path: str) -> int | None:
     """
     Finds the step index of the most recent user prompt in transcript.jsonl.
-    Scans lines in reverse for instantaneous O(1) response time.
+    Scans backward in blocks for instantaneous O(1) response time without buffer cutoffs.
     """
-    lines = _read_tail_lines(transcript_path)
-    if not lines:
+    if not transcript_path or not os.path.isfile(transcript_path):
         return None
 
-    for line in reversed(lines):
-        line = line.strip()
-        if not line:
-            continue
-        with contextlib.suppress(json.JSONDecodeError):
-            step = json.loads(line)
-            text = extract_user_content(step)
-            if text is not None:
-                return step.get("step_index", step.get("step_idx", 0))
+    try:
+        file_size = os.path.getsize(transcript_path)
+        if file_size == 0:
+            return None
+
+        chunk_size = DEFAULT_CHUNK_SIZE
+        offset = file_size
+        remainder = b""
+
+        with open(transcript_path, "rb") as f:
+            while offset > 0:
+                read_size = min(chunk_size, offset)
+                offset -= read_size
+                f.seek(offset)
+                chunk = f.read(read_size) + remainder
+                lines = chunk.splitlines()
+
+                if offset > 0 and lines:
+                    remainder = lines[0]
+                    lines = lines[1:]
+                else:
+                    remainder = b""
+
+                for line in reversed(lines):
+                    if b'"USER' not in line and b'"user' not in line:
+                        continue
+                    with contextlib.suppress(Exception):
+                        step = json.loads(line.decode("utf-8", errors="replace"))
+                        text = extract_user_content(step)
+                        if text is not None:
+                            return step.get("step_index", step.get("step_idx", 0))
+
+                chunk_size = min(chunk_size * 2, 2 * 1024 * 1024)
+    except Exception:
+        return None
 
     return None

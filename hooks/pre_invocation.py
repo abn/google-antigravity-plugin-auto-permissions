@@ -62,6 +62,18 @@ def main():
         )
         workspace_paths = payload.get("workspacePaths") or payload.get("workspace_paths", [])
 
+        if not transcript_path or not os.path.isfile(transcript_path):
+            if conversation_id:
+                cand = os.path.expanduser(
+                    f"~/.gemini/antigravity/brain/{conversation_id}/.system_generated/logs/transcript.jsonl"
+                )
+                if os.path.isfile(cand):
+                    transcript_path = cand
+            if (not transcript_path or not os.path.isfile(transcript_path)) and artifact_dir:
+                cand = os.path.join(artifact_dir, ".system_generated", "logs", "transcript.jsonl")
+                if os.path.isfile(cand):
+                    transcript_path = cand
+
         log_path = resolve_session_log_path(artifact_dir, transcript_path, conversation_id)
         session_dir = resolve_session_root_dir(
             artifact_dir, transcript_path, conversation_id, log_path
