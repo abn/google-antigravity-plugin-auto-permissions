@@ -142,6 +142,117 @@ class TestTranscriptParser(unittest.TestCase):
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
+    def test_large_transcript_buffer_overflow_preserves_prompt(self):
+        """Verifies transcripts exceeding 128KB buffer retain Turn 0 prompt and step index."""
+        with tempfile.NamedTemporaryFile("w+", suffix=".jsonl", delete=False) as f:
+            # Turn 0 prompt
+            f.write(
+                json.dumps(
+                    {
+                        "type": "USER_INPUT",
+                        "step_index": 0,
+                        "content": "Diagnose why package upgrades failed on nibbler",
+                    }
+                )
+                + "\n"
+            )
+            # 250KB of planner and tool output lines (exceeds old 128KB buffer)
+            filler_text = "A" * 1000
+            for i in range(1, 250):
+                f.write(
+                    json.dumps(
+                        {
+                            "type": "PLANNER_RESPONSE",
+                            "step_index": i,
+                            "content": f"Inspecting module chunk {i}: {filler_text}",
+                        }
+                    )
+                    + "\n"
+                )
+            temp_path = f.name
+
+        try:
+            priors, active = read_user_prompts_from_transcript(temp_path, max_history=4)
+            self.assertEqual(active, "Diagnose why package upgrades failed on nibbler")
+            self.assertEqual(priors, [])
+            self.assertEqual(get_last_user_step_index(temp_path), 0)
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    def test_large_multiturn_transcript_preserves_turn_0(self):
+        """Verifies multi-turn sessions exceeding buffer size preserve Turn 0 session anchor."""
+        with tempfile.NamedTemporaryFile("w+", suffix=".jsonl", delete=False) as f:
+            f.write(
+                json.dumps(
+                    {
+                        "type": "USER_INPUT",
+                        "step_index": 0,
+                        "content": "Turn 0: Session anchor requirement",
+                    }
+                )
+                + "\n"
+            )
+            filler_text = "B" * 1000
+            for i in range(1, 150):
+                f.write(
+                    json.dumps(
+                        {
+                            "type": "PLANNER_RESPONSE",
+                            "step_index": i,
+                            "content": f"Step {i}: {filler_text}",
+                        }
+                    )
+                    + "\n"
+                )
+            f.write(
+                json.dumps(
+                    {
+                        "type": "USER_INPUT",
+                        "step_index": 150,
+                        "content": "Turn 1: Intermediate direction",
+                    }
+                )
+                + "\n"
+            )
+            for i in range(151, 300):
+                f.write(
+                    json.dumps(
+                        {
+                            "type": "PLANNER_RESPONSE",
+                            "step_index": i,
+                            "content": f"Step {i}: {filler_text}",
+                        }
+                    )
+                    + "\n"
+                )
+            f.write(
+                json.dumps(
+                    {
+                        "type": "USER_INPUT",
+                        "step_index": 300,
+                        "content": "Turn 2: Final active instruction",
+                    }
+                )
+                + "\n"
+            )
+            temp_path = f.name
+
+        try:
+            priors, active = read_user_prompts_from_transcript(temp_path, max_history=4)
+            self.assertEqual(active, "Turn 2: Final active instruction")
+            self.assertEqual(
+                priors,
+                [
+                    "[Turn 0]: Turn 0: Session anchor requirement",
+                    "[Turn 1]: Turn 1: Intermediate direction",
+                ],
+            )
+            self.assertEqual(get_last_user_step_index(temp_path), 300)
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
 
 if __name__ == "__main__":
     unittest.main()

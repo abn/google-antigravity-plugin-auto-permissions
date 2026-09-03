@@ -38,6 +38,7 @@ from policy_engine import (  # noqa: E402
 from transcript_parser import (  # noqa: E402
     get_last_user_step_index,
     read_user_prompts_from_transcript,
+    sanitize_user_prompt,
 )
 
 
@@ -85,6 +86,18 @@ def main():
             or payload.get("artifactDir")
             or ""
         )
+
+        if not transcript_path or not os.path.isfile(transcript_path):
+            if conversation_id:
+                cand = os.path.expanduser(
+                    f"~/.gemini/antigravity/brain/{conversation_id}/.system_generated/logs/transcript.jsonl"
+                )
+                if os.path.isfile(cand):
+                    transcript_path = cand
+            if (not transcript_path or not os.path.isfile(transcript_path)) and artifact_dir:
+                cand = os.path.join(artifact_dir, ".system_generated", "logs", "transcript.jsonl")
+                if os.path.isfile(cand):
+                    transcript_path = cand
 
         # Extract optional explicit goal object or string
         raw_goal = (
@@ -389,6 +402,24 @@ def main():
         prior_prompts, active_prompt = read_user_prompts_from_transcript(
             transcript_path, max_history=4
         )
+
+        # Fallback to payload-level prompt if transcript yielded no active prompt
+        if not active_prompt:
+            raw_payload_prompt = (
+                payload.get("activePrompt")
+                or payload.get("active_prompt")
+                or payload.get("userPrompt")
+                or payload.get("user_prompt")
+                or payload.get("prompt")
+            )
+            if (
+                raw_payload_prompt
+                and isinstance(raw_payload_prompt, str)
+                and raw_payload_prompt.strip()
+            ):
+                active_prompt = (
+                    sanitize_user_prompt(raw_payload_prompt) or raw_payload_prompt.strip()
+                )
 
         # 8. Load custom semantic guidelines from policy configurations
         custom_guidelines = load_custom_guidelines(
