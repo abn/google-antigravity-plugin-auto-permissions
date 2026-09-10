@@ -4,6 +4,9 @@ An autonomous security authorization and auto-permission classifier plugin for *
 
 The plugin intercepts sensitive tool operations (commands, file writes, web requests, task management) via Antigravity's `PreToolUse` lifecycle hook, provides strictly sanitized contextual intent to a decoupled security classifier (default: the Antigravity Language Server's own model, zero-key; optional Google Gemini, Cloud Code, OpenAI-compatible, or Anthropic), automatically approves safe actions, blocks hostile or out-of-scope operations, and records asynchronous rotatable audit logs in the active session directory.
 
+> [!TIP]
+> **Companion Deep Dive:** Read [Zero-G, Zero-Prompts: Lifting the Heavy Burden of Permission Fatigue in Google Antigravity](https://abn.is/void/zero-g-zero-prompts-lifting-the-heavy-burden-of-permission-fatigue-in-google-ant/) for an architectural breakdown of permission fatigue, the two-tiered evaluation pipeline, and comparisons with Claude Code's Auto Mode.
+
 ---
 
 ## Key Features
@@ -71,7 +74,8 @@ export GEMINI_API_KEY="your-api-key"
 
 ## Architecture & Knowledge Base (OKF 0.2)
 
-For complete technical specifications, security models, empirical benchmarks, and operational guides, explore the **[Open Knowledge Format (OKF 0.2) Documentation Wiki](docs/index.md)** or the monolithic **[Architecture Specification](docs/architecture.md)**.
+- **Companion Deep Dive:** [Zero-G, Zero-Prompts: Lifting the Heavy Burden of Permission Fatigue in Google Antigravity](https://abn.is/void/zero-g-zero-prompts-lifting-the-heavy-burden-of-permission-fatigue-in-google-ant/) provides an in-depth walkthrough of the motivation, design decisions, and two-tiered pipeline.
+- **Documentation Wiki:** For complete technical specifications, security models, empirical benchmarks, and operational guides, explore the **[Open Knowledge Format (OKF 0.2) Documentation Wiki](docs/index.md)** or the monolithic **[Architecture Specification](docs/architecture.md)**.
 
 ---
 
