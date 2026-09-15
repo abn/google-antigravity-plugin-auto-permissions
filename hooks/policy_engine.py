@@ -153,7 +153,7 @@ def parse_resource_rule(rule_str: str) -> tuple[str, str] | None:
 def match_command(pattern: str, command_line: str) -> bool:
     """
     Matches a command string against a pattern.
-    Supports exact token prefix matching, global wildcards (*), and regex groups.
+    Supports literal token prefix matching, regex: pattern prefix, and global wildcards (*).
     """
     if pattern == "*":
         return True
@@ -162,10 +162,19 @@ def match_command(pattern: str, command_line: str) -> bool:
     if not command_line:
         return False
 
-    # If pattern contains regex special chars, evaluate as anchored regex
+    if pattern.startswith("regex:"):
+        regex_pat = pattern[6:].strip()
+        if not regex_pat:
+            return False
+        try:
+            return bool(re.search(rf"^(?:{regex_pat})", command_line))
+        except re.error:
+            return False
+
+    # Backward compatibility: if pattern contains regex special chars, evaluate as anchored regex
     try:
         if re.search(r"[\\^$*+?.()|[\]{}]", pattern):
-            return bool(re.search(f"^{pattern}", command_line))
+            return bool(re.search(rf"^(?:{pattern})", command_line))
     except re.error:
         pass
 
