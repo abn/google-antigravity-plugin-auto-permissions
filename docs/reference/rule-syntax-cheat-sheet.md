@@ -36,10 +36,12 @@ Matches shell command lines executed via `run_command`.
 
 | Syntax Pattern | Example | Matching Behavior |
 | :--- | :--- | :--- |
-| `command(<binary>*)` | `command(pytest*)` | Matches `pytest`, `pytest -v`, `pytest tests/test_core.py`. |
-| `command(<prefix> <subcmd>*)` | `command(git status*)` | Matches `git status`, `git status --short`. |
+| `command(<binary>)` | `command(pytest)` | Matches command prefix word-by-word literally. |
+| `command(<prefix> <subcmd>)` | `command(git status)` | Matches command and subcommand prefix literally. |
 | `command(<exact>)` | `command(cargo test --lib)` | Matches only the exact command string. |
-| Regex Wildcard | `command(npm (test\|run lint)*)` | Matches either `npm test` or `npm run lint`. |
+| `command(regex:<pattern>)` | `command(regex:npm run (build.*))` | Matches commands via anchored regular expression. |
+| `unsandboxed(regex:<pattern>)` | `unsandboxed(regex:git .*)` | Matches unsandboxed commands via regular expression. |
+| Global Wildcard | `command(*)` | Matches all commands. |
 
 ---
 

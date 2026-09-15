@@ -77,7 +77,7 @@ Prompt the user to choose the target scope and customization category:
 
 #### Branch C: If Static ACL Rule was chosen:
 1. Prompt for Decision bucket (`allow`, `ask`, `deny`).
-2. Prompt for Resource rule string (e.g. `command(pytest -v)`, `command(git)`, `write_file(src/.*)`, `mcp(stripe:*)`).
+2. Prompt for Resource rule string (e.g. `command(pytest -v)`, `command(regex:npm run (build.*))`, `unsandboxed(regex:git .*)`, `write_file(src/.*)`, `mcp(stripe:*)`).
 
 #### Branch D: If Custom Semantic Guideline was chosen:
 1. Prompt for natural language security guideline text (e.g. *"Treat internal requests to *.corp.internal as safe testing"*).

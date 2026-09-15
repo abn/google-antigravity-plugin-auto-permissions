@@ -59,6 +59,22 @@ class TestPolicyEngine(unittest.TestCase):
         self.assertTrue(match_command("pytest", "pytest -v tests/"))
         self.assertTrue(match_command("*", "anything"))
         self.assertFalse(match_command("git push", "git pull"))
+        # regex: prefix matching
+        self.assertTrue(match_command("regex:npm run (build.*)", "npm run build"))
+        self.assertTrue(match_command("regex:npm run (build.*)", "npm run build-prod"))
+        self.assertFalse(match_command("regex:npm run (build.*)", "npm run test"))
+        self.assertTrue(match_command("regex:git .*", "git status"))
+        self.assertTrue(match_command("regex:curl .*", "curl https://example.com"))
+        self.assertFalse(match_command("regex:curl .*", "wget https://example.com"))
+        # Alternation must remain anchored to the beginning
+        self.assertFalse(match_command("regex:git status|git log", "echo pwned && git log"))
+        self.assertTrue(match_command("regex:git status|git log", "git log"))
+        self.assertTrue(match_command("regex:git status|git log", "git status --short"))
+        # Empty regex must fail closed
+        self.assertFalse(match_command("regex:", "anything"))
+        self.assertFalse(match_command("regex:   ", "anything"))
+        # Invalid regex fails gracefully
+        self.assertFalse(match_command("regex:[unclosed", "anything"))
 
     def test_match_path(self):
         self.assertTrue(match_path("src/", "src/module/app.py"))
@@ -81,6 +97,35 @@ class TestPolicyEngine(unittest.TestCase):
         self.assertFalse(
             match_tool_against_rule(
                 "command(uv lock)", "run_command", {"CommandLine": "cargo build"}
+            )
+        )
+        self.assertTrue(
+            match_tool_against_rule(
+                "command(regex:npm run (build.*))",
+                "run_command",
+                {"CommandLine": "npm run build"},
+            )
+        )
+        self.assertFalse(
+            match_tool_against_rule(
+                "command(regex:npm run (build.*))",
+                "run_command",
+                {"CommandLine": "npm run test"},
+            )
+        )
+        # Unsandboxed tool with regex: prefix
+        self.assertTrue(
+            match_tool_against_rule(
+                "unsandboxed(regex:git .*)",
+                "run_command",
+                {"CommandLine": "git push origin main", "BypassSandbox": True},
+            )
+        )
+        self.assertFalse(
+            match_tool_against_rule(
+                "unsandboxed(regex:git .*)",
+                "run_command",
+                {"CommandLine": "git push origin main", "BypassSandbox": False},
             )
         )
 
