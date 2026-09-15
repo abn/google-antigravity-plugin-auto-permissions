@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.11.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.10.0...auto-permissions-v0.11.0) (2026-09-15)
+
+
+### Features
+
+* **policy:** support regex prefix for command matching ([#60](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/60)) ([1f3ac1b](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/1f3ac1ba07788e50ac2af00de92ac0c228575c6f))
+
+
+### Bug Fixes
+
+* **parser:** prevent prompt loss on large transcripts and preserve turn 0 ([#57](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/57)) ([7cc5b38](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/7cc5b38897bb668df8c298e08aa4570f60ebd9ef))
+
+
+### Documentation
+
+* **readme:** link companion deep dive blog post ([#59](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/59)) ([b2266eb](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/b2266ebb915e1de6e9f6e29f12d9b7e7ff232656))
+
 ## [0.10.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.9.0...auto-permissions-v0.10.0) (2026-08-23)
 
 
