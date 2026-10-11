@@ -1,27 +1,28 @@
 ---
-okf_version: "0.2"
-type: "architecture"
-title: "OS Sandboxing, Terminal Isolation & Defense-in-Depth"
-description: "How intent classification interacts with OS-level sandboxing (Linux Landlock, Bubblewrap, macOS Seatbelt), and detection invariants for sandbox bypass elevation."
-category: "architecture"
-status: "stable"
+okf_version: '0.2'
+type: architecture
+title: OS Sandboxing, Terminal Isolation & Defense-in-Depth
+description: How intent classification interacts with OS-level sandboxing (Linux Landlock,
+  Bubblewrap, macOS Seatbelt), and detection invariants for sandbox bypass elevation.
+category: architecture
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "security_audit"
-    date: "2026-08-16"
+    tier: security_audit
+    date: '2026-08-16'
 sources:
-  - "hooks/auto_approve_gate.py"
-  - "hooks/policy_engine.py"
-stale_after: "2027-08-16"
+- resource: hooks/auto_approve_gate.py
+- resource: hooks/policy_engine.py
+stale_after: '2027-08-16'
 tags:
-  - "architecture"
-  - "sandboxing"
-  - "defense-in-depth"
-  - "isolation"
-  - "landlock"
+- architecture
+- sandboxing
+- defense-in-depth
+- isolation
+- landlock
 ---
 
 # OS Sandboxing, Terminal Isolation & Defense-in-Depth

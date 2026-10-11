@@ -1,27 +1,28 @@
 ---
-okf_version: "0.2"
-type: "guide"
-title: "Audit Inspection & Policy Remediation"
-description: "How to inspect audit logs, troubleshoot classification latency, and automatically generate scoped ACL rules from security gate denials."
-category: "guides"
-status: "stable"
+okf_version: '0.2'
+type: guide
+title: Audit Inspection & Policy Remediation
+description: How to inspect audit logs, troubleshoot classification latency, and automatically
+  generate scoped ACL rules from security gate denials.
+category: guides
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "hooks/audit_logger.py"
-  - "skills/auto-permissions-audit/scripts/view_audit.py"
-  - "skills/auto-permissions-fix/scripts/fix_permissions.py"
-stale_after: "2027-08-16"
+- resource: hooks/audit_logger.py
+- resource: skills/auto-permissions-audit/scripts/view_audit.py
+- resource: skills/auto-permissions-fix/scripts/fix_permissions.py
+stale_after: '2027-08-16'
 tags:
-  - "audit"
-  - "remediation"
-  - "logging"
-  - "troubleshooting"
+- audit
+- remediation
+- logging
+- troubleshooting
 ---
 
 # Audit Inspection & Policy Remediation

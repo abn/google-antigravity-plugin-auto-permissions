@@ -1,27 +1,28 @@
 ---
-okf_version: "0.2"
-type: "guide"
-title: "Troubleshooting & Frequently Asked Questions (FAQ)"
-description: "Diagnostic procedures and solutions for classifier fallback timeouts, HTTP errors, soft denials, and rule configuration conflicts."
-category: "guides"
-status: "stable"
+okf_version: '0.2'
+type: guide
+title: Troubleshooting & Frequently Asked Questions (FAQ)
+description: Diagnostic procedures and solutions for classifier fallback timeouts,
+  HTTP errors, soft denials, and rule configuration conflicts.
+category: guides
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "troubleshooting-synthesis"
+    agent: antigravity
+    method: troubleshooting-synthesis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "hooks/policy_engine.py"
-  - "hooks/classifier.py"
-  - "skills/auto-permissions-audit/scripts/view_audit.py"
-stale_after: "2027-08-16"
+- resource: hooks/policy_engine.py
+- resource: hooks/classifier.py
+- resource: skills/auto-permissions-audit/scripts/view_audit.py
+stale_after: '2027-08-16'
 tags:
-  - "guides"
-  - "troubleshooting"
-  - "faq"
-  - "diagnostics"
+- guides
+- troubleshooting
+- faq
+- diagnostics
 ---
 
 # Troubleshooting & Frequently Asked Questions (FAQ)

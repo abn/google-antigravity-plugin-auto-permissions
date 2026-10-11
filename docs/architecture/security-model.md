@@ -1,27 +1,28 @@
 ---
-okf_version: "0.2"
-type: "architecture"
-title: "Security Model & Threat Invariants"
-description: "Threat vectors, decoupled prompt payloads, fail-closed safety contracts, and prompt injection defense."
-category: "architecture"
-status: "stable"
+okf_version: '0.2'
+type: architecture
+title: Security Model & Threat Invariants
+description: Threat vectors, decoupled prompt payloads, fail-closed safety contracts,
+  and prompt injection defense.
+category: architecture
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "threat-model-analysis"
+    agent: antigravity
+    method: threat-model-analysis
   verified:
-    tier: "security_audit_and_test_suite"
-    date: "2026-08-16"
+    tier: security_audit_and_test_suite
+    date: '2026-08-16'
 sources:
-  - "hooks/classifier.py"
-  - "hooks/transcript_parser.py"
-  - "rules/auto_permissions.md"
-stale_after: "2027-08-16"
+- resource: hooks/classifier.py
+- resource: hooks/transcript_parser.py
+- resource: rules/auto_permissions.md
+stale_after: '2027-08-16'
 tags:
-  - "security"
-  - "threat-model"
-  - "prompt-injection"
-  - "fail-closed"
+- security
+- threat-model
+- prompt-injection
+- fail-closed
 ---
 
 # Security Model & Threat Invariants

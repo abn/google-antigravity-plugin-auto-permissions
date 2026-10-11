@@ -1,28 +1,29 @@
 ---
-okf_version: "0.2"
-type: "benchmark"
-title: "Classifier Output Schema & Explainability Impact"
-description: "Empirical comparison of security classifier output schemas: outcome-only vs outcome+reason vs category vs Chain-of-Thought."
-category: "benchmarks"
-status: "stable"
+okf_version: '0.2'
+type: benchmark
+title: Classifier Output Schema & Explainability Impact
+description: 'Empirical comparison of security classifier output schemas: outcome-only
+  vs outcome+reason vs category vs Chain-of-Thought.'
+category: benchmarks
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "live-api-benchmarking"
+    agent: antigravity
+    method: live-api-benchmarking
   verified:
-    tier: "empirical_benchmarks"
-    date: "2026-08-16"
+    tier: empirical_benchmarks
+    date: '2026-08-16'
 sources:
-  - "hooks/classifier.py"
-  - "scratch/benchmark_schema_impact.py"
-  - "scratch/schema_benchmark_results.json"
-stale_after: "2027-08-16"
+- resource: hooks/classifier.py
+- resource: scratch/benchmark_schema_impact.py
+- resource: scratch/schema_benchmark_results.json
+stale_after: '2027-08-16'
 tags:
-  - "benchmarks"
-  - "classifier"
-  - "tokens"
-  - "latency"
-  - "schema"
+- benchmarks
+- classifier
+- tokens
+- latency
+- schema
 ---
 
 # Classifier Output Schema & Explainability Impact

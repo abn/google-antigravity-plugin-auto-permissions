@@ -13,8 +13,8 @@ trust:
     tier: "empirical_benchmarks"
     date: "2026-08-16"
 sources:
-  - "hooks/classifier.py"
-  - "hooks/transcript_parser.py"
+  - resource: "hooks/classifier.py"
+  - resource: "hooks/transcript_parser.py"
 stale_after: "2027-08-16"
 tags:
   - "kv-cache"

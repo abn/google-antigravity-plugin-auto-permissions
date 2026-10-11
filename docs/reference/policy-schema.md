@@ -1,24 +1,25 @@
 ---
-okf_version: "0.2"
-type: "reference"
-title: "Policy Configuration & Session Overrides JSON Schema"
-description: "Complete formal schema specification for configuration files and runtime session overrides."
-category: "reference"
-status: "stable"
+okf_version: '0.2'
+type: reference
+title: Policy Configuration & Session Overrides JSON Schema
+description: Complete formal schema specification for configuration files and runtime
+  session overrides.
+category: reference
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "hooks/policy_engine.py"
-stale_after: "2027-08-16"
+- resource: hooks/policy_engine.py
+stale_after: '2027-08-16'
 tags:
-  - "reference"
-  - "schema"
-  - "json"
+- reference
+- schema
+- json
 ---
 
 # Policy Configuration JSON Schema

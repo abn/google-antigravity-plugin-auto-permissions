@@ -1,26 +1,27 @@
 ---
-okf_version: "0.2"
-type: "reference"
-title: "Static ACL Rule Syntax & Pattern Cheat Sheet"
-description: "Complete regex, wildcard, glob, and prefix matching cheat sheet for static policy rules."
-category: "reference"
-status: "stable"
+okf_version: '0.2'
+type: reference
+title: Static ACL Rule Syntax & Pattern Cheat Sheet
+description: Complete regex, wildcard, glob, and prefix matching cheat sheet for static
+  policy rules.
+category: reference
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "hooks/policy_engine.py"
-stale_after: "2027-08-16"
+- resource: hooks/policy_engine.py
+stale_after: '2027-08-16'
 tags:
-  - "reference"
-  - "syntax"
-  - "rules"
-  - "regex"
-  - "patterns"
+- reference
+- syntax
+- rules
+- regex
+- patterns
 ---
 
 # Static ACL Rule Syntax & Pattern Cheat Sheet

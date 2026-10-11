@@ -1,25 +1,26 @@
 ---
-okf_version: "0.2"
-type: "reference"
-title: "Built-in Permission Bundles Catalog"
-description: "Comprehensive catalog of all 8 pre-packaged zero-dependency built-in bundles, descriptions, and rule patterns."
-category: "reference"
-status: "stable"
+okf_version: '0.2'
+type: reference
+title: Built-in Permission Bundles Catalog
+description: Comprehensive catalog of all 8 pre-packaged zero-dependency built-in
+  bundles, descriptions, and rule patterns.
+category: reference
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "hooks/bundles/__init__.py"
-  - "hooks/bundles/*.json"
-stale_after: "2027-08-16"
+- resource: hooks/bundles/__init__.py
+- resource: hooks/bundles/*.json
+stale_after: '2027-08-16'
 tags:
-  - "reference"
-  - "bundles"
-  - "catalog"
+- reference
+- bundles
+- catalog
 ---
 
 # Built-in Permission Bundles Catalog

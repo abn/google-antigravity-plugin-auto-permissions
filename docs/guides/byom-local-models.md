@@ -1,28 +1,29 @@
 ---
-okf_version: "0.2"
-type: "guide"
-title: "Bring Your Own Model (BYOM) & Local Inference"
-description: "Configuring custom model providers including OpenAI-compatible servers (vLLM, Ollama, SGLang, Lemonade), Anthropic Claude, and Google Gemini."
-category: "guides"
-status: "stable"
+okf_version: '0.2'
+type: guide
+title: Bring Your Own Model (BYOM) & Local Inference
+description: Configuring custom model providers including OpenAI-compatible servers
+  (vLLM, Ollama, SGLang, Lemonade), Anthropic Claude, and Google Gemini.
+category: guides
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "hooks/classifier.py"
-  - "skills/auto-permissions-configure/scripts/configure_permissions.py"
-stale_after: "2027-08-16"
+- resource: hooks/classifier.py
+- resource: skills/auto-permissions-configure/scripts/configure_permissions.py
+stale_after: '2027-08-16'
 tags:
-  - "byom"
-  - "local-models"
-  - "ollama"
-  - "vllm"
-  - "openai"
-  - "anthropic"
+- byom
+- local-models
+- ollama
+- vllm
+- openai
+- anthropic
 ---
 
 # Bring Your Own Model (BYOM) & Local Inference

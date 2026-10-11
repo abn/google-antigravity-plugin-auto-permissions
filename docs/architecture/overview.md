@@ -1,27 +1,28 @@
 ---
-okf_version: "0.2"
-type: "architecture"
-title: "Auto-Permissions Core Architecture & Cascade Lifecycle"
-description: "Detailed specification of the multi-tier authorization cascade, sub-millisecond fast-path evaluation, and runtime lifecycle hooks."
-category: "architecture"
-status: "stable"
+okf_version: '0.2'
+type: architecture
+title: Auto-Permissions Core Architecture & Cascade Lifecycle
+description: Detailed specification of the multi-tier authorization cascade, sub-millisecond
+  fast-path evaluation, and runtime lifecycle hooks.
+category: architecture
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite_and_empirical_benchmarks"
-    date: "2026-08-16"
+    tier: test_suite_and_empirical_benchmarks
+    date: '2026-08-16'
 sources:
-  - "hooks/auto_approve_gate.py"
-  - "hooks/policy_engine.py"
-  - "hooks/classifier.py"
-stale_after: "2027-08-16"
+- resource: hooks/auto_approve_gate.py
+- resource: hooks/policy_engine.py
+- resource: hooks/classifier.py
+stale_after: '2027-08-16'
 tags:
-  - "architecture"
-  - "fast-path"
-  - "lifecycle"
-  - "cascade"
+- architecture
+- fast-path
+- lifecycle
+- cascade
 ---
 
 # Auto-Permissions Core Architecture & Cascade Lifecycle
