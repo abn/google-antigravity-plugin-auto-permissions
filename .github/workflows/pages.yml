@@ -1,10 +1,12 @@
-name: Publish wiki
+name: Publish site and wiki
 
 on:
   push:
     branches: [main]
     paths:
       - 'docs/**'
+      - 'site/**'
+      - 'themes/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -40,17 +42,35 @@ jobs:
     runs-on: ubuntu-24.04
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.deploy-url }}
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
 
-      - id: deploy
+      - name: Render wiki with okf-wiki
+        id: render-wiki
         uses: abn/okf-wiki/action@main
         with:
           content: docs
-          deploy: true
-          brand: auto-permissions
+          out: _site
+          base: /google-antigravity-plugin-auto-permissions/wiki
+          theme: themes/abn
+          deploy: false
+          brand: "auto-permissions."
           brand-sub: wiki
           title: Auto-Permissions Wiki
           sections: "architecture:Architecture,guides:Guides,skills:Skills,reference:Reference,benchmarks:Benchmarks"
-          nav-links: "GitHub=https://github.com/${{ github.repository }}"
+          nav-links: "Landing=https://abn.github.io/google-antigravity-plugin-auto-permissions/,GitHub=https://github.com/${{ github.repository }}"
+
+      - name: Copy landing page to site root
+        run: |
+          mkdir -p _site/google-antigravity-plugin-auto-permissions
+          cp -r site/* _site/google-antigravity-plugin-auto-permissions/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site/google-antigravity-plugin-auto-permissions
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

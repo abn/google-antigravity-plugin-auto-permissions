@@ -1,0 +1,12 @@
+{
+  "name": "abn.is",
+  "version": "1.1.0",
+  "description": "The abn.is brand theme (violet and intersex-yellow, IBM Plex) layered over the okf-wiki default layout.",
+  "assets": {
+    "tokens.css": { "mode": "replace" },
+    "fonts.css": { "mode": "replace" },
+    "fonts/": { "mode": "replace" },
+    "brand-mark.svg": { "mode": "replace" },
+    "favicon.svg": { "mode": "replace" }
+  }
+}

@@ -1,0 +1,615 @@
+/* GENERATED FILE — DO NOT EDIT.
+ *
+ * Extracted from src/styles/tokens.css by scripts/extract-tokens.mjs; run
+ * `make tokens` to regenerate. scripts/build-guard.mjs fails the build if this
+ * is stale, so editing it by hand is not a shortcut, it is a build failure.
+ *
+ * This exists for ONE consumer: the standalone eval-report document at
+ * /a/<id>, which is emitted outside Astro's layouts and so cannot receive the
+ * bundled tokens.css any other way. Everything else on the site imports
+ * src/styles/tokens.css directly and must keep doing so.
+ *
+ * The base-reset layer is deliberately NOT included — it would collide with the
+ * report's own body and heading rules.
+ *
+ * The trailing `@media print` block is DERIVED, not authored: it resets every
+ * token that differs between light and dark back to its light value, so a
+ * standalone page that links this file prints correctly without keeping its
+ * own hand-written print palette. See extract-tokens.mjs for how.
+ */
+
+/* =============================================================
+   abn. — Personal Brand Foundation · Design Tokens
+   v1.1 · 2026
+   -------------------------------------------------------------
+   v1.1 (2026-07-29) promotes 10 tokens that were live on abn.is but
+   had no canonical home: --c-stone-300, --color-scrim-lightbox, the
+   five image-dimming values (--img-dim- and --img-lift- prefixes),
+   --card-ring-spread, --card-ring-dark, and --dur-card-hover. See the
+   note on that last one — it is a duplicate value awaiting a ruling.
+   -------------------------------------------------------------
+   Two layers:
+     1. PRIMITIVES  — raw, theme-agnostic values (--c-violet-600…)
+     2. SEMANTIC    — role-based, theme-aware (--color-bg, --color-accent…)
+   Always consume SEMANTIC tokens in product code; primitives are
+   the palette they're built from.
+
+   Theme:
+     • defaults to light
+     • follows OS via prefers-color-scheme
+     • force with <html data-theme="light"> / data-theme="dark">
+
+   Type: IBM Plex Mono is the whole voice; JetBrains Mono is code only.
+   Heritage: violet + intersex-yellow (#FFD800). a11y: WCAG AA+.
+   ============================================================= */
+
+:root {
+  /* Native chrome — the page scrollbar, select popups, the file picker —
+     follows the theme. Without this the browser paints its light scrollbar
+     down the side of a dark page. The print block re-asserts light. */
+  color-scheme: light;
+
+  /* ---------- PRIMITIVES · violet (signature) ---------- */
+  --c-violet-50:  #FAF1FD;
+  --c-violet-100: #F2DDFB;
+  --c-violet-200: #E6BCF6;
+  --c-violet-300: #D596EF;
+  --c-violet-400: #C06AE6;
+  --c-violet-500: #B345D4;
+  --c-violet-600: #A435CE; /* ★ UI purple — interactive, focus, fills (AA 5.3:1 on white) */
+  --c-violet-700: #7902AA; /* ★ Brand purple — heritage; accent text on light (AA 8.6:1) */
+  --c-violet-800: #660C8C;
+  --c-violet-900: #4E0A6B;
+
+  /* ---------- PRIMITIVES · yellow (intersex heritage) ---------- */
+  --c-yellow-tint: #FFF7CC;
+  --c-yellow-200:  #FFEC99;
+  --c-yellow-flag: #FFD800; /* ★ the flag yellow — fills only */
+  --c-yellow-text: #A16207; /* yellow that must read as text on light (AA) */
+  --c-yellow-deep: #D9A400; /* end-stop for wordmark gradient on light (keeps >=3:1) */
+
+  /* ---------- PRIMITIVES · identity-accent gradients (use sparingly) ---------- */
+  --gradient-pride:     conic-gradient(from 140deg,#E40303,#FF8C00,#FFD800,#1CA94C,#0066FF,#A435CE,#E40303); /* avatar ring */
+  --gradient-pride-bar: linear-gradient(90deg,#E40303,#FF8C00,#FFD800,#1CA94C,#0066FF,#A435CE);            /* 4px site top-rule */
+
+  /* ---------- PRIMITIVES · neutrals (warm stone) ---------- */
+  --c-paper:   #FFFFFF;
+  --c-surface: #FAFAF9;
+  --c-mist:    #F5F5F4;
+  --c-line:    #E7E5E4;
+  --c-stone-300: #D6D3D1; /* stronger hairline / pill border on light; shell chrome */
+  --c-stone-400: #A8A29E;
+  --c-muted:   #78716C;
+  --c-stone-600: #57534E;
+  --c-slate:   #44403C;
+  --c-ink:     #1C1917;
+
+  /* ---------- PRIMITIVES · dark neutrals ---------- */
+  --c-void:      #0D0D0F;
+  --c-void-raised: #111114; /* caption/footer sunken strip on dark — a hair above void, below surface */
+  --c-surface-d: #16161A;
+  --c-surface-d2:#1C1C21;
+  --c-line-d:    #2A2A2F;
+  --c-line-d2:   #3A3A40;
+  --c-faint-d:   #7C7C86; /* ~4.7:1 on --c-void — was #71717A at ~4.0:1, failing WCAG AA for text (flagged via --color-text-faint on .hero-meta) */
+  --c-muted-d:   #A1A1AA;
+  --c-text-d:    #E4E4E7;
+
+  /* ---------- PRIMITIVES · semantic hues ---------- */
+  --c-success:   #16A34A;  --c-success-d: #4ADE80;
+  --c-info:      #0891B2;  --c-info-d:    #22D3EE;
+  --c-info-text: #0E7490;
+  --c-danger:    #DC2626;  --c-danger-d:  #F87171;
+  --c-danger-text:#B91C1C;
+  --c-danger-soft-d:#FCA5A5; /* softened red — failed-chip / warning-callout label & neg verdict on dark */
+  --c-success-text:#15803D; /* green that reads as text/verdict on light */
+
+  /* ---------- PRIMITIVES · soft status fills (light pastels) ---------- */
+  --c-green-fill: #DCFCE7;  --c-green-line: #BBF7D0;
+  --c-violet-fill:#F2DDFB;  --c-violet-line:#E9C9F6; /* fill == --c-violet-100 */
+  --c-amber-fill: #FEF9C3;  --c-amber-line: #FDE68A;
+  --c-amber-text: #854D0E;  /* yellow-as-label/text on a pale-yellow fill (stronger than --c-yellow-text) */
+  --c-amber-text-d:#FFE566; /* yellow label on dark */
+  --c-red-fill:   #FEE2E2;  --c-red-line:   #FECACA;
+  --c-cyan-fill:  #CFFAFE;  --c-cyan-line:  #A5F3FC;
+  --c-info-text-d:#67E8F9;  /* cyan label on dark */
+
+  /* =====================================================
+     SEMANTIC · LIGHT (default)
+     ===================================================== */
+  --color-bg:            var(--c-surface);
+  --color-bg-elevated:   var(--c-paper);
+  --color-surface:       var(--c-paper);
+  --color-surface-sunken:var(--c-mist);
+  --color-line:          var(--c-line);
+  --color-line-strong:   var(--c-stone-400);
+
+  --color-heading:       var(--c-ink);
+  --color-text:          var(--c-slate);     /* #44403C  ~9:1  */
+  --color-text-muted:    var(--c-stone-600);  /* #57534E  ~7:1  — re-tiered darker so faint can stay AA & ordered */
+  --color-text-faint:    var(--c-muted);      /* #78716C  ~4.5:1 — lightest AA-safe text on #FAFAF9. (#A8A29E is non-text: lines/disabled only) */
+
+  --color-accent:        var(--c-violet-600); /* fills, buttons */
+  --color-accent-text:   var(--c-violet-700); /* accent as TEXT */
+  --color-accent-soft:   color-mix(in srgb, var(--c-violet-600) 8%, transparent);
+  --color-accent-ring:   var(--c-violet-300); /* focus ring */
+  --color-on-accent:     var(--c-paper);      /* text on violet fill */
+
+  --color-highlight:     var(--c-yellow-flag);/* featured fills — solid, opaque */
+  --color-on-highlight:  var(--c-ink);        /* text on yellow */
+  --color-highlight-text:var(--c-yellow-text);/* yellow-ish text on light */
+  /* `<mark>` in prose. NOT --color-highlight: that one is opaque, and an opaque
+     flag-yellow behind body text is the contrast failure the brand rules forbid.
+     This is a translucent stroke laid UNDER the text (see .prose mark), so the
+     ink keeps its own colour and only the paper changes. The two themes need
+     different alphas because the stroke sits on paper in one and on void in the
+     other — 58% is the lightest that still reads on #FAFAF9, 40% the heaviest
+     that does not glow on #0D0D0F. */
+  --color-mark:          color-mix(in srgb, var(--c-yellow-flag) 58%, transparent);
+  --mark-line:           none;   /* light paints the stroke; see below */
+
+  --color-success: var(--c-success);
+  --color-info:    var(--c-info);
+  --color-info-text: var(--c-info-text);
+  --color-warning: var(--c-yellow-flag);
+  --color-danger:  var(--c-danger);
+  --color-danger-text: var(--c-danger-text);
+
+  --color-code-bg:     var(--c-paper);
+  --color-code-chrome: var(--c-mist);
+  --color-inline-code-bg: color-mix(in srgb, var(--c-violet-600) 8%, transparent);
+  --color-inline-code-fg: var(--c-violet-700);
+
+  --color-selection-bg: var(--c-yellow-flag);
+  --color-selection-fg: var(--c-ink);
+  --color-scrim:        rgba(0,0,0,0.62); /* banner title overlay */
+  --color-scrim-lightbox: rgba(0,0,0,0.92); /* the single lightbox / diagram pan-zoom scrim — resolves hand-off ruling C (image + mermaid lightboxes read as one component). Theme-independent by intent. */
+  /* hero wordmark gradient — display sizes only, never body/UI */
+  --gradient-wordmark: linear-gradient(120deg, var(--c-violet-600), var(--c-violet-700) 25%, var(--c-yellow-deep));
+
+  /* ---------- CALLOUT · editorial asides (bg / line / label) · LIGHT ----------
+     Card+eyebrow anatomy. note=violet · tip=yellow · info=cyan · warn=RED
+     (callout "warn" is RED by intent — distinct from amber STATUS "pending"). */
+  --callout-note-bg:    var(--color-accent-soft);
+  --callout-note-line:  color-mix(in srgb, var(--c-violet-600) 33%, transparent);
+  --callout-note-label: var(--c-violet-700);
+  --callout-tip-bg:     #FFF7CC66;
+  --callout-tip-line:   #FFD80059;
+  --callout-tip-label:  var(--c-amber-text);
+  --callout-info-bg:    color-mix(in srgb, var(--c-info) 5%, transparent);
+  --callout-info-line:  color-mix(in srgb, var(--c-info) 33%, transparent);
+  --callout-info-label: var(--c-info-text);
+  --callout-warn-bg:    color-mix(in srgb, var(--c-danger) 5%, transparent);
+  --callout-warn-line:  color-mix(in srgb, var(--c-danger) 20%, transparent);
+  --callout-warn-label: var(--c-danger-text);
+  /* pull — the one callout family member with NO dark override, deliberately: a
+     fixed brand fill that must read identically in both themes, like the pride
+     rule and the wordmark gradient. Stated here rather than repeated three
+     times, and stated in DESIGN.md. Do NOT add these to the dark block or to
+     the prefers-color-scheme block: the absence IS the design, and six
+     declarations in the built CSS means someone added an override by reflex. */
+  --callout-pull-bg:    linear-gradient(120deg, #7902AA, #A435CE 48%, #A435CE);
+  --callout-pull-ink:   #fff;
+  --callout-pull-label: #FFD800;
+
+  /* ---------- STATUS · chips / verdicts (fill / line / text) · LIGHT ----------
+     6 roles. Chip-state map: done=success · running=active · retrying=pending
+     · queued=neutral · failed=danger · skipped=muted. Verdicts reuse text only:
+     .pos=success-text, .neg=danger-text. */
+  --status-success-fill: var(--c-green-fill);  --status-success-line: var(--c-green-line);  --status-success-text: var(--c-success-text);
+  --status-active-fill:  var(--c-violet-fill); --status-active-line:  var(--c-violet-line); --status-active-text:  var(--c-violet-700);
+  --status-pending-fill: var(--c-amber-fill);  --status-pending-line: var(--c-amber-line);  --status-pending-text: var(--c-amber-text);
+  --status-neutral-fill: var(--c-mist);        --status-neutral-line: var(--c-line);        --status-neutral-text: var(--c-muted);
+  --status-danger-fill:  var(--c-red-fill);    --status-danger-line:  var(--c-red-line);    --status-danger-text:  var(--c-danger-text);
+  --status-muted-fill:   var(--c-surface);     --status-muted-line:   var(--c-line);        --status-muted-text:   var(--c-stone-400);
+  --status-info-fill:    var(--c-cyan-fill);   --status-info-line:    var(--c-cyan-line);   --status-info-text:    var(--c-info-text);
+
+  /* =====================================================
+     TYPE
+     ===================================================== */
+  --font-ui:   "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-code: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --text-display: 6rem;     /* 96 */
+  --text-h1:      2.5rem;    /* 40 */
+  --text-h2:      1.75rem;   /* 28 */
+  --text-h3:      1.25rem;   /* 20 */
+  --text-lg:      1.125rem;  /* 18 */
+  --text-body:    1rem;      /* 16 */
+  --text-sm:      0.8125rem; /* 13 */
+  --text-xs:      0.75rem;   /* 12 */
+  --text-kicker:  0.6875rem; /* 11 */
+
+  --fw-regular: 400;
+  --fw-medium:  500;
+  --fw-semibold:600;
+  --fw-bold:    700;
+
+  --lh-tight:   0.95;
+  --lh-snug:    1.1;
+  --lh-normal:  1.5;
+  --lh-relaxed: 1.75;
+
+  --ls-display: -0.05em;
+  --ls-tight:   -0.03em;
+  --ls-snug:    -0.02em;
+  --ls-kicker:  0.14em;
+
+  --measure: 65ch; /* max line length for long-form body */
+
+  /* =====================================================
+     SPACE · RADIUS · SHADOW · MOTION
+     ===================================================== */
+  --space-1: 4px;   --space-2: 8px;   --space-3: 12px;  --space-4: 16px;
+  --space-5: 20px;  --space-6: 24px;  --space-8: 32px;  --space-10: 40px;
+  --space-12: 48px; --space-16: 64px; --space-20: 80px;
+
+  --radius-sm:  4px;
+  --radius-md:  8px;
+  --radius-lg:  12px;
+  --radius-xl:  14px;
+  --radius-pill: 999px;
+
+  --border-width: 1px;
+  --border-width-strong: 1.5px;
+  --accent-rule: 3px; /* the violet left-rule on callouts / no-image cards */
+
+  --shadow-sm: 0 1px 3px rgba(28,25,23,0.08);
+  --shadow-md: 0 4px 16px rgba(28,25,23,0.10);
+  --shadow-lg: 0 10px 28px rgba(28,25,23,0.10); /* card hover-lift — canonical for ALL cards (PostCard / featured / keep-reading) */
+
+  --focus-ring:        0 0 0 3px var(--color-accent-ring);
+  --focus-ring-offset: 2px;
+
+  /* Dark-mode image dimming tokens — used by .img-dim utility */
+  --img-dim-brightness: 0.72;
+  --img-dim-saturate:   0.9;
+  --img-dim-contrast:   1.02;
+  --img-lift-brightness: 0.92;
+  --img-lift-saturate:  0.97;
+
+  /* Card hover ring — spread + dark-mode tint */
+  --card-ring-spread: 2px;
+  --card-ring-dark:   rgba(192,106,230,.55);
+
+  /* Card hover transition — slightly slower for a more deliberate feel.
+     OPEN: this is the same 320ms as --dur-slow. Keep it as a separate
+     named role, or fold card hover onto --dur-slow? Code follows either. */
+  --dur-card-hover: 320ms;
+
+  /* Motion scale — single easing; three durations. Snap stray literals:
+     150ms→fast, 180ms→dur, 250ms→slow. */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 120ms;
+  --dur:      200ms;
+  --dur-slow: 320ms;
+
+  /* =====================================================
+     Z-INDEX · layering scale (replaces magic 18/20/100/200/9999
+     and the duplicated 2147483000 max-int for lightboxes)
+     ===================================================== */
+  --z-base:      0;
+  --z-raised:    10;  /* hover-lifted cards, popovers within flow */
+  --z-sticky:    100; /* sticky table columns / sub-headers */
+  --z-header:    200; /* site header / nav */
+  --z-overlay:   1000;/* scrims, drawers, modals */
+  --z-skip-link: 1100;/* skip-to-content, always above overlay */
+  --z-lightbox:  2147483000; /* image / diagram lightbox stage — top of everything */
+}
+
+/* =====================================================
+   SEMANTIC · DARK
+   ===================================================== */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg:            var(--c-void);
+  --color-bg-elevated:   var(--c-surface-d);
+  --color-surface:       var(--c-surface-d);
+  --color-surface-sunken:var(--c-void);
+  --color-surface-sunken-deep: var(--c-void-raised);
+  --color-line:          var(--c-line-d);
+  --color-line-strong:   var(--c-line-d2);
+
+  --color-heading:       #FFFFFF;
+  --color-text:          var(--c-text-d);
+  --color-text-muted:    var(--c-muted-d);
+  --color-text-faint:    var(--c-faint-d);
+
+  --color-accent:        var(--c-violet-400); /* fills on dark */
+  --color-accent-text:   var(--c-violet-400); /* AA 5.96:1 on --c-void. Was
+                                                annotated 6.4:1, which is the
+                                                ratio against #000000 — this
+                                                pairing is on #0D0D0F. */
+  --color-accent-soft:   color-mix(in srgb, var(--c-violet-400) 14%, transparent);
+  --color-accent-ring:   var(--c-violet-700);
+  --color-on-accent:     var(--c-void);
+
+  --color-highlight:     var(--c-yellow-flag);
+  --color-on-highlight:  var(--c-ink);
+  --color-highlight-text:var(--c-yellow-flag); /* yellow reads fine on dark */
+  /* DARK TAKES A RULE, NOT A FILL, and the numbers are the argument. A 40%
+     flag-yellow wash over --c-void composites to #6E5E09 — an olive, not a
+     yellow — which sat only 3.02:1 against the page and dropped ink-on-mark
+     to 5.06:1 against light's 13.91:1. A rule leaves the text on the page
+     ground at 15.30:1 and puts the yellow at 13.94:1 against it. More
+     visible mark, unharmed text, and the yellow still reads as yellow. */
+  --color-mark:          transparent;
+  --mark-line:           underline;
+
+  --color-success: var(--c-success-d);
+  --color-info:    var(--c-info-d);
+  --color-info-text: var(--c-info-d);
+  --color-warning: var(--c-yellow-flag);
+  --color-danger:  var(--c-danger-d);
+  --color-danger-text: var(--c-danger-d);
+
+  --color-code-bg:     var(--c-void);
+  --color-code-chrome: var(--c-surface-d);
+  --color-inline-code-bg: color-mix(in srgb, var(--c-violet-400) 18%, transparent);
+  --color-inline-code-fg: var(--c-violet-300);
+
+  --color-scrim:        rgba(0,0,0,0.72);
+  --gradient-wordmark: linear-gradient(120deg, var(--c-violet-400), var(--c-violet-600) 30%, var(--c-yellow-flag));
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.5);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.55);
+
+  /* CALLOUT · DARK */
+  --callout-note-bg:    color-mix(in srgb, var(--c-violet-400) 14%, transparent);
+  --callout-note-line:  color-mix(in srgb, var(--c-violet-400) 30%, transparent);
+  --callout-note-label: var(--c-violet-300);
+  --callout-tip-bg:     rgba(255,216,0,.08);
+  --callout-tip-line:   rgba(255,216,0,.24);
+  --callout-tip-label:  var(--c-amber-text-d);
+  --callout-info-bg:    color-mix(in srgb, var(--c-info-d) 7%, transparent);
+  --callout-info-line:  color-mix(in srgb, var(--c-info-d) 28%, transparent);
+  --callout-info-label: var(--c-info-text-d);
+  --callout-warn-bg:    rgba(248,113,113,.09);
+  --callout-warn-line:  rgba(248,113,113,.30);
+  --callout-warn-label: var(--c-danger-soft-d);
+
+  /* STATUS · DARK */
+  --status-success-fill: rgba(74,222,128,.12);  --status-success-line: rgba(74,222,128,.28);  --status-success-text: var(--c-success-d);
+  --status-active-fill:  rgba(164,53,206,.16);   --status-active-line:  rgba(164,53,206,.32);   --status-active-text:  var(--c-violet-300);
+  --status-pending-fill: rgba(255,216,0,.10);    --status-pending-line: rgba(255,216,0,.28);    --status-pending-text: var(--c-amber-text-d);
+  --status-neutral-fill: rgba(255,255,255,.05);  --status-neutral-line: rgba(255,255,255,.12);  --status-neutral-text: var(--c-muted-d);
+  --status-danger-fill:  rgba(248,113,113,.10);  --status-danger-line:  rgba(248,113,113,.30);  --status-danger-text:  var(--c-danger-soft-d);
+  --status-muted-fill:   rgba(255,255,255,.03);  --status-muted-line:   rgba(255,255,255,.10);  --status-muted-text:   var(--c-faint-d);
+  --status-info-fill:    rgba(34,211,238,.10);   --status-info-line:    rgba(34,211,238,.28);   --status-info-text:    var(--c-info-text-d);
+}
+
+/* Follow the OS unless the user forced a theme */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-bg:            var(--c-void);
+    --color-bg-elevated:   var(--c-surface-d);
+    --color-surface:       var(--c-surface-d);
+    --color-surface-sunken:var(--c-void);
+    --color-surface-sunken-deep: var(--c-void-raised);
+    --color-line:          var(--c-line-d);
+    --color-line-strong:   var(--c-line-d2);
+    --color-heading:       #FFFFFF;
+    --color-text:          var(--c-text-d);
+    --color-text-muted:    var(--c-muted-d);
+    --color-text-faint:    var(--c-faint-d);
+    --color-accent:        var(--c-violet-400);
+    --color-accent-text:   var(--c-violet-400);
+    --color-accent-soft:   color-mix(in srgb, var(--c-violet-400) 14%, transparent);
+    --color-accent-ring:   var(--c-violet-700);
+    --color-on-accent:     var(--c-void);
+    --color-highlight-text:var(--c-yellow-flag);
+    --color-mark:          transparent;
+    --mark-line:           underline;
+    --color-success: var(--c-success-d);
+    --color-info:    var(--c-info-d);
+    --color-info-text: var(--c-info-d);
+    --color-danger:  var(--c-danger-d);
+    --color-danger-text: var(--c-danger-d);
+    --color-code-bg:     var(--c-void);
+    --color-code-chrome: var(--c-surface-d);
+    --color-inline-code-bg: color-mix(in srgb, var(--c-violet-400) 18%, transparent);
+    --color-inline-code-fg: var(--c-violet-300);
+    --color-scrim:        rgba(0,0,0,0.72);
+    --gradient-wordmark: linear-gradient(120deg, var(--c-violet-400), var(--c-violet-600) 30%, var(--c-yellow-flag));
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.5);
+    --shadow-lg: 0 10px 30px rgba(0,0,0,0.55);
+    --callout-note-bg:    color-mix(in srgb, var(--c-violet-400) 14%, transparent);
+    --callout-note-line:  color-mix(in srgb, var(--c-violet-400) 30%, transparent);
+    --callout-note-label: var(--c-violet-300);
+    --callout-tip-bg:     rgba(255,216,0,.08);
+    --callout-tip-line:   rgba(255,216,0,.24);
+    --callout-tip-label:  var(--c-amber-text-d);
+    --callout-info-bg:    color-mix(in srgb, var(--c-info-d) 7%, transparent);
+    --callout-info-line:  color-mix(in srgb, var(--c-info-d) 28%, transparent);
+    --callout-info-label: var(--c-info-text-d);
+    --callout-warn-bg:    rgba(248,113,113,.09);
+    --callout-warn-line:  rgba(248,113,113,.30);
+    --callout-warn-label: var(--c-danger-soft-d);
+    --status-success-fill: rgba(74,222,128,.12);  --status-success-line: rgba(74,222,128,.28);  --status-success-text: var(--c-success-d);
+    --status-active-fill:  rgba(164,53,206,.16);   --status-active-line:  rgba(164,53,206,.32);   --status-active-text:  var(--c-violet-300);
+    --status-pending-fill: rgba(255,216,0,.10);    --status-pending-line: rgba(255,216,0,.28);    --status-pending-text: var(--c-amber-text-d);
+    --status-neutral-fill: rgba(255,255,255,.05);  --status-neutral-line: rgba(255,255,255,.12);  --status-neutral-text: var(--c-muted-d);
+    --status-danger-fill:  rgba(248,113,113,.10);  --status-danger-line:  rgba(248,113,113,.30);  --status-danger-text:  var(--c-danger-soft-d);
+    --status-muted-fill:   rgba(255,255,255,.03);  --status-muted-line:   rgba(255,255,255,.10);  --status-muted-text:   var(--c-faint-d);
+  --status-info-fill:    rgba(34,211,238,.10);   --status-info-line:    rgba(34,211,238,.28);   --status-info-text:    var(--c-info-text-d);
+  }
+}
+
+@media print {
+  :root, :root[data-theme="dark"], :root:not([data-theme="light"]) {
+    color-scheme: light;
+    --callout-info-bg: color-mix(in srgb, var(--c-info) 5%, transparent);
+    --callout-info-label: var(--c-info-text);
+    --callout-info-line: color-mix(in srgb, var(--c-info) 33%, transparent);
+    --callout-note-bg: var(--color-accent-soft);
+    --callout-note-label: var(--c-violet-700);
+    --callout-note-line: color-mix(in srgb, var(--c-violet-600) 33%, transparent);
+    --callout-tip-bg: #FFF7CC66;
+    --callout-tip-label: var(--c-amber-text);
+    --callout-tip-line: #FFD80059;
+    --callout-warn-bg: color-mix(in srgb, var(--c-danger) 5%, transparent);
+    --callout-warn-label: var(--c-danger-text);
+    --callout-warn-line: color-mix(in srgb, var(--c-danger) 20%, transparent);
+    --color-accent-ring: var(--c-violet-300);
+    --color-accent-soft: color-mix(in srgb, var(--c-violet-600) 8%, transparent);
+    --color-accent-text: var(--c-violet-700);
+    --color-accent: var(--c-violet-600);
+    --color-bg-elevated: var(--c-paper);
+    --color-bg: var(--c-surface);
+    --color-code-bg: var(--c-paper);
+    --color-code-chrome: var(--c-mist);
+    --color-danger-text: var(--c-danger-text);
+    --color-danger: var(--c-danger);
+    --color-heading: var(--c-ink);
+    --color-highlight-text: var(--c-yellow-text);
+    --color-highlight: var(--c-yellow-flag);
+    --color-info-text: var(--c-info-text);
+    --color-info: var(--c-info);
+    --color-inline-code-bg: color-mix(in srgb, var(--c-violet-600) 8%, transparent);
+    --color-inline-code-fg: var(--c-violet-700);
+    --color-line-strong: var(--c-stone-400);
+    --color-line: var(--c-line);
+    --color-mark: color-mix(in srgb, var(--c-yellow-flag) 58%, transparent);
+    --color-on-accent: var(--c-paper);
+    --color-on-highlight: var(--c-ink);
+    --color-scrim: rgba(0,0,0,0.62);
+    --color-success: var(--c-success);
+    --color-surface-sunken: var(--c-mist);
+    --color-surface: var(--c-paper);
+    --color-text-faint: var(--c-muted);
+    --color-text-muted: var(--c-stone-600);
+    --color-text: var(--c-slate);
+    --color-warning: var(--c-yellow-flag);
+    --gradient-wordmark: linear-gradient(120deg, var(--c-violet-600), var(--c-violet-700) 25%, var(--c-yellow-deep));
+    --mark-line: none;
+    --shadow-lg: 0 10px 28px rgba(28,25,23,0.10);
+    --shadow-md: 0 4px 16px rgba(28,25,23,0.10);
+    --shadow-sm: 0 1px 3px rgba(28,25,23,0.08);
+    --status-active-fill: var(--c-violet-fill);
+    --status-active-line: var(--c-violet-line);
+    --status-active-text: var(--c-violet-700);
+    --status-danger-fill: var(--c-red-fill);
+    --status-danger-line: var(--c-red-line);
+    --status-danger-text: var(--c-danger-text);
+    --status-info-fill: var(--c-cyan-fill);
+    --status-info-line: var(--c-cyan-line);
+    --status-info-text: var(--c-info-text);
+    --status-muted-fill: var(--c-surface);
+    --status-muted-line: var(--c-line);
+    --status-muted-text: var(--c-stone-400);
+    --status-neutral-fill: var(--c-mist);
+    --status-neutral-line: var(--c-line);
+    --status-neutral-text: var(--c-muted);
+    --status-pending-fill: var(--c-amber-fill);
+    --status-pending-line: var(--c-amber-line);
+    --status-pending-text: var(--c-amber-text);
+    --status-success-fill: var(--c-green-fill);
+    --status-success-line: var(--c-green-line);
+    --status-success-text: var(--c-success-text);
+  }
+}
+
+/* ============================================================================
+   okf-wiki default theme contract adapter
+   Maps okf-wiki default wiki.css hooks to abn.is brand tokens
+   ========================================================================== */
+:root {
+  --font-display: "IBM Plex Sans", var(--font-ui);
+  --color-current-tint: var(--c-violet-100);
+  --color-surface-sunken-deep: var(--c-mist);
+  --color-line-control: var(--color-line-strong);
+  --color-code-fg: var(--c-slate);
+  --color-code-line: var(--color-line);
+  --color-mark-ink: var(--c-ink);
+  --focus-ring: var(--color-accent);
+  --focus-ring-width: 2px;
+
+  --status-success-tint: var(--status-success-fill);
+  --status-info-tint: var(--status-info-fill);
+  --status-warn-tint: var(--status-pending-fill);
+  --status-warn-line: var(--status-pending-line);
+  --status-warn-text: var(--status-pending-text);
+  --status-danger-tint: var(--status-danger-fill);
+  --status-neutral-tint: var(--status-neutral-fill);
+
+  --lb-bg: var(--c-void);
+  --lb-bar: var(--c-surface-d);
+  --lb-line: var(--c-line-d);
+  --lb-line-strong: var(--c-line-d2);
+  --lb-text: var(--c-text-d);
+  --lb-muted: var(--c-muted-d);
+  --lb-faint: var(--c-faint-d);
+  --lb-accent: var(--color-accent);
+  --lb-accent-line: var(--color-accent-ring);
+  --lb-hint: var(--c-muted-d);
+
+  --diagram-font: "IBM Plex Sans", var(--font-ui);
+  --diagram-ground: var(--color-bg);
+  --diagram-surface: var(--color-surface);
+  --diagram-surface-alt: var(--color-surface-sunken);
+  --diagram-ink: var(--color-text);
+  --diagram-muted: var(--color-text-muted);
+  --diagram-line: var(--color-line);
+  --diagram-accent: var(--c-violet-600);
+  --diagram-accent-soft: var(--c-violet-100);
+  --diagram-accent-ink: var(--c-violet-700);
+  --diagram-yellow: var(--c-yellow-flag);
+  --diagram-amber: var(--c-amber-text);
+}
+
+:root[data-theme="dark"] {
+  --color-current-tint: var(--color-accent-soft);
+  --color-code-fg: var(--c-text-d);
+  --color-code-line: var(--color-line);
+  --color-mark-ink: var(--c-yellow-flag);
+  --focus-ring: var(--color-accent);
+
+  --status-success-tint: var(--status-success-fill);
+  --status-info-tint: var(--status-info-fill);
+  --status-warn-tint: var(--status-pending-fill);
+  --status-warn-line: var(--status-pending-line);
+  --status-warn-text: var(--status-pending-text);
+  --status-danger-tint: var(--status-danger-fill);
+  --status-neutral-tint: var(--status-neutral-fill);
+
+  --diagram-ground: var(--color-bg);
+  --diagram-surface: var(--color-surface);
+  --diagram-surface-alt: var(--color-surface-sunken);
+  --diagram-ink: var(--color-text);
+  --diagram-muted: var(--color-text-muted);
+  --diagram-line: var(--color-line);
+  --diagram-accent: var(--c-violet-400);
+  --diagram-accent-soft: #261A2D;
+  --diagram-accent-ink: var(--c-violet-300);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-current-tint: var(--color-accent-soft);
+    --color-code-fg: var(--c-text-d);
+    --color-code-line: var(--color-line);
+    --color-mark-ink: var(--c-yellow-flag);
+    --focus-ring: var(--color-accent);
+
+    --status-success-tint: var(--status-success-fill);
+    --status-info-tint: var(--status-info-fill);
+    --status-warn-tint: var(--status-pending-fill);
+    --status-warn-line: var(--status-pending-line);
+    --status-warn-text: var(--status-pending-text);
+    --status-danger-tint: var(--status-danger-fill);
+    --status-neutral-tint: var(--status-neutral-fill);
+
+    --diagram-ground: var(--color-bg);
+    --diagram-surface: var(--color-surface);
+    --diagram-surface-alt: var(--color-surface-sunken);
+    --diagram-ink: var(--color-text);
+    --diagram-muted: var(--color-text-muted);
+    --diagram-line: var(--color-line);
+    --diagram-accent: var(--c-violet-400);
+    --diagram-accent-soft: #261A2D;
+    --diagram-accent-ink: var(--c-violet-300);
+  }
+}
