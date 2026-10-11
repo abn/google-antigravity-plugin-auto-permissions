@@ -1,4 +1,5 @@
 {
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
   "name": "auto-permissions",
   "version": "0.11.0",
   "description": "Autonomous security authorization moderator and auto-permission classifier for Google Antigravity tools",

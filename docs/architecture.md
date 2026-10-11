@@ -233,7 +233,7 @@ Every classification event produces an atomic single-line JSON record:
 
 ## 8. Fast-Path Static Policy Engine & Denial Remediation Workflow
 
-### 8.1 Hierarchical Policy Scopes
+### 8.1 Hierarchical Policy Scopes & Antigravity v2.21+ Permissions Engine Alignment
 To achieve sub-millisecond execution for known commands and eliminate LLM API costs for trusted operations, the plugin implements a hierarchical policy engine (`hooks/policy_engine.py`) evaluated prior to the classifier:
 
 1. **Session Scope:** `<session_dir>/session_overrides.json` (active conversation overrides).
@@ -241,6 +241,11 @@ To achieve sub-millisecond execution for known commands and eliminate LLM API co
 3. **Global Scope:** `~/.gemini/config/auto-permissions.json` (user-wide system rules).
 
 Rules are strictly evaluated with Antigravity's **`Deny > Ask > Allow`** precedence model.
+
+#### Contract & Engine Alignment (Antigravity v2.21+)
+- **Canonical Permission Overrides:** When an action is permitted (`allow`, `ask`, or `force_ask`), the `PreToolUse` hook output includes a `permissionOverrides` array targeting canonical Antigravity resources (e.g. `command(...)`, `unsandboxed(...)`, `write_file(...)`, `read_file(...)`, `read_url(...)`, `mcp(...)`).
+- **Sandbox Privilege Isolation:** Commands requesting host privilege elevation (`BypassSandbox: true`) are segregated from sandboxed `command(...)` allow rules. To auto-allow host elevation without interactive approval, an explicit `unsandboxed(...)` rule is required. Static deny and ask rules on `command(...)` continue to apply globally.
+- **Pattern Matching Semantics:** Literal token prefix matching is standard (`command(git status*)`). Subshell expansion metacharacters (`$(...)`, backticks, `$((...))`, `<(...)`, `>(...)`, `{...,...}`) automatically disable prefix matching and enforce exact matching. Arbitrary regular expressions require an explicit `regex:` prefix (`command(regex:...)`). Canonical slash notation (`mcp(server/tool)`) is emitted and preferred.
 
 ### 8.2 The `auto-permissions-fix` Policy Remediation Tooling
 The `auto-permissions-fix` CLI tool (`skills/auto-permissions-fix/scripts/fix_permissions.py`) allows developers to parse recent audit denials and generate static permission grants:

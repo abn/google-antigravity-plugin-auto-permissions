@@ -7,7 +7,6 @@ Supports configuring static rules at Session, Project, or Global scopes.
 import argparse
 import json
 import os
-import re
 import sys
 from typing import Any
 
@@ -21,76 +20,13 @@ from hooks.policy_engine import (  # noqa: E402
     GLOBAL_CONFIG_PATH,
     PROJECT_CONFIG_REL_PATH,
     add_rule_to_scope,
+    derive_canonical_permission_resources,
 )
 
 
 def suggest_rules_for_tool_call(tool_name: str, tool_args: dict[str, Any]) -> list[str]:
     """Derives candidate Antigravity permission rule strings from a tool call."""
-    suggestions = []
-
-    if tool_name == "run_command":
-        cmd = str(tool_args.get("CommandLine", "")).strip()
-        if cmd:
-            tokens = cmd.split()
-            # 1. Exact command
-            suggestions.append(f"command({cmd})")
-            # 2. Binary + Subcommand prefix (e.g. `uv lock`, `git status`)
-            if len(tokens) >= 2 and not tokens[0].startswith("-"):
-                suggestions.append(f"command({tokens[0]} {tokens[1]})")
-            # 3. Binary only prefix (e.g. `pytest`, `ruff`)
-            if len(tokens) >= 1:
-                suggestions.append(f"command({tokens[0]})")
-            # 4. Unsandboxed variant if requested
-            if tool_args.get("BypassSandbox") is True:
-                suggestions.append(f"unsandboxed({cmd})")
-                if len(tokens) >= 2:
-                    suggestions.append(f"unsandboxed({tokens[0]} {tokens[1]})")
-
-    elif tool_name in ("write_to_file", "replace_file_content", "multi_replace_file_content"):
-        path = str(tool_args.get("TargetFile", "")).strip()
-        if path:
-            suggestions.append(f"write_file({path})")
-            parent = os.path.dirname(path)
-            if parent:
-                suggestions.append(f"write_file({parent}/.*)")
-
-    elif tool_name == "read_url_content":
-        url = str(tool_args.get("Url", "")).strip()
-        if url:
-            host_match = re.search(r"https?://([^/:]+)", url)
-            host = host_match.group(1) if host_match else url.split("/")[0]
-            suggestions.append(f"read_url({host})")
-
-    elif tool_name == "manage_task":
-        action = str(tool_args.get("Action", "")).strip()
-        if action:
-            suggestions.append(f"manage_task({action})")
-
-    elif tool_name == "call_mcp_tool":
-        server = str(tool_args.get("ServerName", "")).strip()
-        sub_tool = str(tool_args.get("ToolName", "")).strip()
-        if server and sub_tool:
-            suggestions.append(f"mcp({server}:{sub_tool})")
-            suggestions.append(f"mcp({server}:*)")
-        elif server:
-            suggestions.append(f"mcp({server}:*)")
-
-    elif tool_name.startswith("mcp_"):
-        raw = tool_name[4:]
-        if "_" in raw:
-            server, sub_tool = raw.split("_", 1)
-            suggestions.append(f"mcp({server}:{sub_tool})")
-            suggestions.append(f"mcp({server}:*)")
-        else:
-            suggestions.append(f"mcp({raw}:*)")
-
-    elif tool_name in ("read_resource", "list_resources"):
-        server = str(tool_args.get("ServerName", "")).strip()
-        if server:
-            suggestions.append(f"mcp({server}:{tool_name})")
-            suggestions.append(f"mcp({server}:*)")
-
-    return list(dict.fromkeys(suggestions))  # Deduplicate preserving order
+    return derive_canonical_permission_resources(tool_name, tool_args)
 
 
 def load_denied_audit_records(audit_path: str) -> list[dict[str, Any]]:

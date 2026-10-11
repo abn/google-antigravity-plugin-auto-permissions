@@ -65,5 +65,8 @@ Antigravity's `run_command` supports an optional `BypassSandbox: boolean` flag t
 
 ### Invariant: Zero Unprompted Privilege Elevation
 When an agent submits a tool call with `BypassSandbox: true`:
-1. **Explicit Intent Grounding:** The classifier checks `<active_user_prompt>` for explicit human instructions requiring network or external writes (e.g. "push to origin", "create pull request").
-2. **Denial on Unsolicited Elevation:** If the user merely requested local operations (e.g. "run the tests", "build the binary"), any attempt by the agent to elevate to `BypassSandbox: true` is treated as a severe security escalation and permanently blocked (`hard_deny`).
+1. **Static ACL Policy Isolation:** Static `command(...)` allow rules strictly apply to sandboxed execution. If an agent attempts to run a command with `BypassSandbox: true`, `command(...)` allow rules will **never** auto-allow host elevation. To auto-allow an unsandboxed command, the user or project must explicitly grant an `unsandboxed(...)` rule (e.g. `unsandboxed(git push*)`).
+2. **Global Deny & Ask Preservation:** Static `deny` and `ask` rules defined on `command(...)` continue to protect both sandboxed and unsandboxed calls uniformly.
+3. **Explicit Intent Grounding:** For calls proceeding to the semantic classifier, `<proposed_tool_call>` explicitly includes `Execution Environment: Host Elevation (BypassSandbox: true)`. The classifier checks `<active_user_prompt>` for explicit human instructions requiring network or external writes (e.g. "push to origin", "create pull request").
+4. **Denial on Unsolicited Elevation:** If the user merely requested local operations (e.g. "run the tests", "build the binary"), any attempt by the agent to elevate to `BypassSandbox: true` is treated as a severe security escalation and permanently blocked (`hard_deny`).
+5. **Canonical Permission Overrides:** When an action is approved (`allow`, `ask`, or `force_ask`), `auto-permissions` emits a canonical `permissionOverrides` array (e.g. `["unsandboxed(git push origin main)"]` or `["command(pytest tests/)"]`) ensuring full contract compliance with Antigravity v2.21+ permissions engine.

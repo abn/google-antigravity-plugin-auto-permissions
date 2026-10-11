@@ -35,7 +35,7 @@ class TestFixPermissions(unittest.TestCase):
             "write_to_file", {"TargetFile": "src/components/button.tsx"}
         )
         self.assertIn("write_file(src/components/button.tsx)", rules)
-        self.assertIn("write_file(src/components/.*)", rules)
+        self.assertIn("write_file(src/components/)", rules)
 
         # URL read tool
         rules = suggest_rules_for_tool_call(
@@ -47,8 +47,8 @@ class TestFixPermissions(unittest.TestCase):
         rules = suggest_rules_for_tool_call(
             "call_mcp_tool", {"ServerName": "nowledge-mem", "ToolName": "memory_search"}
         )
-        self.assertIn("mcp(nowledge-mem:memory_search)", rules)
-        self.assertIn("mcp(nowledge-mem:*)", rules)
+        self.assertIn("mcp(nowledge-mem/memory_search)", rules)
+        self.assertIn("mcp(nowledge-mem/*)", rules)
 
     def test_load_denied_audit_records(self):
         with tempfile.NamedTemporaryFile("w+", suffix=".jsonl", delete=False) as f:

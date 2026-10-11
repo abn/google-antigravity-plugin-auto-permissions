@@ -154,6 +154,9 @@ def match_command(pattern: str, command_line: str) -> bool:
     """
     Matches a command string against a pattern.
     Supports literal token prefix matching, regex: pattern prefix, and global wildcards (*).
+    If command_line contains unquoted shell substitution or expansion metacharacters
+    ($(..), backticks, $((..))), prefix matching is disabled and exact full-line matching
+    is required unless regex: is used.
     """
     if pattern == "*":
         return True
@@ -171,6 +174,13 @@ def match_command(pattern: str, command_line: str) -> bool:
         except re.error:
             return False
 
+    # Check for dangerous metacharacters (subshells, expansion, redirection, pipelines)
+    # that hide execution or alter I/O destinations behind an otherwise benign prefix
+    has_subshell_metachars = bool(
+        re.search(r"\$\(|\`|\$\(\(|\<\(|\>\(|\{[^{}]*,[^{}]*\}|[><|]", command_line)
+    )
+    if has_subshell_metachars:
+        return pattern == command_line
     # Backward compatibility: if pattern contains regex special chars, evaluate as anchored regex
     try:
         if re.search(r"[\\^$*+?.()|[\]{}]", pattern):
@@ -195,12 +205,21 @@ def match_command(pattern: str, command_line: str) -> bool:
 def match_path(pattern: str, target_path: str) -> bool:
     """
     Matches a file path against a pattern.
-    Supports exact path, directory prefix, wildcards, and regex.
+    Supports exact path, directory prefix, wildcards, and explicit regex: prefix.
     """
     if pattern == "*":
         return True
     pattern = os.path.expanduser(pattern.strip())
     target_path = os.path.expanduser(target_path.strip())
+
+    if pattern.startswith("regex:"):
+        regex_pat = pattern[6:].strip()
+        if not regex_pat:
+            return False
+        try:
+            return bool(re.search(rf"^(?:{regex_pat})", target_path))
+        except re.error:
+            return False
 
     if pattern == target_path:
         return True
@@ -278,7 +297,107 @@ def match_mcp(pattern: str, server_name: str, tool_name: str) -> bool:
     return False
 
 
-def match_tool_against_rule(rule_str: str, tool_name: str, tool_args: dict[str, Any]) -> bool:
+def derive_canonical_permission_resources(tool_name: str, tool_args: dict[str, Any]) -> list[str]:
+    """
+    Derives canonical Antigravity permission resource strings from a tool call.
+    Uses official Antigravity action(target) syntax (e.g. command(...), unsandboxed(...),
+    read_file(...), write_file(...), read_url(...), mcp(...)).
+    """
+    resources: list[str] = []
+
+    if tool_name == "run_command":
+        cmd = str(tool_args.get("CommandLine", "")).strip()
+        if cmd:
+            is_bypass = tool_args.get("BypassSandbox") is True
+            prefix = "unsandboxed" if is_bypass else "command"
+            tokens = cmd.split()
+            # 1. Exact command
+            resources.append(f"{prefix}({cmd})")
+            # Only derive prefix grants if command has no shell expansion or redirection
+            has_metachars = bool(
+                re.search(r"\$\(|\`|\$\(\(|\<\(|\>\(|\{[^{}]*,[^{}]*\}|[><|]", cmd)
+            )
+            if not has_metachars:
+                # 2. Binary + Subcommand prefix (e.g. `uv lock`, `git status`)
+                if len(tokens) >= 2 and not tokens[0].startswith("-"):
+                    resources.append(f"{prefix}({tokens[0]} {tokens[1]})")
+                # 3. Binary only prefix (e.g. `pytest`, `ruff`)
+                if len(tokens) >= 1:
+                    resources.append(f"{prefix}({tokens[0]})")
+
+    elif tool_name in ("write_to_file", "replace_file_content", "multi_replace_file_content"):
+        path = str(
+            tool_args.get("TargetFile")
+            or tool_args.get("target_file")
+            or tool_args.get("AbsolutePath")
+            or tool_args.get("path")
+            or ""
+        ).strip()
+        if path:
+            resources.append(f"write_file({path})")
+            parent = os.path.dirname(path)
+            if parent:
+                resources.append(f"write_file({parent}/)")
+
+    elif tool_name in ("view_file", "list_dir", "grep_search"):
+        path = str(
+            tool_args.get("AbsolutePath")
+            or tool_args.get("path")
+            or tool_args.get("TargetFile")
+            or tool_args.get("DirectoryPath")
+            or tool_args.get("SearchPath")
+            or ""
+        ).strip()
+        if path:
+            resources.append(f"read_file({path})")
+            parent = os.path.dirname(path)
+            if parent:
+                resources.append(f"read_file({parent}/)")
+
+    elif tool_name == "read_url_content":
+        url = str(tool_args.get("Url") or tool_args.get("url") or "").strip()
+        if url:
+            host_match = re.search(r"https?://([^/:]+)", url)
+            host = host_match.group(1) if host_match else url.split("/")[0]
+            resources.append(f"read_url({host})")
+
+    elif tool_name == "manage_task":
+        action = str(tool_args.get("Action") or tool_args.get("action") or "").strip()
+        if action:
+            resources.append(f"manage_task({action})")
+
+    elif tool_name == "call_mcp_tool":
+        server = str(tool_args.get("ServerName") or tool_args.get("server_name") or "").strip()
+        sub_tool = str(tool_args.get("ToolName") or tool_args.get("tool_name") or "").strip()
+        if server and sub_tool:
+            resources.append(f"mcp({server}/{sub_tool})")
+            resources.append(f"mcp({server}/*)")
+        elif server:
+            resources.append(f"mcp({server}/*)")
+
+    elif tool_name.startswith("mcp_"):
+        raw = tool_name[4:]
+        if "_" in raw:
+            server, sub_tool = raw.split("_", 1)
+            resources.append(f"mcp({server}/{sub_tool})")
+            resources.append(f"mcp({server}/*)")
+        else:
+            resources.append(f"mcp({raw}/*)")
+
+    elif tool_name in ("read_resource", "list_resources"):
+        server = str(tool_args.get("ServerName") or tool_args.get("server_name") or "").strip()
+        if server:
+            resources.append(f"mcp({server}/*)")
+
+    return list(dict.fromkeys(resources))
+
+
+def match_tool_against_rule(
+    rule_str: str,
+    tool_name: str,
+    tool_args: dict[str, Any],
+    mode: str = "allow",
+) -> bool:
     """Evaluates if a specific tool call matches a permission resource rule."""
     parsed = parse_resource_rule(rule_str)
     if not parsed:
@@ -287,10 +406,17 @@ def match_tool_against_rule(rule_str: str, tool_name: str, tool_args: dict[str, 
 
     if tool_name == "run_command":
         cmd = str(tool_args.get("CommandLine", ""))
-        if action == "command":
-            return match_command(target_pattern, cmd)
-        if action == "unsandboxed" and tool_args.get("BypassSandbox") is True:
-            return match_command(target_pattern, cmd)
+        is_bypass = tool_args.get("BypassSandbox") is True
+        if is_bypass:
+            if action == "unsandboxed":
+                return match_command(target_pattern, cmd)
+            if action == "command" and mode in ("deny", "ask"):
+                return match_command(target_pattern, cmd)
+            return False
+        else:
+            if action == "command":
+                return match_command(target_pattern, cmd)
+            return False
 
     elif tool_name in ("write_to_file", "replace_file_content", "multi_replace_file_content"):
         path = str(
@@ -572,6 +698,7 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
         "allow": [],
         "ask": [],
         "deny": [],
+        "deny_unless_prior_grant": [],
         "custom_guidelines": [],
         "allowed_skill_paths": [],
         "govern_surfaces": [],
@@ -607,6 +734,7 @@ def load_policy_file(file_path: str) -> dict[str, Any]:
                     "allow",
                     "ask",
                     "deny",
+                    "deny_unless_prior_grant",
                     "custom_guidelines",
                     "allowed_skill_paths",
                     "govern_surfaces",
@@ -2608,25 +2736,37 @@ def evaluate_static_policies(
 
         # Check Deny first
         for rule in policy.get("deny", []):
-            if match_tool_against_rule(rule, tool_name, tool_args):
+            if match_tool_against_rule(rule, tool_name, tool_args, mode="deny"):
                 return (
                     "deny",
                     f"Blocked by static {scope_name} policy rule '{rule}'",
                     scope_name,
                 )
 
-        # Check Ask second
+        # Check Deny Unless Prior Grant second
+        for rule in policy.get("deny_unless_prior_grant", []):
+            if match_tool_against_rule(rule, tool_name, tool_args, mode="deny"):
+                return (
+                    "deny_unless_prior_grant",
+                    (
+                        f"Blocked by static {scope_name} policy rule '{rule}' "
+                        "unless previously granted"
+                    ),
+                    scope_name,
+                )
+
+        # Check Ask third
         for rule in policy.get("ask", []):
-            if match_tool_against_rule(rule, tool_name, tool_args):
+            if match_tool_against_rule(rule, tool_name, tool_args, mode="ask"):
                 return (
                     "ask",
                     f"Escalated by static {scope_name} policy rule '{rule}'",
                     scope_name,
                 )
 
-        # Check Allow third
+        # Check Allow fourth
         for rule in policy.get("allow", []):
-            if match_tool_against_rule(rule, tool_name, tool_args):
+            if match_tool_against_rule(rule, tool_name, tool_args, mode="allow"):
                 return (
                     "allow",
                     f"Auto-approved by static {scope_name} policy rule '{rule}'",
@@ -2638,7 +2778,7 @@ def evaluate_static_policies(
 
     # 2.1 Bundled Deny
     for rule in bundled.get("deny", []):
-        if match_tool_against_rule(rule, tool_name, tool_args):
+        if match_tool_against_rule(rule, tool_name, tool_args, mode="deny"):
             b_src = bundled.get("provenance", {}).get(rule, "bundle")
             return (
                 "deny",
@@ -2646,9 +2786,19 @@ def evaluate_static_policies(
                 f"bundle:{b_src}",
             )
 
-    # 2.2 Bundled Ask
+    # 2.2 Bundled Deny Unless Prior Grant
+    for rule in bundled.get("deny_unless_prior_grant", []):
+        if match_tool_against_rule(rule, tool_name, tool_args, mode="deny"):
+            b_src = bundled.get("provenance", {}).get(rule, "bundle")
+            return (
+                "deny_unless_prior_grant",
+                (f"Blocked by bundled policy ({b_src}) rule '{rule}' unless previously granted"),
+                f"bundle:{b_src}",
+            )
+
+    # 2.3 Bundled Ask
     for rule in bundled.get("ask", []):
-        if match_tool_against_rule(rule, tool_name, tool_args):
+        if match_tool_against_rule(rule, tool_name, tool_args, mode="ask"):
             b_src = bundled.get("provenance", {}).get(rule, "bundle")
             return (
                 "ask",
@@ -2658,7 +2808,7 @@ def evaluate_static_policies(
 
     # 2.3 Bundled Allow
     for rule in bundled.get("allow", []):
-        if match_tool_against_rule(rule, tool_name, tool_args):
+        if match_tool_against_rule(rule, tool_name, tool_args, mode="allow"):
             b_src = bundled.get("provenance", {}).get(rule, "bundle")
             return (
                 "allow",

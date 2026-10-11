@@ -78,4 +78,23 @@ This log tracks documentation additions, structural refactors, benchmark refresh
 - **Automated Regression Tests (`tests/test_classifier.py`):**
   - Added unit test coverage for explicit user path prompt directives and system instruction alignment.
 
+---
+
+### 2026-10-11: Antigravity v2.21 Permissions Engine & Hook Contract Alignment
+
+- **Canonical Permission Overrides Emission (`hooks/auto_approve_gate.py`):**
+  - Aligned `PreToolUse` hook output with Antigravity v2.21+ permissions engine by emitting canonical `permissionOverrides` arrays on `allow`, `ask`, and `force_ask` verdicts.
+  - Added first-class support for `deny_unless_prior_grant` decision semantics.
+- **Sandbox Privilege Elevation Segregation (`hooks/policy_engine.py`, `hooks/classifier.py`):**
+  - Sealed privilege escalation vector where commands requesting host elevation (`BypassSandbox: true`) could match static `command(...)` allow rules.
+  - Required explicit `unsandboxed(...)` rules to auto-allow host elevation, preserving global coverage for `deny` and `ask` rules on `command(...)`.
+  - Annotated `<proposed_tool_call>` with `Execution Environment: Host Elevation (BypassSandbox: true)` for transparent classifier evaluation.
+- **Pattern Matching Modernization (`hooks/policy_engine.py`):**
+  - Enforced literal token prefix matching. Commands containing shell expansion metacharacters (`$(...)`, backticks, `$((...))`, `<(...)`, `>(...)`, `{...,...}`) automatically disable prefix matching and require exact match.
+  - Added support for explicit `regex:` prefix for regular expressions.
+  - Modernized MCP suggestions and derivations to canonical slash notation (`mcp(server/tool)` and `mcp(server/*)`), retaining colon fallback.
+- **Plugin Manifest & Frontmatter (`plugin.json`, `rules/auto_permissions.md`):**
+  - Added `$schema: "https://antigravity.google/schemas/v1/plugin.json"` to `plugin.json`.
+  - Added `trigger: always_on` alongside `always_on: true` to rule frontmatter.
+
 
