@@ -1,26 +1,27 @@
 ---
-okf_version: "0.2"
-type: "benchmark"
-title: "Empirical Rule Scaling & Fast-Path Latency Analysis"
-description: "Empirical benchmark measuring static policy evaluation latency (in microseconds) across 10 to 5,000 rules."
-category: "benchmarks"
-status: "stable"
+okf_version: '0.2'
+type: benchmark
+title: Empirical Rule Scaling & Fast-Path Latency Analysis
+description: Empirical benchmark measuring static policy evaluation latency (in microseconds)
+  across 10 to 5,000 rules.
+category: benchmarks
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "microsecond-perf-benchmark"
+    agent: antigravity
+    method: microsecond-perf-benchmark
   verified:
-    tier: "empirical_benchmarks"
-    date: "2026-08-16"
+    tier: empirical_benchmarks
+    date: '2026-08-16'
 sources:
-  - "hooks/policy_engine.py"
-  - "scratch/benchmark_rules_latency.py"
-stale_after: "2027-08-16"
+- resource: hooks/policy_engine.py
+- resource: scratch/benchmark_rules_latency.py
+stale_after: '2027-08-16'
 tags:
-  - "benchmarks"
-  - "latency"
-  - "scaling"
-  - "performance"
+- benchmarks
+- latency
+- scaling
+- performance
 ---
 
 # Empirical Rule Scaling & Fast-Path Latency Analysis

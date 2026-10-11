@@ -1,26 +1,27 @@
 ---
-okf_version: "0.2"
-type: "architecture"
-title: "Permission Bundles Architecture & Scoped Directory Layout"
-description: "Specification for reusable permission bundles, DAG extends resolution, cycle detection, and scoped directory encapsulation."
-category: "architecture"
-status: "stable"
+okf_version: '0.2'
+type: architecture
+title: Permission Bundles Architecture & Scoped Directory Layout
+description: Specification for reusable permission bundles, DAG extends resolution,
+  cycle detection, and scoped directory encapsulation.
+category: architecture
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite_and_empirical_benchmarks"
-    date: "2026-08-16"
+    tier: test_suite_and_empirical_benchmarks
+    date: '2026-08-16'
 sources:
-  - "hooks/bundles/__init__.py"
-  - "hooks/policy_engine.py"
-stale_after: "2027-08-16"
+- resource: hooks/bundles/__init__.py
+- resource: hooks/policy_engine.py
+stale_after: '2027-08-16'
 tags:
-  - "bundles"
-  - "scoping"
-  - "dag"
-  - "directory-layout"
+- bundles
+- scoping
+- dag
+- directory-layout
 ---
 
 # Permission Bundles Architecture & Scoped Directory Layout

@@ -1,24 +1,25 @@
 ---
-okf_version: "0.2"
-type: "guide"
-title: "Auto-Permissions Configure Skill Guide"
-description: "Instructions and recipes for using the interactive configuration skill across Session, Project, and Global scopes."
-category: "skills"
-status: "stable"
+okf_version: '0.2'
+type: guide
+title: Auto-Permissions Configure Skill Guide
+description: Instructions and recipes for using the interactive configuration skill
+  across Session, Project, and Global scopes.
+category: skills
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "skills/auto-permissions-configure/SKILL.md"
-stale_after: "2027-08-16"
+- resource: skills/auto-permissions-configure/SKILL.md
+stale_after: '2027-08-16'
 tags:
-  - "skills"
-  - "configure"
-  - "recipes"
+- skills
+- configure
+- recipes
 ---
 
 # Auto-Permissions Configure Skill Guide

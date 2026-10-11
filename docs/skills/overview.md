@@ -1,27 +1,28 @@
 ---
-okf_version: "0.2"
-type: "reference"
-title: "Antigravity Skills Overview & Discovery"
-description: "Overview of bundled agent skills, skill whitelist permissions, and interactive workflows."
-category: "skills"
-status: "stable"
+okf_version: '0.2'
+type: reference
+title: Antigravity Skills Overview & Discovery
+description: Overview of bundled agent skills, skill whitelist permissions, and interactive
+  workflows.
+category: skills
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "skills/auto-permissions-configure/SKILL.md"
-  - "skills/auto-permissions-audit/SKILL.md"
-  - "skills/auto-permissions-fix/SKILL.md"
-  - "skills/auto-permissions-test/SKILL.md"
-stale_after: "2027-08-16"
+- resource: skills/auto-permissions-configure/SKILL.md
+- resource: skills/auto-permissions-audit/SKILL.md
+- resource: skills/auto-permissions-fix/SKILL.md
+- resource: skills/auto-permissions-test/SKILL.md
+stale_after: '2027-08-16'
 tags:
-  - "skills"
-  - "antigravity"
-  - "interactive"
+- skills
+- antigravity
+- interactive
 ---
 
 # Antigravity Skills Overview & Discovery

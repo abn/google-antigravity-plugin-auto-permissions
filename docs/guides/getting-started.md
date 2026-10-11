@@ -1,25 +1,26 @@
 ---
-okf_version: "0.2"
-type: "guide"
-title: "Getting Started with Auto-Permissions"
-description: "Quickstart guide for installing, configuring, and verifying the auto-permissions security gate in Google Antigravity."
-category: "guides"
-status: "stable"
+okf_version: '0.2'
+type: guide
+title: Getting Started with Auto-Permissions
+description: Quickstart guide for installing, configuring, and verifying the auto-permissions
+  security gate in Google Antigravity.
+category: guides
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "user-guide-synthesis"
+    agent: antigravity
+    method: user-guide-synthesis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "README.md"
-  - "hooks.json"
-stale_after: "2027-08-16"
+- resource: README.md
+- resource: hooks.json
+stale_after: '2027-08-16'
 tags:
-  - "quickstart"
-  - "guide"
-  - "installation"
+- quickstart
+- guide
+- installation
 ---
 
 # Getting Started with Auto-Permissions

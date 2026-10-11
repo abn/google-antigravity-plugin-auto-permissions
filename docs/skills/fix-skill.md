@@ -1,24 +1,25 @@
 ---
-okf_version: "0.2"
-type: "guide"
-title: "Auto-Permissions Fix Skill Guide"
-description: "Instructions for converting security gate denials into persistent scoped ACL rules."
-category: "skills"
-status: "stable"
+okf_version: '0.2'
+type: guide
+title: Auto-Permissions Fix Skill Guide
+description: Instructions for converting security gate denials into persistent scoped
+  ACL rules.
+category: skills
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "skills/auto-permissions-fix/SKILL.md"
-stale_after: "2027-08-16"
+- resource: skills/auto-permissions-fix/SKILL.md
+stale_after: '2027-08-16'
 tags:
-  - "skills"
-  - "remediation"
-  - "fix"
+- skills
+- remediation
+- fix
 ---
 
 # Auto-Permissions Fix Skill Guide

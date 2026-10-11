@@ -1,26 +1,27 @@
 ---
-okf_version: "0.2"
-type: "reference"
-title: "Model Context Protocol (MCP) Tool Governance"
-description: "Specification and rule patterns for governing Model Context Protocol (MCP) servers, tools, resources, and custom prefixes."
-category: "reference"
-status: "stable"
+okf_version: '0.2'
+type: reference
+title: Model Context Protocol (MCP) Tool Governance
+description: Specification and rule patterns for governing Model Context Protocol
+  (MCP) servers, tools, resources, and custom prefixes.
+category: reference
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "hooks/policy_engine.py"
-  - "hooks/bundles/mcp_nmem.json"
-stale_after: "2027-08-16"
+- resource: hooks/policy_engine.py
+- resource: hooks/bundles/mcp_nmem.json
+stale_after: '2027-08-16'
 tags:
-  - "reference"
-  - "mcp"
-  - "tools"
-  - "governance"
+- reference
+- mcp
+- tools
+- governance
 ---
 
 # Model Context Protocol (MCP) Tool Governance

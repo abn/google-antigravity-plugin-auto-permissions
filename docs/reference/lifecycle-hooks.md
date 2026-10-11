@@ -1,27 +1,28 @@
 ---
-okf_version: "0.2"
-type: "reference"
-title: "Lifecycle Hook Specifications & JSON Contracts"
-description: "Input and output JSON contracts for PreToolUse (auto_approve_gate.py) and PreInvocation (pre_invocation.py)."
-category: "reference"
-status: "stable"
+okf_version: '0.2'
+type: reference
+title: Lifecycle Hook Specifications & JSON Contracts
+description: Input and output JSON contracts for PreToolUse (auto_approve_gate.py)
+  and PreInvocation (pre_invocation.py).
+category: reference
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "hooks.json"
-  - "hooks/auto_approve_gate.py"
-  - "hooks/pre_invocation.py"
-stale_after: "2027-08-16"
+- resource: hooks.json
+- resource: hooks/auto_approve_gate.py
+- resource: hooks/pre_invocation.py
+stale_after: '2027-08-16'
 tags:
-  - "reference"
-  - "hooks"
-  - "pre-tool-use"
-  - "pre-invocation"
+- reference
+- hooks
+- pre-tool-use
+- pre-invocation
 ---
 
 # Lifecycle Hook Specifications & JSON Contracts

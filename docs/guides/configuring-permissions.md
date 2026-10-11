@@ -1,26 +1,27 @@
 ---
-okf_version: "0.2"
-type: "guide"
-title: "Configuring Policies & 5-Tier Scoping Hierarchy"
-description: "How to configure static ACL rules, semantic guidelines, timeout budgets, and model settings across Session, Project Local, Project, and Global scopes."
-category: "guides"
-status: "stable"
+okf_version: '0.2'
+type: guide
+title: Configuring Policies & 5-Tier Scoping Hierarchy
+description: How to configure static ACL rules, semantic guidelines, timeout budgets,
+  and model settings across Session, Project Local, Project, and Global scopes.
+category: guides
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "hooks/policy_engine.py"
-  - "skills/auto-permissions-configure/scripts/configure_permissions.py"
-stale_after: "2027-08-16"
+- resource: hooks/policy_engine.py
+- resource: skills/auto-permissions-configure/scripts/configure_permissions.py
+stale_after: '2027-08-16'
 tags:
-  - "configuration"
-  - "scoping"
-  - "rules"
-  - "policy"
+- configuration
+- scoping
+- rules
+- policy
 ---
 
 # Configuring Policies & 5-Tier Scoping Hierarchy

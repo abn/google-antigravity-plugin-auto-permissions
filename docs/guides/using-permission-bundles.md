@@ -1,26 +1,27 @@
 ---
-okf_version: "0.2"
-type: "guide"
-title: "Using & Authoring Permission Bundles"
-description: "How to discover, enable, disable, and author custom permission bundles with DAG inheritance."
-category: "guides"
-status: "stable"
+okf_version: '0.2'
+type: guide
+title: Using & Authoring Permission Bundles
+description: How to discover, enable, disable, and author custom permission bundles
+  with DAG inheritance.
+category: guides
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "hooks/bundles/__init__.py"
-  - "skills/auto-permissions-configure/scripts/configure_permissions.py"
-stale_after: "2027-08-16"
+- resource: hooks/bundles/__init__.py
+- resource: skills/auto-permissions-configure/scripts/configure_permissions.py
+stale_after: '2027-08-16'
 tags:
-  - "bundles"
-  - "guide"
-  - "acl"
-  - "dag"
+- bundles
+- guide
+- acl
+- dag
 ---
 
 # Using & Authoring Permission Bundles

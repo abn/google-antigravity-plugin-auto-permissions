@@ -1,27 +1,28 @@
 ---
-okf_version: "0.2"
-type: "guide"
-title: "Auto-Permissions Benchmark Skill Guide"
-description: "How to run a labeled accuracy + latency battery against any configured classifier provider/model to validate a model choice."
-category: "skills"
-status: "stable"
+okf_version: '0.2'
+type: guide
+title: Auto-Permissions Benchmark Skill Guide
+description: How to run a labeled accuracy + latency battery against any configured
+  classifier provider/model to validate a model choice.
+category: skills
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "skills/auto-permissions-benchmark/SKILL.md"
-  - "skills/auto-permissions-benchmark/scripts/benchmark_accuracy.py"
-stale_after: "2027-08-16"
+- resource: skills/auto-permissions-benchmark/SKILL.md
+- resource: skills/auto-permissions-benchmark/scripts/benchmark_accuracy.py
+stale_after: '2027-08-16'
 tags:
-  - "skills"
-  - "benchmark"
-  - "accuracy"
-  - "latency"
-  - "test"
+- skills
+- benchmark
+- accuracy
+- latency
+- test
 ---
 
 # Auto-Permissions Benchmark Skill Guide

@@ -1,0 +1,56 @@
+name: Publish wiki
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate the bundle
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27'
+
+      - name: Validate OKF v0.2
+        run: |
+          GOBIN="$RUNNER_TEMP/bin" GOTOOLCHAIN=auto \
+            go install github.com/okfcli/okf/cmd/okf@latest
+          "$RUNNER_TEMP/bin/okf" validate docs/
+
+  publish:
+    name: Render and deploy
+    needs: validate
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.deploy-url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: deploy
+        uses: abn/okf-wiki/action@v1
+        with:
+          content: docs
+          deploy: true
+          brand: auto-permissions
+          brand-sub: wiki
+          title: Auto-Permissions Wiki
+          sections: "architecture:Architecture,guides:Guides,skills:Skills,reference:Reference,benchmarks:Benchmarks"
+          nav-links: "GitHub=https://github.com/${{ github.repository }}"
