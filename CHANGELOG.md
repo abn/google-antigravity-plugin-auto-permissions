@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.12.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.11.0...auto-permissions-v0.12.0) (2026-10-11)
+
+
+### Features
+
+* **policy:** align permissions engine and hooks with Antigravity 2.21 ([#61](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/61)) ([ef9edb3](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/ef9edb394b7abde7859991742764c5347505744c))
+* **site:** move landing to site/ and serve wiki at /wiki with abn theme ([016f572](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/016f57249acc871cb3707ab61ce64b955529aca5))
+
+
+### Documentation
+
+* **wiki:** add preset interplay doc, okf v0.2, and pages deployment ([#63](https://github.com/abn/google-antigravity-plugin-auto-permissions/issues/63)) ([07153ba](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/07153ba004330053ec13059809b52de054b82bcd))
+* **wiki:** fix Mermaid diagram syntax across architecture and guides ([b077b8b](https://github.com/abn/google-antigravity-plugin-auto-permissions/commit/b077b8b69e91ad9a1469a9f0d15fb0d7f2072694))
+
 ## [0.11.0](https://github.com/abn/google-antigravity-plugin-auto-permissions/compare/auto-permissions-v0.10.0...auto-permissions-v0.11.0) (2026-09-15)
 
 
