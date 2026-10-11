@@ -150,7 +150,29 @@ Parses denials from `audit.jsonl` and generates persistent ACL grants across Ses
 
 ---
 
-### 4. `auto-permissions-test` (Policy & Classifier Simulation)
+### 4. Antigravity v2.21+ Permissions Engine Contract & Rule Syntax
+
+The plugin is fully aligned with Google Antigravity v2.21+ permissions architecture:
+
+* **Literal Token Prefix vs. Regex Matching:**
+  - Standard command rules use literal whitespace token prefix matching (e.g. `command(git status*)` matches `git status --short`).
+  - Regular expressions require an explicit `regex:` prefix (e.g. `command(regex:^npm run (build|test).*$)` or `write_file(regex:^src/.*\.py$)`).
+* **Shell Expansion & Redirection Metacharacter Guards:**
+  - If a command contains subshell expansions, process substitutions, brace expansions, or redirection/pipelines (`$(...)`, backticks, `$((...))`, `<(...)`, `>(...)`, `{...,...}`, `>`, `<`, `>>`, `|`), prefix matching is automatically disabled, requiring an exact character-for-character match to prevent command injection behind benign prefixes.
+* **Sandbox Privilege Elevation Isolation (`unsandboxed`):**
+  - Commands executed with `BypassSandbox: true` (host kernel isolation bypassed) will **never** match static `command(...)` allow rules.
+  - To auto-allow an unsandboxed command, an explicit `unsandboxed(...)` rule is required (e.g. `unsandboxed(git push*)`). Static `deny` and `ask` rules on `command(...)` continue to protect both sandboxed and host-elevated executions uniformly.
+* **Canonical Slash MCP Notation:**
+  - Antigravity v2.21+ canonical slash notation `mcp(server/tool)` and `mcp(server/*)` is preferred, with full backward compatibility for legacy colon notation (`mcp:server:tool`).
+* **Selective `permissionOverrides` Emission:**
+  - In alignment with the Antigravity lifecycle hook contract, `permissionOverrides` are emitted on `allow` only when granting access outside standard workspace boundaries or host elevation (`BypassSandbox: true`). Routine workspace operations (e.g. internal file writes, `pytest`) do not emit overrides, avoiding pollution of session permission tables.
+  - `permissionOverrides` are always emitted on `ask`, `force_ask`, and `deny_unless_prior_grant` to render prompt cards.
+* **Static `deny_unless_prior_grant` Support:**
+  - Policy files (`.agents/auto-permissions.json`, session overrides, and global configs) support a `"deny_unless_prior_grant": [...]` section to restrict sensitive tools unless approved in a prior grant during the session.
+
+---
+
+### 5. `auto-permissions-test` (Policy & Classifier Simulation)
 Simulates how the security classifier and static policies would evaluate a hypothetical tool call against a given user prompt before executing it, rendering collapsible input/output traces.
 
 * **Test a command against a user prompt (Markdown output with collapsible folds):**

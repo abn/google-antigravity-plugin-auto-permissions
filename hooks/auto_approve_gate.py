@@ -9,6 +9,7 @@ and outputs authorization decision JSON on stdout.
 import json
 import os
 import sys
+from typing import Any
 
 # Ensure local hooks package is in path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -18,31 +19,112 @@ if parent_dir not in sys.path:
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
-from audit_logger import (  # noqa: E402
-    log_audit_event_async,
-    resolve_session_log_path,
-    resolve_session_root_dir,
-)
-from classifier import classify_tool_call  # noqa: E402
-from policy_engine import (  # noqa: E402
-    check_intra_turn_cache,
-    check_intra_turn_circuit_breaker,
-    check_same_turn_file_grant,
-    evaluate_static_policies,
-    evaluate_workspace_write_fast_path,
-    is_safe_read_only_command,
-    is_ungoverned_surface,
-    load_custom_guidelines,
-    resolve_classifier_config,
-)
-from transcript_parser import (  # noqa: E402
-    get_last_user_step_index,
-    read_user_prompts_from_transcript,
-    sanitize_user_prompt,
-)
+try:
+    from audit_logger import (  # noqa: E402
+        log_audit_event_async,
+        resolve_session_log_path,
+        resolve_session_root_dir,
+    )
+    from classifier import classify_tool_call  # noqa: E402
+    from policy_engine import (  # noqa: E402
+        check_intra_turn_cache,
+        check_intra_turn_circuit_breaker,
+        check_same_turn_file_grant,
+        derive_canonical_permission_resources,
+        evaluate_static_policies,
+        evaluate_workspace_write_fast_path,
+        is_safe_read_only_command,
+        is_ungoverned_surface,
+        load_custom_guidelines,
+        resolve_classifier_config,
+    )
+    from transcript_parser import (  # noqa: E402
+        get_last_user_step_index,
+        read_user_prompts_from_transcript,
+        sanitize_user_prompt,
+    )
+
+    _MODULE_IMPORT_ERROR: Exception | None = None
+except Exception as _import_exc:  # pragma: no cover
+    _MODULE_IMPORT_ERROR = _import_exc
+
+
+def is_operation_external_or_elevation(
+    tool_name: str,
+    tool_args: dict[str, Any],
+    workspace_paths: list[str] | None,
+) -> bool:
+    """Returns True if the tool operation accesses external scopes or requests host elevation."""
+    if tool_name == "run_command":
+        return bool(tool_args.get("BypassSandbox") is True)
+
+    if tool_name in (
+        "write_to_file",
+        "replace_file_content",
+        "multi_replace_file_content",
+        "view_file",
+        "list_dir",
+    ):
+        path = str(
+            tool_args.get("TargetFile")
+            or tool_args.get("target_file")
+            or tool_args.get("AbsolutePath")
+            or tool_args.get("path")
+            or ""
+        ).strip()
+        if not path:
+            return False
+        norm = os.path.normpath(os.path.expanduser(path))
+        if workspace_paths:
+            for ws in workspace_paths:
+                norm_ws = os.path.normpath(os.path.expanduser(ws))
+                if norm == norm_ws or norm.startswith(norm_ws + os.sep):
+                    return False
+            return True
+        return False
+
+    if tool_name == "read_url_content":
+        return True
+
+    return bool(
+        tool_name in ("call_mcp_tool", "read_resource", "list_resources")
+        or tool_name.startswith("mcp_")
+    )
+
+
+def make_hook_output(
+    decision: str,
+    reason: str,
+    tool_name: str,
+    tool_args: dict[str, Any],
+    is_external_or_elevation: bool = False,
+) -> dict[str, Any]:
+    """Builds standard Antigravity PreToolUse hook output with canonical permissionOverrides.
+
+    Only emits permissionOverrides on 'allow' when granting external directory access
+    or host elevation (BypassSandbox: true). Always emits on 'ask', 'force_ask',
+    and 'deny_unless_prior_grant'.
+    """
+    output: dict[str, Any] = {"decision": decision, "reason": reason}
+    if decision in ("ask", "force_ask", "deny_unless_prior_grant") or (
+        decision == "allow" and is_external_or_elevation
+    ):
+        overrides = derive_canonical_permission_resources(tool_name, tool_args)
+        if overrides:
+            output["permissionOverrides"] = [overrides[0]]
+    return output
 
 
 def main():
+    if _MODULE_IMPORT_ERROR is not None:
+        output = {
+            "decision": "ask",
+            "reason": f"Auto-permissions gate module load error: {_MODULE_IMPORT_ERROR}",
+        }
+        print(json.dumps(output))
+        sys.stdout.flush()
+        return
+
     try:
         raw_stdin = sys.stdin.read()
         if not raw_stdin or not raw_stdin.strip():
@@ -134,7 +216,10 @@ def main():
 
         if static_verdict:
             decision, reason, scope = static_verdict
-            hook_output = {"decision": decision, "reason": reason}
+            is_ext = is_operation_external_or_elevation(tool_name, tool_args, workspace_paths)
+            hook_output = make_hook_output(
+                decision, reason, tool_name, tool_args, is_external_or_elevation=is_ext
+            )
             classification = {
                 "decision": decision,
                 "reason": reason,
@@ -175,10 +260,9 @@ def main():
             workspace_paths=workspace_paths,
         ):
             ungoverned_reason = f"Tool '{tool_name}' is fast-path approved (surface not opted in)."
-            hook_output = {
-                "decision": "allow",
-                "reason": ungoverned_reason,
-            }
+            hook_output = make_hook_output(
+                "allow", ungoverned_reason, tool_name, tool_args, is_external_or_elevation=False
+            )
             classification = {
                 "decision": "allow",
                 "reason": ungoverned_reason,
@@ -226,10 +310,9 @@ def main():
                     )
                     risk_cat = "safe_read_command"
 
-                hook_output = {
-                    "decision": "allow",
-                    "reason": safe_read_reason,
-                }
+                hook_output = make_hook_output(
+                    "allow", safe_read_reason, tool_name, tool_args, is_external_or_elevation=False
+                )
                 classification = {
                     "decision": "allow",
                     "reason": safe_read_reason,
@@ -270,10 +353,14 @@ def main():
         )
         if cached_verdict:
             cached_decision, cached_reason = cached_verdict
-            hook_output = {
-                "decision": cached_decision,
-                "reason": cached_reason,
-            }
+            is_ext = is_operation_external_or_elevation(tool_name, tool_args, workspace_paths)
+            hook_output = make_hook_output(
+                cached_decision,
+                cached_reason,
+                tool_name,
+                tool_args,
+                is_external_or_elevation=is_ext,
+            )
             classification = {
                 "decision": cached_decision,
                 "reason": cached_reason,
@@ -314,10 +401,9 @@ def main():
         )
         if file_grant:
             grant_decision, grant_reason = file_grant
-            hook_output = {
-                "decision": grant_decision,
-                "reason": grant_reason,
-            }
+            hook_output = make_hook_output(
+                grant_decision, grant_reason, tool_name, tool_args, is_external_or_elevation=False
+            )
             classification = {
                 "decision": grant_decision,
                 "reason": grant_reason,
@@ -358,10 +444,9 @@ def main():
         )
         if write_fast_path:
             write_decision, write_reason, write_scope = write_fast_path
-            hook_output = {
-                "decision": write_decision,
-                "reason": write_reason,
-            }
+            hook_output = make_hook_output(
+                write_decision, write_reason, tool_name, tool_args, is_external_or_elevation=False
+            )
             classification = {
                 "decision": write_decision,
                 "reason": write_reason,
@@ -441,10 +526,9 @@ def main():
         )
         if circuit_breaker:
             cb_decision, cb_reason, cb_failed_step, cb_err = circuit_breaker
-            hook_output = {
-                "decision": cb_decision,
-                "reason": cb_reason,
-            }
+            hook_output = make_hook_output(
+                cb_decision, cb_reason, tool_name, tool_args, is_external_or_elevation=True
+            )
             classification = {
                 "decision": cb_decision,
                 "reason": cb_reason,
@@ -519,11 +603,17 @@ def main():
         elif decision_category == "force_ask":
             hook_decision = "force_ask"
             hook_reason = reason_text
+        elif decision_category == "deny_unless_prior_grant":
+            hook_decision = "deny_unless_prior_grant"
+            hook_reason = reason_text
         else:
             hook_decision = "ask"
             hook_reason = reason_text
 
-        hook_output = {"decision": hook_decision, "reason": hook_reason}
+        is_ext = is_operation_external_or_elevation(tool_name, tool_args, workspace_paths)
+        hook_output = make_hook_output(
+            hook_decision, hook_reason, tool_name, tool_args, is_external_or_elevation=is_ext
+        )
 
         # 12. Asynchronously write rotatable audit record to session directory
         context_summary = {

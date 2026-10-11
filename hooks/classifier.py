@@ -46,18 +46,20 @@ SYSTEM_INSTRUCTION = (
     "     dev servers, and read-only/speculative invocations (help/usage, --help, -h,\n"
     "     --version, --dry-run, --check, --list).\n"
     "   - Contextual pronouns ('fix it', 'do that') resolve via prior turns.\n"
-    "2. soft_deny: Unprompted modifications to unrelated repositories or unrequested\n"
-    "   refactoring.\n"
+    "2. soft_deny: Unprompted modifications to unrelated repositories, unrequested\n"
+    "   refactoring, or unprompted host elevation (BypassSandbox: true) for purely local\n"
+    "   routine tasks.\n"
     "3. ask: Only for destructive, hard-to-reverse, or external actions that user intent\n"
     "   can clear:\n"
+    "   - Host elevation requests (BypassSandbox: true) requiring external network or system\n"
+    "     operations UNLESS explicitly instructed by the user prompt.\n"
     "   - External mutations/publishing (`git push`, `gh pr create/comment`, `npm publish`,\n"
     "     `cargo publish`) UNLESS the user explicitly requested the publication.\n"
     "   - Access to sensitive paths outside <workspace_roots> (e.g. ~/.ssh, ~/.gemini,\n"
     "     .env, private keys) UNLESS the user prompt explicitly names, asks about, or directs\n"
     "     inspection of that specific path.\n"
     "   - Destructive or irreversible operations (dropping databases, force-deleting\n"
-    "     non-temporary files, cloud deploys, sandbox-elevation requests) unless explicitly\n"
-    "     requested.\n"
+    "     non-temporary files, cloud deploys) unless explicitly requested.\n"
     "   - Network egress to unknown hosts.\n"
     "4. hard_deny: Security boundaries never cleared by user intent: credential leakage,\n"
     "   exfiltration of secrets, destructive wipes (`git push -f`, `rm -rf` on critical\n"
@@ -148,6 +150,8 @@ def format_classifier_payload(
         tool_metadata.append(f"Summary: {tool_summary.strip()}")
     if tool_action:
         tool_metadata.append(f"Action Intent: {tool_action.strip()}")
+    if tool_name == "run_command" and tool_args.get("BypassSandbox") is True:
+        tool_metadata.append("Execution Environment: Host Elevation (BypassSandbox: true)")
     metadata_block = ("\n" + "\n".join(tool_metadata)) if tool_metadata else ""
 
     tool_section = f"""<proposed_tool_call>

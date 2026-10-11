@@ -1,6 +1,7 @@
 ---
 name: auto-permissions
 description: Auto-permissions security gate rules and operational guidelines for autonomous tool execution.
+trigger: always_on
 always_on: true
 ---
 

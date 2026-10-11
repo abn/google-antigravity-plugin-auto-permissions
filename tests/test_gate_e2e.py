@@ -24,6 +24,7 @@ class TestGateE2E(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
+            # Routine in-workspace commands do NOT emit permissionOverrides on allow
             input_payload = {
                 "toolCall": {"name": "run_command", "args": {"CommandLine": "pytest"}},
                 "stepIdx": 1,
@@ -42,6 +43,7 @@ class TestGateE2E(unittest.TestCase):
                 res = json.loads(output_text)
                 self.assertEqual(res["decision"], "allow")
                 self.assertEqual(res["reason"], "Authorized test command")
+                self.assertNotIn("permissionOverrides", res)
 
             # Check audit log written
             audit_log_path = os.path.join(tmpdir, "auto-permissions", "audit.jsonl")
@@ -50,6 +52,112 @@ class TestGateE2E(unittest.TestCase):
                 audit_records = [json.loads(line) for line in f if line.strip()]
                 self.assertEqual(len(audit_records), 1)
                 self.assertEqual(audit_records[0]["hook_output"]["decision"], "allow")
+
+    @patch("hooks.auto_approve_gate.classify_tool_call")
+    def test_gate_e2e_allow_elevation_overrides(self, mock_classify):
+        mock_classify.return_value = (
+            "<raw_prompt>",
+            {
+                "decision": "allow",
+                "reason": "Authorized host elevation",
+                "risk_category": "safe_routine",
+            },
+            None,
+            45.2,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Commands requesting BypassSandbox: true DO emit permissionOverrides on allow
+            input_payload = {
+                "toolCall": {
+                    "name": "run_command",
+                    "args": {"CommandLine": "git push origin main", "BypassSandbox": True},
+                },
+                "stepIdx": 2,
+                "conversationId": "test-e2e-elevation",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+            }
+
+            stdin_data = json.dumps(input_payload)
+            with (
+                patch("sys.stdin", io.StringIO(stdin_data)),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout,
+            ):
+                gate.main()
+                output_text = mock_stdout.getvalue().strip()
+                res = json.loads(output_text)
+                self.assertEqual(res["decision"], "allow")
+                self.assertEqual(
+                    res.get("permissionOverrides"), ["unsandboxed(git push origin main)"]
+                )
+
+    @patch("hooks.auto_approve_gate.classify_tool_call")
+    def test_gate_e2e_ask_permission_overrides(self, mock_classify):
+        mock_classify.return_value = (
+            "<raw_prompt>",
+            {
+                "decision": "ask",
+                "reason": "Requires confirmation for test execution.",
+                "risk_category": "safe_routine",
+            },
+            None,
+            40.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_payload = {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "npm test"}},
+                "stepIdx": 4,
+                "conversationId": "test-e2e-ask-overrides",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+            }
+
+            stdin_data = json.dumps(input_payload)
+            with (
+                patch("sys.stdin", io.StringIO(stdin_data)),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout,
+            ):
+                gate.main()
+                output_text = mock_stdout.getvalue().strip()
+                res = json.loads(output_text)
+                self.assertEqual(res["decision"], "ask")
+                self.assertEqual(res.get("permissionOverrides"), ["command(npm test)"])
+
+    def test_gate_e2e_deny_unless_prior_grant(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg = {"deny_unless_prior_grant": ["command(curl https://api.internal)"]}
+            agents_dir = os.path.join(tmpdir, ".agents", "auto-permissions")
+            os.makedirs(agents_dir, exist_ok=True)
+            cfg_file = os.path.join(agents_dir, "config.json")
+            with open(cfg_file, "w") as f:
+                json.dump(cfg, f)
+
+            input_payload = {
+                "toolCall": {
+                    "name": "run_command",
+                    "args": {"CommandLine": "curl https://api.internal"},
+                },
+                "stepIdx": 5,
+                "conversationId": "test-e2e-prior-grant",
+                "workspacePaths": [tmpdir],
+                "artifactDirectoryPath": tmpdir,
+            }
+
+            stdin_data = json.dumps(input_payload)
+            with (
+                patch("sys.stdin", io.StringIO(stdin_data)),
+                patch("sys.stdout", new=io.StringIO()) as mock_stdout,
+            ):
+                gate.main()
+                output_text = mock_stdout.getvalue().strip()
+                res = json.loads(output_text)
+                self.assertEqual(res["decision"], "deny_unless_prior_grant")
+                self.assertIn("unless previously granted", res["reason"])
+                self.assertEqual(
+                    res.get("permissionOverrides"), ["command(curl https://api.internal)"]
+                )
 
     @patch("hooks.auto_approve_gate.classify_tool_call")
     def test_gate_e2e_soft_deny(self, mock_classify):
@@ -643,6 +751,19 @@ class TestGateE2E(unittest.TestCase):
                 res3 = json.loads(mock_stdout3.getvalue().strip())
                 self.assertEqual(res3["decision"], "allow")
                 mock_classify.assert_called_once()
+
+    def test_gate_e2e_module_import_error_fail_closed(self):
+        """Verify top-level module import failures fail closed to 'ask' cleanly with exit 0."""
+        with (
+            patch.object(gate, "_MODULE_IMPORT_ERROR", SyntaxError("invalid syntax on line 180")),
+            patch("sys.stdin", io.StringIO(json.dumps({"toolCall": {"name": "run_command"}}))),
+            patch("sys.stdout", new=io.StringIO()) as mock_stdout,
+        ):
+            gate.main()
+            output = json.loads(mock_stdout.getvalue().strip())
+            self.assertEqual(output["decision"], "ask")
+            self.assertIn("Auto-permissions gate module load error", output["reason"])
+            self.assertIn("invalid syntax on line 180", output["reason"])
 
 
 if __name__ == "__main__":

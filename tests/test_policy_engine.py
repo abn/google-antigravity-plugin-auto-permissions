@@ -12,6 +12,7 @@ from hooks.policy_engine import (
     check_intra_turn_cache,
     check_intra_turn_circuit_breaker,
     check_same_turn_file_grant,
+    derive_canonical_permission_resources,
     evaluate_static_policies,
     evaluate_workspace_write_fast_path,
     is_path_in_workspaces,
@@ -53,6 +54,64 @@ class TestPolicyEngine(unittest.TestCase):
         self.assertEqual(parse_resource_rule("read_url(github.com)"), ("read_url", "github.com"))
         self.assertIsNone(parse_resource_rule("invalid_syntax"))
 
+    def test_derive_canonical_permission_resources(self):
+        # Sandboxed command
+        self.assertEqual(
+            derive_canonical_permission_resources("run_command", {"CommandLine": "npm run build"}),
+            ["command(npm run build)", "command(npm run)", "command(npm)"],
+        )
+        # Unsandboxed command
+        self.assertEqual(
+            derive_canonical_permission_resources(
+                "run_command", {"CommandLine": "git push origin main", "BypassSandbox": True}
+            ),
+            ["unsandboxed(git push origin main)", "unsandboxed(git push)", "unsandboxed(git)"],
+        )
+        # File write
+        self.assertEqual(
+            derive_canonical_permission_resources("write_to_file", {"TargetFile": "src/app.py"}),
+            ["write_file(src/app.py)", "write_file(src/)"],
+        )
+        # File read
+        self.assertEqual(
+            derive_canonical_permission_resources(
+                "view_file", {"AbsolutePath": "/var/log/app.log"}
+            ),
+            ["read_file(/var/log/app.log)", "read_file(/var/log/)"],
+        )
+        # URL read
+        self.assertEqual(
+            derive_canonical_permission_resources(
+                "read_url_content", {"Url": "https://docs.google.com/view"}
+            ),
+            ["read_url(docs.google.com)"],
+        )
+        # MCP tool call (canonical slash notation)
+        self.assertEqual(
+            derive_canonical_permission_resources(
+                "call_mcp_tool", {"ServerName": "db", "ToolName": "query"}
+            ),
+            ["mcp(db/query)", "mcp(db/*)"],
+        )
+        # Native MCP tool prefix
+        self.assertEqual(
+            derive_canonical_permission_resources("mcp_sqlite_query", {}),
+            ["mcp(sqlite/query)", "mcp(sqlite/*)"],
+        )
+        # Commands with shell expansion / redirection metacharacters suppress prefix grants
+        self.assertEqual(
+            derive_canonical_permission_resources(
+                "run_command", {"CommandLine": "git log $(whoami)"}
+            ),
+            ["command(git log $(whoami))"],
+        )
+        self.assertEqual(
+            derive_canonical_permission_resources(
+                "run_command", {"CommandLine": "git status > /tmp/out"}
+            ),
+            ["command(git status > /tmp/out)"],
+        )
+
     def test_match_command(self):
         self.assertTrue(match_command("uv lock", "uv lock"))
         self.assertTrue(match_command("uv lock", "uv lock --upgrade"))
@@ -76,12 +135,45 @@ class TestPolicyEngine(unittest.TestCase):
         # Invalid regex fails gracefully
         self.assertFalse(match_command("regex:[unclosed", "anything"))
 
+        # regex: prefix matching
+        self.assertTrue(match_command("regex:npm run (build.*)", "npm run build"))
+        self.assertTrue(match_command("regex:npm run (build.*)", "npm run build-prod"))
+        self.assertFalse(match_command("regex:npm run (build.*)", "npm run test"))
+        self.assertTrue(match_command("regex:git .*", "git status"))
+        self.assertTrue(match_command("regex:curl .*", "curl https://example.com"))
+        self.assertFalse(match_command("regex:curl .*", "wget https://example.com"))
+        self.assertFalse(match_command("regex:git status|git log", "echo pwned && git log"))
+        self.assertTrue(match_command("regex:git status|git log", "git log"))
+        self.assertFalse(match_command("regex:", "anything"))
+        self.assertFalse(match_command("regex:   ", "anything"))
+        self.assertFalse(match_command("regex:[unclosed", "anything"))
+
+        # Subshell and redirection metacharacters disable prefix matching, requiring exact match
+        self.assertTrue(match_command("git status", "git status"))
+        self.assertFalse(match_command("git", "git log $(whoami)"))
+        self.assertFalse(match_command("git", "git log `whoami`"))
+        self.assertFalse(match_command("git", "git log $((1+1))"))
+        self.assertFalse(match_command("git", "git checkout {master,dev}"))
+        self.assertFalse(match_command("git", "git diff <(echo safe)"))
+        self.assertFalse(match_command("git", "git status > /tmp/out"))
+        self.assertFalse(match_command("git", "git status >> /tmp/out"))
+        self.assertFalse(match_command("git", "git status < /tmp/in"))
+        self.assertFalse(match_command("git", "git status | grep modified"))
+        self.assertTrue(match_command("git log $(whoami)", "git log $(whoami)"))
+        self.assertTrue(match_command("git status > /tmp/out", "git status > /tmp/out"))
+
     def test_match_path(self):
         self.assertTrue(match_path("src/", "src/module/app.py"))
         self.assertTrue(match_path("/tmp/test.txt", "/tmp/test.txt"))
         self.assertTrue(match_path("tests/.*", "tests/test_auth.py"))
         self.assertTrue(match_path("*", "/any/path"))
         self.assertFalse(match_path("src/", "docs/readme.md"))
+
+        # regex: prefix matching
+        self.assertTrue(match_path("regex:^src/.*\\.py$", "src/module/app.py"))
+        self.assertFalse(match_path("regex:^src/.*\\.py$", "docs/readme.md"))
+        self.assertFalse(match_path("regex:", "src/app.py"))
+        self.assertFalse(match_path("regex:[unclosed", "src/app.py"))
 
     def test_match_url(self):
         self.assertTrue(match_url("github.com", "https://api.github.com/repos"))
@@ -196,6 +288,59 @@ class TestPolicyEngine(unittest.TestCase):
                 "mcp(nowledge-mem:memory_search)",
                 "call_mcp_tool",
                 {"ServerName": "nowledge-mem", "ToolName": "memory_delete"},
+            )
+        )
+
+        # Strict BypassSandbox isolation
+        self.assertTrue(
+            match_tool_against_rule(
+                "command(pytest)", "run_command", {"CommandLine": "pytest", "BypassSandbox": False}
+            )
+        )
+        self.assertFalse(
+            match_tool_against_rule(
+                "command(pytest)",
+                "run_command",
+                {"CommandLine": "pytest", "BypassSandbox": True},
+                mode="allow",
+            )
+        )
+        self.assertTrue(
+            match_tool_against_rule(
+                "unsandboxed(pytest)",
+                "run_command",
+                {"CommandLine": "pytest", "BypassSandbox": True},
+                mode="allow",
+            )
+        )
+        self.assertTrue(
+            match_tool_against_rule(
+                "command(rm -rf)",
+                "run_command",
+                {"CommandLine": "rm -rf /tmp/test", "BypassSandbox": True},
+                mode="deny",
+            )
+        )
+        # Canonical slash syntax for MCP
+        self.assertTrue(
+            match_tool_against_rule(
+                "mcp(server/tool)",
+                "call_mcp_tool",
+                {"ServerName": "server", "ToolName": "tool"},
+            )
+        )
+        self.assertTrue(
+            match_tool_against_rule(
+                "mcp(server/*)",
+                "call_mcp_tool",
+                {"ServerName": "server", "ToolName": "other"},
+            )
+        )
+        self.assertTrue(
+            match_tool_against_rule(
+                "mcp(server/tool)",
+                "mcp_server_tool",
+                {},
             )
         )
 
@@ -1189,6 +1334,23 @@ class TestPolicyEngine(unittest.TestCase):
                     log_path=log_path, last_user_step_idx=10, provider="anthropic"
                 )
             )
+
+    def test_static_policy_deny_unless_prior_grant(self):
+        with tempfile.TemporaryDirectory() as td:
+            cfg = {"deny_unless_prior_grant": ["command(git push*)"]}
+            agents_dir = os.path.join(td, ".agents", "auto-permissions")
+            os.makedirs(agents_dir, exist_ok=True)
+            cfg_file = os.path.join(agents_dir, "config.json")
+            with open(cfg_file, "w") as f:
+                json.dump(cfg, f)
+
+            verdict = evaluate_static_policies(
+                "run_command", {"CommandLine": "git push origin main"}, workspace_paths=[td]
+            )
+            self.assertIsNotNone(verdict)
+            self.assertEqual(verdict[0], "deny_unless_prior_grant")
+            self.assertIn("unless previously granted", verdict[1])
+            self.assertEqual(verdict[2], "project")
 
 
 if __name__ == "__main__":
