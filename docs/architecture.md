@@ -39,17 +39,17 @@ The safety classifier runs as an isolated, independent decision gate. It observe
 
 ```mermaid
 flowchart LR
-    subgraph Agent Loop [Vulnerable Agent Execution Context]
-        Agent[Autonomous Agent]
-        CoT[Chain-of-Thought]
-        ToolOut[Raw Tool Output / Web / Files]
+    subgraph AgentLoop ["Vulnerable Agent Execution Context"]
+        Agent["Autonomous Agent"]
+        CoT["Chain-of-Thought"]
+        ToolOut["Raw Tool Output / Web / Files"]
     end
 
-    subgraph Security Gate [Isolated Security Perimeter]
-        UserIntent[Clean User Intent]
-        ToolReq[Proposed Tool Call]
-        Classifier[Security Classifier (Antigravity LS / Gemini)]
-        Decision[Authorization Verdict]
+    subgraph SecurityGate ["Isolated Security Perimeter"]
+        UserIntent["Clean User Intent"]
+        ToolReq["Proposed Tool Call"]
+        Classifier["Security Classifier (Antigravity LS / Gemini)"]
+        Decision["Authorization Verdict"]
     end
 
     Agent -->|Proposes Action| ToolReq

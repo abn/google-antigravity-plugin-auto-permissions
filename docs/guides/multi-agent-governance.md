@@ -32,18 +32,18 @@ Modern agentic coding workflows often spawn specialized subagents (e.g. `researc
 
 ```mermaid
 graph TD
-    ParentAgent[Parent Agent] --> SubagentCall{invoke_subagent / define_subagent}
-    SubagentCall --> SurfaceCheck{governed_surfaces.subagents?}
-    SurfaceCheck -- false (Default Fast-Path) --> FastAllow[🟢 ALLOW (~0.05ms)<br/>Subagent spawns freely]
-    SurfaceCheck -- true (Opt-In Security Gate) --> Classify[LLM Security Classifier / Static ACL]
-    Classify -- In Scope --> SubagentSpawn[Spawn Subagent Process]
-    Classify -- Prohibited / Escalated --> Block[🔴 DENY / 🟡 ASK]
+    ParentAgent["Parent Agent"] --> SubagentCall{"invoke_subagent / define_subagent"}
+    SubagentCall --> SurfaceCheck{"governed_surfaces.subagents?"}
+    SurfaceCheck -- "false (Default Fast-Path)" --> FastAllow["🟢 ALLOW (~0.05ms)<br/>Subagent spawns freely"]
+    SurfaceCheck -- "true (Opt-In Security Gate)" --> Classify["LLM Security Classifier / Static ACL"]
+    Classify -- In Scope --> SubagentSpawn["Spawn Subagent Process"]
+    Classify -- Prohibited / Escalated --> Block["🔴 DENY / 🟡 ASK"]
 
-    SubagentSpawn --> SubagentExecution[Subagent Executes Tool Calls]
-    SubagentExecution --> SubagentGate[PreToolUse Gate for Subagent Actions]
-    SubagentGate --> WorkspaceContainment{Confined to Workspace Roots?}
-    WorkspaceContainment -- Yes --> StaticCascade[Evaluate Static ACL & Bundles]
-    WorkspaceContainment -- No --> HardBlock[🔴 HARD_DENY: Boundary Escape]
+    SubagentSpawn --> SubagentExecution["Subagent Executes Tool Calls"]
+    SubagentExecution --> SubagentGate["PreToolUse Gate for Subagent Actions"]
+    SubagentGate --> WorkspaceContainment{"Confined to Workspace Roots?"}
+    WorkspaceContainment -- Yes --> StaticCascade["Evaluate Static ACL & Bundles"]
+    WorkspaceContainment -- No --> HardBlock["🔴 HARD_DENY: Boundary Escape"]
 ```
 
 ---

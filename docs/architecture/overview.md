@@ -31,41 +31,41 @@ The `auto-permissions` plugin introduces a dual-layer security authorization arc
 
 ```mermaid
 flowchart TD
-    A[Tool Call Invocations] --> B[Fast-Path Static Evaluation Engine]
+    A["Tool Call Invocations"] --> B["Fast-Path Static Evaluation Engine"]
     
     subgraph FastPath ["Fast-Path Static Cascade (~0.1ms)"]
-        B --> C{Intra-Turn Cache?}
-        C -- Hit --> Z1[Return Cached Verdict]
-        C -- Miss --> D{Ungoverned Tool Surface?}
-        D -- Yes --> Z2[Return Allow]
-        D -- No --> E{Safe Read-Only Command / Artifact?}
-        E -- Yes --> Z3[Return Allow]
-        E -- No --> F{Workspace Write Fast-Path?}
-        F -- Yes --> Z4[Return Allow]
-        F -- No --> G{Explicit Static Scope Rules?}
-        G -- Match --> Z5[Return Allow / Deny / Ask]
-        G -- No Match --> H{Active Permission Bundles?}
-        H -- Match --> Z6[Return Allow / Deny / Ask with Provenance]
+        B --> C{"Intra-Turn Cache?"}
+        C -- Hit --> Z1["Return Cached Verdict"]
+        C -- Miss --> D{"Ungoverned Tool Surface?"}
+        D -- Yes --> Z2["Return Allow"]
+        D -- No --> E{"Safe Read-Only Command / Artifact?"}
+        E -- Yes --> Z3["Return Allow"]
+        E -- No --> F{"Workspace Write Fast-Path?"}
+        F -- Yes --> Z4["Return Allow"]
+        F -- No --> G{"Explicit Static Scope Rules?"}
+        G -- Match --> Z5["Return Allow / Deny / Ask"]
+        G -- No Match --> H{"Active Permission Bundles?"}
+        H -- Match --> Z6["Return Allow / Deny / Ask with Provenance"]
     end
     
-    H -- No Match --> I[LLM Security Classifier Fallback (~1.4s)]
+    H -- No Match --> I["LLM Security Classifier Fallback (~1.4s)"]
     
     subgraph ClassifierPath ["LLM Classifier Fallback (~1.4s)"]
-        I --> J[Parse Sanitized Prompt History]
-        J --> K[Compile Layered XML Payload]
-        K --> L[REST API Call: Gemini / OpenAI / Anthropic]
-        L --> M[JSON Schema Verdict & Reason Extraction]
-        M --> N[Intra-Turn Cache Update]
+        I --> J["Parse Sanitized Prompt History"]
+        J --> K["Compile Layered XML Payload"]
+        K --> L["REST API Call: Gemini / OpenAI / Anthropic"]
+        L --> M["JSON Schema Verdict & Reason Extraction"]
+        M --> N["Intra-Turn Cache Update"]
     end
     
-    N --> O[Asynchronous Non-Blocking Audit Logger]
+    N --> O["Asynchronous Non-Blocking Audit Logger"]
     Z1 --> O
     Z2 --> O
     Z3 --> O
     Z4 --> O
     Z5 --> O
     Z6 --> O
-    O --> P[PreToolUse Exit Decision Output]
+    O --> P["PreToolUse Exit Decision Output"]
 ```
 
 ---

@@ -3,7 +3,8 @@
 ## 2026-10-11
 * **Creation**: Added docs/architecture/preset-and-sandbox-interplay.md documenting permission presets, sandboxing boundaries, bidirectional policy transformation, and the complete execution truth table across presets.
 * **Update**: Conformed docs bundle to OKF v0.2 frontmatter schemas, sources syntax, and taxonomy.
-* **Update**: Added GitHub Actions workflow (.github/workflows/pages.yml) using abn/okf-wiki/action@v1 for GitHub Pages publishing.
+* **Update**: Added GitHub Actions workflow (.github/workflows/pages.yml) using abn/okf-wiki/action@main for GitHub Pages publishing.
+* **Update**: Fixed Mermaid node and subgraph syntax across documentation diagrams to ensure strict parsing.
 * **Update**: Aligned PreToolUse hook output with Antigravity v2.21+ permissions engine by emitting canonical permissionOverrides arrays and supporting deny_unless_prior_grant semantics.
 * **Update**: Segregated sandbox privilege elevation in policy engine, requiring explicit unsandboxed rules for BypassSandbox: true commands.
 * **Update**: Modernized command pattern matching with literal token prefixes, shell expansion safeguards, regex: prefix, and canonical slash MCP notation.
