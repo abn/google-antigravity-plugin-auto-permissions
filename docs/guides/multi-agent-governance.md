@@ -1,26 +1,27 @@
 ---
-okf_version: "0.2"
-type: "guide"
-title: "Multi-Agent Permission Governance & Subagent Scoping"
-description: "How auto-permissions handles subagent delegation, governed surfaces toggles, and workspace boundary confinement across multi-agent workflows."
-category: "guides"
-status: "stable"
+okf_version: '0.2'
+type: guide
+title: Multi-Agent Permission Governance & Subagent Scoping
+description: How auto-permissions handles subagent delegation, governed surfaces toggles,
+  and workspace boundary confinement across multi-agent workflows.
+category: guides
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "hooks/policy_engine.py"
-  - "rules/auto_permissions.md"
-stale_after: "2027-08-16"
+- resource: hooks/policy_engine.py
+- resource: rules/auto_permissions.md
+stale_after: '2027-08-16'
 tags:
-  - "guides"
-  - "multi-agent"
-  - "subagents"
-  - "governance"
+- guides
+- multi-agent
+- subagents
+- governance
 ---
 
 # Multi-Agent Permission Governance & Subagent Scoping

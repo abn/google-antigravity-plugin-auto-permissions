@@ -1,3 +1,18 @@
+---
+okf_version: "0.2"
+type: architecture
+title: "Auto-Permissions Comprehensive Architecture & System Design"
+description: "Comprehensive technical architecture, security principles, data flow, and design specifications for the auto-permissions plugin in Google Antigravity 2.0."
+category: architecture
+status: stable
+stale_after: 2027-10-11
+tags:
+  - architecture
+  - security-model
+  - fast-path
+  - classifier
+---
+
 # Architecture & Technical Design: Auto-Permissions Security Moderator Plugin
 
 This document specifies the technical architecture, security principles, data flow, and design decisions for the `auto-permissions` plugin in Google Antigravity 2.0.
@@ -498,8 +513,8 @@ flowchart LR
 
 ## 12. References & Related Documents
 
-* **[README.md](../README.md):** Quickstart guide, installation instructions, and basic configuration recipes.
-* **[AGENTS.md](../AGENTS.md):** Operational guidelines and safety invariants for autonomous agents working in this repository.
-* **[hooks.json](../hooks.json):** Lifecycle hook declarations for Google Antigravity 2.0.
+* **`README.md`:** Quickstart guide, installation instructions, and basic configuration recipes.
+* **`AGENTS.md`:** Operational guidelines and safety invariants for autonomous agents working in this repository.
+* **`hooks.json`:** Lifecycle hook declarations for Google Antigravity 2.0.
 
 

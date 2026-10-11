@@ -1,26 +1,27 @@
 ---
-okf_version: "0.2"
-type: "guide"
-title: "Auto-Permissions Test Skill & Simulation Guide"
-description: "How to simulate and dry-run classifier evaluations against candidate tool calls and custom user prompts."
-category: "skills"
-status: "stable"
+okf_version: '0.2'
+type: guide
+title: Auto-Permissions Test Skill & Simulation Guide
+description: How to simulate and dry-run classifier evaluations against candidate
+  tool calls and custom user prompts.
+category: skills
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "skills/auto-permissions-test/SKILL.md"
-  - "skills/auto-permissions-test/scripts/test_permission.py"
-stale_after: "2027-08-16"
+- resource: skills/auto-permissions-test/SKILL.md
+- resource: skills/auto-permissions-test/scripts/test_permission.py
+stale_after: '2027-08-16'
 tags:
-  - "skills"
-  - "simulation"
-  - "test"
-  - "dry-run"
+- skills
+- simulation
+- test
+- dry-run
 ---
 
 # Auto-Permissions Test Skill & Simulation Guide

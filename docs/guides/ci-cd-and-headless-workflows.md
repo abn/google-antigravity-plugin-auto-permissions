@@ -1,27 +1,28 @@
 ---
-okf_version: "0.2"
-type: "guide"
-title: "CI/CD & Headless Autonomous Workflows"
-description: "Best practices for running headless non-interactive Antigravity agents in continuous integration pipelines without blocking on permission prompts."
-category: "guides"
-status: "stable"
+okf_version: '0.2'
+type: guide
+title: CI/CD & Headless Autonomous Workflows
+description: Best practices for running headless non-interactive Antigravity agents
+  in continuous integration pipelines without blocking on permission prompts.
+category: guides
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "operational-best-practices"
+    agent: antigravity
+    method: operational-best-practices
   verified:
-    tier: "ci_pipeline_tests"
-    date: "2026-08-16"
+    tier: ci_pipeline_tests
+    date: '2026-08-16'
 sources:
-  - "hooks/policy_engine.py"
-  - "hooks/bundles/__init__.py"
-stale_after: "2027-08-16"
+- resource: hooks/policy_engine.py
+- resource: hooks/bundles/__init__.py
+stale_after: '2027-08-16'
 tags:
-  - "guides"
-  - "ci-cd"
-  - "headless"
-  - "automation"
-  - "github-actions"
+- guides
+- ci-cd
+- headless
+- automation
+- github-actions
 ---
 
 # CI/CD & Headless Autonomous Workflows

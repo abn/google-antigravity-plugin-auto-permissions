@@ -1,26 +1,27 @@
 ---
-okf_version: "0.2"
-type: "benchmark"
-title: "KV-Cache Retention & Token Economics"
-description: "Empirical evaluation of prefix caching hit rates, Time-to-First-Token (TTFT) acceleration, and cost reduction across multi-turn sessions."
-category: "benchmarks"
-status: "stable"
+okf_version: '0.2'
+type: benchmark
+title: KV-Cache Retention & Token Economics
+description: Empirical evaluation of prefix caching hit rates, Time-to-First-Token
+  (TTFT) acceleration, and cost reduction across multi-turn sessions.
+category: benchmarks
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "empirical-cache-benchmarking"
+    agent: antigravity
+    method: empirical-cache-benchmarking
   verified:
-    tier: "empirical_benchmarks"
-    date: "2026-08-16"
+    tier: empirical_benchmarks
+    date: '2026-08-16'
 sources:
-  - "hooks/classifier.py"
-  - "hooks/transcript_parser.py"
-stale_after: "2027-08-16"
+- resource: hooks/classifier.py
+- resource: hooks/transcript_parser.py
+stale_after: '2027-08-16'
 tags:
-  - "benchmarks"
-  - "kv-cache"
-  - "tokens"
-  - "ttft"
+- benchmarks
+- kv-cache
+- tokens
+- ttft
 ---
 
 # KV-Cache Retention & Token Economics

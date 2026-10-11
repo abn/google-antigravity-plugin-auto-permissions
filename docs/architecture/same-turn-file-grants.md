@@ -1,26 +1,27 @@
 ---
-okf_version: "0.2"
-type: "architecture"
-title: "Same-Turn File Grants & Scratch Acceleration"
-description: "How the static policy engine tracks newly written files in the active turn and grants immediate execution without classifier roundtrips."
-category: "architecture"
-status: "stable"
+okf_version: '0.2'
+type: architecture
+title: Same-Turn File Grants & Scratch Acceleration
+description: How the static policy engine tracks newly written files in the active
+  turn and grants immediate execution without classifier roundtrips.
+category: architecture
+status: stable
 trust:
   generated:
-    agent: "antigravity"
-    method: "code-analysis"
+    agent: antigravity
+    method: code-analysis
   verified:
-    tier: "test_suite"
-    date: "2026-08-16"
+    tier: test_suite
+    date: '2026-08-16'
 sources:
-  - "hooks/policy_engine.py"
-  - "hooks/auto_approve_gate.py"
-stale_after: "2027-08-16"
+- resource: hooks/policy_engine.py
+- resource: hooks/auto_approve_gate.py
+stale_after: '2027-08-16'
 tags:
-  - "architecture"
-  - "fast-path"
-  - "same-turn-grants"
-  - "scratch"
+- architecture
+- fast-path
+- same-turn-grants
+- scratch
 ---
 
 # Same-Turn File Grants & Scratch Acceleration

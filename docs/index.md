@@ -1,28 +1,5 @@
 ---
 okf_version: "0.2"
-type: "index"
-title: "Google Antigravity Auto-Permissions Knowledge Base"
-description: "Root entrypoint, concept graph, and navigation index for the Auto-Permissions autonomous security authorization plugin."
-category: "index"
-status: "stable"
-trust:
-  generated:
-    agent: "antigravity"
-    method: "project-knowledge-synthesis"
-  verified:
-    tier: "test_suite_and_empirical_benchmarks"
-    date: "2026-08-16"
-sources:
-  - "README.md"
-  - "AGENTS.md"
-  - "hooks/auto_approve_gate.py"
-  - "hooks/policy_engine.py"
-stale_after: "2027-08-16"
-tags:
-  - "antigravity"
-  - "security"
-  - "auto-permissions"
-  - "okf-wiki"
 ---
 
 # Google Antigravity Auto-Permissions Knowledge Base
@@ -52,6 +29,7 @@ Deep technical specifications on security boundaries, fail-closed contracts, and
 - [`architecture/overview.md`](architecture/overview.md) — Multi-tier cascade, sub-millisecond fast-path, and runtime lifecycle hooks.
 - [`architecture/security-model.md`](architecture/security-model.md) — Threat model, decoupled classifier payload, and injection defense.
 - [`architecture/sandbox-and-os-isolation.md`](architecture/sandbox-and-os-isolation.md) — OS sandboxing (Landlock, Bubblewrap) vs. intent classification, and bypass elevation detection.
+- [`architecture/preset-and-sandbox-interplay.md`](architecture/preset-and-sandbox-interplay.md) — Permission presets (`Default`, `Request Review`, `Turbo`), sandboxing boundaries, and classifier decision flow.
 - [`architecture/kv-cache-optimization.md`](architecture/kv-cache-optimization.md) — Prefix invariance, chronological layering, and prompt caching.
 - [`architecture/same-turn-file-grants.md`](architecture/same-turn-file-grants.md) — Intra-turn acceleration and immediate execution grants for newly authored files.
 - [`architecture/permission-bundles.md`](architecture/permission-bundles.md) — Bundle DAG inheritance (`extends`), scoping, and dual-resolution layout.
